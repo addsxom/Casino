@@ -2,7 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const { sleep } = require('../../utils');
 
-const SLOT_CHANNEL_ID = 'REMPLACE_PAR_ID_DU_SALON';
+const SLOT_CHANNEL_ID = '1546311653564620897';
 
 const SLOT_GIF = 'https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif';
 const WIN_GIF = 'https://media.giphy.com/media/Vu5UbNpjpqfMq2UFg0/giphy.gif';
