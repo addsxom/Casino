@@ -837,20 +837,31 @@ module.exports = {
       'collect',
       async interaction => {
         if (
-          interaction.user.id !==
-          message.author.id
-        ) {
-          return interaction.reply({
-            content:
-              '❌・Cette partie ne vous appartient pas.',
-            ephemeral: true
-          });
-        }
-
-        if (
           interaction.customId !==
           'crash_cashout'
         ) {
+          return;
+        }
+
+        // On envoie l'ACK à Discord dès l'arrivée du clic.
+        // La requête part avant les calculs, le stop du collector
+        // et la génération du Canvas final.
+        const ackPromise =
+          interaction.deferUpdate().catch(
+            error => {
+              console.error(
+                'Crash cashout ACK error:',
+                error
+              );
+              return null;
+            }
+          );
+
+        if (
+          interaction.user.id !==
+          message.author.id
+        ) {
+          await ackPromise;
           return;
         }
 
@@ -858,15 +869,11 @@ module.exports = {
           game.ended ||
           game.cashoutLocked
         ) {
-          return interaction.reply({
-            content:
-              '💥・Cette partie est déjà terminée.',
-            ephemeral: true
-          }).catch(() => {});
+          await ackPromise;
+          return;
         }
 
-        // SECTION CRITIQUE CASH OUT :
-        // aucun await avant que le résultat soit complètement figé.
+        // Verrouillage synchrone immédiat.
         game.cashoutLocked = true;
 
         const lockedMultiplier =
@@ -887,12 +894,12 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // On accuse réception du clic IMMÉDIATEMENT.
-        // Cela évite DiscordAPIError[10062] / "didn't respond in time".
-        await interaction.deferUpdate();
+        // On attend seulement maintenant la confirmation Discord.
+        const acknowledged =
+          await ackPromise;
 
-        // Ensuite seulement on modifie le message.
-        // Le jeu est déjà complètement figé côté logique.
+        // Même si Discord refuse exceptionnellement l'ACK,
+        // la partie reste figée et le paiement est conservé.
         await gameMessage.edit(
           buildInstantResultPayload(
             message,
@@ -900,7 +907,6 @@ module.exports = {
           )
         ).catch(() => {});
 
-        // Puis on génère et affiche le graphique de résumé final.
         await gameMessage.edit(
           buildResultPayload(
             message,
