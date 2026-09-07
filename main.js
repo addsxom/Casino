@@ -48,4 +48,21 @@ bot.color = "#6B6DE6",
 loadCommands(bot);
 loadEvents(bot);
 
-bot.login(process.env.TOKEN);
+async function loginBot() {
+    try {
+        await bot.login(process.env.TOKEN);
+    } catch (error) {
+        console.error(
+            'Discord login error:',
+            error?.code || error?.message || error
+        );
+
+        // Timeout réseau / Cloudflare temporaire :
+        // on réessaie sans faire tomber le process.
+        setTimeout(() => {
+            loginBot().catch(() => {});
+        }, 5000);
+    }
+}
+
+loginBot().catch(() => {});
