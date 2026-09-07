@@ -5,36 +5,10 @@ const {
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
-  EmbedBuilder,
-  AttachmentBuilder
+  EmbedBuilder
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
-
-let canvasModule = null;
-
-function getCreateCanvas() {
-  if (!canvasModule) {
-    canvasModule = require('@napi-rs/canvas');
-  }
-
-  return canvasModule.createCanvas;
-}
-
-function testCanvasRenderer() {
-  const createCanvas = getCreateCanvas();
-  const canvas = createCanvas(2, 2);
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, 2, 2);
-
-  const buffer = canvas.toBuffer('image/png');
-
-  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
-    throw new Error('Canvas n\'a pas généré de PNG valide.');
-  }
-}
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -65,166 +39,49 @@ function getNextMultiplier(current, tickCount) {
   return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
-function buildCrashCanvas(game) {
-  const width = 900;
-  const height = 420;
-  const createCanvas = getCreateCanvas();
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
+function buildLiveGraph(history) {
+  const width = 28;
+  const height = 7;
+  const values = history.slice(-width);
 
-  const playing = game.status === 'playing';
-  const lost = game.status === 'lost';
-  const cashed = game.status === 'cashed';
+  if (!values.length) values.push(1);
 
-  const accent = lost
-    ? '#ef476f'
-    : cashed
-      ? '#46d18c'
-      : '#8b8df8';
+  const min = 1;
+  const max = Math.max(...values, 1.15);
+  const range = Math.max(0.15, max - min);
 
-  ctx.fillStyle = '#0f1118';
-  ctx.fillRect(0, 0, width, height);
+  const grid = Array.from(
+    { length: height },
+    () => Array(width).fill(' ')
+  );
 
-  const left = 56;
-  const right = width - 36;
-  const top = 36;
-  const bottom = height - 52;
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-
-  for (let i = 0; i <= 5; i++) {
-    const y = top + ((bottom - top) * i) / 5;
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
-    ctx.stroke();
-  }
-
-  for (let i = 0; i <= 8; i++) {
-    const x = left + ((right - left) * i) / 8;
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
-    ctx.stroke();
-  }
-
-  const values = game.history.slice(-60);
-  const maxValue = Math.max(1.2, ...values) * 1.08;
-  const range = Math.max(0.2, maxValue - 1);
-
-  const points = values.map((value, index) => {
+  values.forEach((value, index) => {
     const x = values.length <= 1
-      ? left
-      : left + ((right - left) * index) / (values.length - 1);
+      ? 0
+      : Math.round(
+          (index / (values.length - 1)) * (width - 1)
+        );
 
     const normalized = Math.max(
       0,
-      Math.min(1, (value - 1) / range)
+      Math.min(1, (value - min) / range)
     );
 
-    const y = bottom - normalized * (bottom - top);
+    const y =
+      height - 1 -
+      Math.round(normalized * (height - 1));
 
-    return { x, y };
+    for (let row = y; row < height; row++) {
+      grid[row][x] = row === y ? '▓' : '░';
+    }
   });
 
-  if (points.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-
-    for (let i = 1; i < points.length - 1; i++) {
-      const current = points[i];
-      const next = points[i + 1];
-
-      const cx = (current.x + next.x) / 2;
-      const cy = (current.y + next.y) / 2;
-
-      ctx.quadraticCurveTo(
-        current.x,
-        current.y,
-        cx,
-        cy
-      );
-    }
-
-    const last = points[points.length - 1];
-    ctx.lineTo(last.x, last.y);
-
-    ctx.strokeStyle = accent;
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 16;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-
-    const gradient = ctx.createLinearGradient(
-      0,
-      top,
-      0,
-      bottom
-    );
-
-    gradient.addColorStop(
-      0,
-      lost
-        ? 'rgba(239,71,111,0.30)'
-        : cashed
-          ? 'rgba(70,209,140,0.26)'
-          : 'rgba(139,141,248,0.28)'
-    );
-    gradient.addColorStop(1, 'rgba(15,17,24,0)');
-
-    ctx.lineTo(last.x, bottom);
-    ctx.lineTo(points[0].x, bottom);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-  }
-
-  if (points.length) {
-    const last = points[points.length - 1];
-
-    ctx.beginPath();
-    ctx.arc(last.x, last.y, 8, 0, Math.PI * 2);
-    ctx.fillStyle = accent;
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 18;
-    ctx.fill();
-    ctx.shadowBlur = 0;
-  }
-
-  const displayedMultiplier = lost
-    ? game.crashPoint
-    : cashed
-      ? game.cashoutMultiplier
-      : game.multiplier;
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 46px Arial';
-  ctx.fillText(
-    `x${displayedMultiplier.toFixed(2)}`,
-    left,
-    62
-  );
-
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '500 18px Arial';
-
-  const label = playing
-    ? `+${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)}%`
-    : lost
-      ? 'CRASH'
-      : 'CASH OUT';
-
-  ctx.fillText(label, left, 92);
-
-  return canvas.toBuffer('image/png');
+  return grid
+    .map(row => row.join(''))
+    .join('\n');
 }
 
-function buildCrashEmbed(message, game, imageName) {
+function buildCrashEmbed(message, game) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
 
@@ -234,22 +91,24 @@ function buildCrashEmbed(message, game, imageName) {
       ? game.cashoutMultiplier
       : game.multiplier;
 
-  let description = '';
+  let description =
+    `# x${displayedMultiplier.toFixed(2)}\n` +
+    `\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n`;
 
   if (playing) {
-    description =
-      `**${formatCoins(game.amount)} coins🪙** → **${formatCoins(game.amount * game.multiplier)} coins🪙**`;
+    description +=
+      `**${formatCoins(game.amount)} coins🪙** → **${formatCoins(game.amount * game.multiplier)} coins🪙**\n` +
+      `+${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)} %`;
   } else if (lost) {
-    description =
+    description +=
       `💥 **Perdu : ${formatCoins(game.amount)} coins🪙**`;
   } else {
-    description =
+    description +=
       `✅ **+${formatCoins(game.payout)} coins🪙** à **x${displayedMultiplier.toFixed(2)}**`;
   }
 
   return new EmbedBuilder()
     .setDescription(description)
-    .setImage(`attachment://${imageName}`)
     .setColor(
       lost
         ? 0xef476f
@@ -278,25 +137,10 @@ function buildCrashRow(game) {
   ];
 }
 
-function buildCrashPayload(message, game, frame = 0) {
-  const imageName = `crash-${message.id}-${frame}.png`;
-
+function buildCrashPayload(message, game) {
   return {
-    embeds: [
-      buildCrashEmbed(
-        message,
-        game,
-        imageName
-      )
-    ],
-    components: buildCrashRow(game),
-    files: [
-      new AttachmentBuilder(
-        buildCrashCanvas(game),
-        { name: imageName }
-      )
-    ],
-    attachments: []
+    embeds: [buildCrashEmbed(message, game)],
+    components: buildCrashRow(game)
   };
 }
 
@@ -308,17 +152,6 @@ module.exports = {
     const guildId = message.guild.id;
     const amount = Number(args[0]);
 
-    try {
-      testCanvasRenderer();
-    } catch (error) {
-      console.error('Crash Canvas error:', error);
-
-      return message.reply(
-        '❌・Le moteur Canvas du Crash ne fonctionne pas. ' +
-        'Fais **npm install** puis redémarre le bot.\n' +
-        `-# ${error.message}`
-      );
-    }
 
     if (!Number.isInteger(amount) || amount <= 0) {
       return message.reply(
@@ -353,9 +186,8 @@ module.exports = {
       history: [1]
     };
 
-    let frame = 0;
     const gameMessage = await message.reply(
-      buildCrashPayload(message, game, frame++)
+      buildCrashPayload(message, game)
     );
 
     let tickRunning = false;
@@ -373,7 +205,7 @@ module.exports = {
       clearInterval(timer);
       collector.stop('crashed');
 
-      await gameMessage.edit(buildCrashPayload(message, game, frame++)).catch(() => {});
+      await gameMessage.edit(buildCrashPayload(message, game)).catch(() => {});
     };
 
     const timer = setInterval(async () => {
@@ -402,7 +234,7 @@ module.exports = {
         if (game.ended) return;
 
         await gameMessage.edit(
-          buildCrashPayload(message, game, frame++)
+          buildCrashPayload(message, game)
         );
 
         // Si un Cash Out est arrivé pendant cet edit,
@@ -412,7 +244,7 @@ module.exports = {
           version !== game.renderVersion
         ) {
           await gameMessage.edit(
-            buildCrashPayload(message, game, frame++)
+            buildCrashPayload(message, game)
           ).catch(() => {});
           return;
         }
@@ -453,7 +285,7 @@ module.exports = {
       // Un seul aller-retour Discord : le bouton disparaît immédiatement
       // et l'UI affiche le résultat avant la sauvegarde Mongo.
       await interaction.update(
-        buildCrashPayload(message, game, frame++)
+        buildCrashPayload(message, game)
       );
 
       // Un tick Discord pouvait déjà être en vol au moment du clic.
@@ -470,7 +302,7 @@ module.exports = {
         });
 
         await gameMessage.edit(
-          buildCrashPayload(message, game, frame++)
+          buildCrashPayload(message, game)
         ).catch(() => {});
       }
 
