@@ -887,17 +887,20 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // On fige VISUELLEMENT tout de suite :
-        // GIF retiré + bouton supprimé avant de générer le Canvas final.
-        await interaction.update(
+        // On accuse réception du clic IMMÉDIATEMENT.
+        // Cela évite DiscordAPIError[10062] / "didn't respond in time".
+        await interaction.deferUpdate();
+
+        // Ensuite seulement on modifie le message.
+        // Le jeu est déjà complètement figé côté logique.
+        await gameMessage.edit(
           buildInstantResultPayload(
             message,
             game
           )
-        );
+        ).catch(() => {});
 
-        // Le graphique de résumé est généré ensuite,
-        // sans laisser le GIF continuer pendant ce temps.
+        // Puis on génère et affiche le graphique de résumé final.
         await gameMessage.edit(
           buildResultPayload(
             message,
