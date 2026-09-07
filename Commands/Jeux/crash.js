@@ -9,11 +9,7 @@ const {
 const UserCoins = require('../../Models/UserCoins.js');
 
 let canvasModule = null;
-let gifEncoderModule = null;
-let crashAnimationCache = null;
-let crashAnimationFramesCache = null;
-const ANIMATION_FPS = 3;
-const ANIMATION_FRAME_MS = 1000 / ANIMATION_FPS;
+const LIVE_UPDATE_MS = 700;
 
 function getCreateCanvas() {
   if (!canvasModule) {
@@ -21,14 +17,6 @@ function getCreateCanvas() {
   }
 
   return canvasModule.createCanvas;
-}
-
-function getGifEncoder() {
-  if (!gifEncoderModule) {
-    gifEncoderModule = require('gif-encoder-2');
-  }
-
-  return gifEncoderModule;
 }
 
 const HOUSE_EDGE = 0.03;
@@ -81,90 +69,61 @@ function buildRoundTimeline() {
   return values;
 }
 
-function buildAnimationFrames(timeline) {
-  const framesPerSecond = ANIMATION_FPS;
-  const frames = [];
-
-  for (let i = 0; i < timeline.length - 1; i++) {
-    const from = timeline[i];
-    const to = timeline[i + 1];
-
-    for (let step = 0; step < framesPerSecond; step++) {
-      const t = step / framesPerSecond;
-      const eased = t * t * (3 - 2 * t);
-
-      frames.push(
-        from + (to - from) * eased
-      );
-    }
-  }
-
-  frames.push(timeline[timeline.length - 1]);
-
-  return {
-    frames,
-    framesPerSecond
-  };
-}
-
-function getAnimationFrames() {
-  if (crashAnimationFramesCache) {
-    return crashAnimationFramesCache;
-  }
-
-  const timeline = buildRoundTimeline();
-  crashAnimationFramesCache =
-    buildAnimationFrames(timeline).frames;
-
-  return crashAnimationFramesCache;
-}
-
 function getVisualMultiplierAt(
   startedAt,
   timestamp = Date.now()
 ) {
-  const frames = getAnimationFrames();
-
+  const timeline = buildRoundTimeline();
   const elapsed = Math.max(
     0,
     timestamp - startedAt
   );
 
-  const frameIndex = Math.min(
-    frames.length - 1,
-    Math.floor(
-      elapsed / ANIMATION_FRAME_MS
-    )
+  const segmentIndex = Math.min(
+    timeline.length - 2,
+    Math.floor(elapsed / TICK_MS)
   );
 
+  if (elapsed >= (timeline.length - 1) * TICK_MS) {
+    return timeline[timeline.length - 1];
+  }
+
+  const localT =
+    (elapsed % TICK_MS) / TICK_MS;
+
+  const eased =
+    localT * localT * (3 - 2 * localT);
+
+  const from = timeline[segmentIndex];
+  const to = timeline[segmentIndex + 1];
+
   return Number(
-    frames[frameIndex].toFixed(2)
+    (from + (to - from) * eased).toFixed(2)
   );
 }
 
-function drawCrashFrame(
-  ctx,
-  width,
-  height,
-  allFrames,
-  frameIndex
-) {
-  const multiplier = allFrames[frameIndex];
-  const accent = '#8b8df8';
+function buildLiveCanvas(game) {
+  const createCanvas = getCreateCanvas();
+  const width = 620;
+  const height = 260;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
 
   ctx.fillStyle = '#0f1118';
   ctx.fillRect(0, 0, width, height);
 
-  const left = 48;
+  const left = 36;
   const right = width - 28;
-  const top = 30;
-  const bottom = height - 42;
+  const top = 34;
+  const bottom = height - 30;
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
 
   for (let i = 0; i <= 4; i++) {
-    const y = top + ((bottom - top) * i) / 4;
+    const y =
+      top +
+      ((bottom - top) * i) / 4;
 
     ctx.beginPath();
     ctx.moveTo(left, y);
@@ -173,7 +132,9 @@ function drawCrashFrame(
   }
 
   for (let i = 0; i <= 7; i++) {
-    const x = left + ((right - left) * i) / 7;
+    const x =
+      left +
+      ((right - left) * i) / 7;
 
     ctx.beginPath();
     ctx.moveTo(x, top);
@@ -181,137 +142,78 @@ function drawCrashFrame(
     ctx.stroke();
   }
 
-  const scaleStartIndex = Math.max(
-    0,
-    frameIndex - 41
-  );
+  const values = game.history.length
+    ? game.history
+    : [1];
 
-  const currentMax = Math.max(
+  const maxValue = Math.max(
     1.15,
-    ...allFrames.slice(
-      scaleStartIndex,
-      frameIndex + 1
-    )
+    ...values
   );
-
-  // Echelle dynamique : la courbe reste lisible dès x1.05
-  // au lieu d'être écrasée par une échelle fixe jusqu'à x100.
-  const maxGraphMultiplier =
-    1 + (currentMax - 1) * 1.18;
 
   const range = Math.max(
     0.15,
-    maxGraphMultiplier - 1
+    (maxValue - 1) * 1.18
   );
 
-  const progressPoints = [];
+  const maxVisiblePoints = 30;
+  const visibleValues =
+    values.slice(-maxVisiblePoints);
 
-  // La courbe naît à gauche et progresse vers la droite.
-  // Une fois la largeur remplie, on conserve les points les plus récents.
-  const maxVisiblePoints = 42;
-  const startIndex = Math.max(
-    0,
-    frameIndex - maxVisiblePoints + 1
-  );
-
-  const visibleCount =
-    frameIndex - startIndex + 1;
-
-  for (
-    let i = startIndex;
-    i <= frameIndex;
-    i++
-  ) {
-    const localIndex =
-      i - startIndex;
-
-    const x = visibleCount <= 1
-      ? left
-      : left +
-        ((right - left) * localIndex) /
+  const points = visibleValues.map(
+    (value, index) => {
+      const x =
+        left +
+        ((right - left) * index) /
           Math.max(
             maxVisiblePoints - 1,
-            visibleCount - 1
+            visibleValues.length - 1,
+            1
           );
 
-    const normalized = Math.max(
-      0,
-      Math.min(
-        1,
-        (allFrames[i] - 1) / range
-      )
-    );
+      const normalized = Math.max(
+        0,
+        Math.min(
+          1,
+          (value - 1) / range
+        )
+      );
 
-    const y =
-      bottom -
-      normalized * (bottom - top);
+      const y =
+        bottom -
+        normalized * (bottom - top);
 
-    progressPoints.push({ x, y });
-  }
-  if (progressPoints.length > 1) {
+      return { x, y };
+    }
+  );
+
+  if (points.length > 1) {
     ctx.beginPath();
     ctx.moveTo(
-      progressPoints[0].x,
-      progressPoints[0].y
+      points[0].x,
+      points[0].y
     );
 
-    for (
-      let i = 1;
-      i < progressPoints.length - 1;
-      i++
-    ) {
-      const current = progressPoints[i];
-      const next = progressPoints[i + 1];
-
-      ctx.quadraticCurveTo(
-        current.x,
-        current.y,
-        (current.x + next.x) / 2,
-        (current.y + next.y) / 2
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(
+        points[i].x,
+        points[i].y
       );
     }
 
-    const last =
-      progressPoints[progressPoints.length - 1];
-
-    ctx.lineTo(last.x, last.y);
-
-    ctx.strokeStyle = accent;
+    ctx.strokeStyle = '#8b8df8';
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 14;
+    ctx.shadowColor = '#8b8df8';
+    ctx.shadowBlur = 12;
     ctx.stroke();
     ctx.shadowBlur = 0;
-
-    const gradient = ctx.createLinearGradient(
-      0,
-      top,
-      0,
-      bottom
-    );
-
-    gradient.addColorStop(
-      0,
-      'rgba(139,141,248,0.24)'
-    );
-    gradient.addColorStop(
-      1,
-      'rgba(15,17,24,0)'
-    );
-
-    ctx.lineTo(last.x, bottom);
-    ctx.lineTo(progressPoints[0].x, bottom);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
   }
 
-  if (progressPoints.length) {
-    const last =
-      progressPoints[progressPoints.length - 1];
+  const last = points[points.length - 1];
 
+  if (last) {
     ctx.beginPath();
     ctx.arc(
       last.x,
@@ -320,85 +222,19 @@ function drawCrashFrame(
       0,
       Math.PI * 2
     );
-    ctx.fillStyle = accent;
-    ctx.shadowColor = accent;
-    ctx.shadowBlur = 18;
+    ctx.fillStyle = '#8b8df8';
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '700 42px Arial';
+  ctx.font = '700 38px Arial';
   ctx.fillText(
-    `x${multiplier.toFixed(2)}`,
+    `x${game.multiplier.toFixed(2)}`,
     left,
-    58
+    55
   );
 
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '600 17px Arial';
-
-  ctx.fillText(
-    `+${Math.max(
-      0,
-      (multiplier - 1) * 100
-    ).toFixed(1)}%`,
-    left,
-    86
-  );
-
-  // Le Canvas live reste volontairement minimal :
-  // uniquement la courbe, le multiplicateur et le pourcentage.
-}
-
-function buildCrashAnimation() {
-  if (crashAnimationCache) {
-    return crashAnimationCache;
-  }
-
-  const createCanvas = getCreateCanvas();
-  const GIFEncoder = getGifEncoder();
-
-  const width = 500;
-  const height = 220;
-
-  const frames = getAnimationFrames();
-  const framesPerSecond = ANIMATION_FPS;
-
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-
-  const encoder = new GIFEncoder(
-    width,
-    height,
-    'neuquant',
-    true,
-    frames.length
-  );
-
-  encoder.start();
-  encoder.setDelay(
-    Math.round(1000 / framesPerSecond)
-  );
-  encoder.setQuality(30);
-
-  for (let i = 0; i < frames.length; i++) {
-    drawCrashFrame(
-      ctx,
-      width,
-      height,
-      frames,
-      i
-    );
-
-    encoder.addFrame(ctx);
-  }
-
-  encoder.finish();
-
-  crashAnimationCache = encoder.out.getData();
-
-  return crashAnimationCache;
+  return canvas.toBuffer('image/png');
 }
 
 function buildResultCanvas(game) {
@@ -604,7 +440,7 @@ function buildGameEmbed(message, game, showAnimation = true) {
     });
 
   if (showAnimation) {
-    embed.setImage('attachment://crash-animation.gif');
+    embed.setImage('attachment://crash-live.png');
   }
 
   return embed;
@@ -654,14 +490,40 @@ function buildInitialCrashPayload(
     ),
     files: [
       new AttachmentBuilder(
-        buildCrashAnimation(),
+        buildLiveCanvas(game),
         {
-          name: 'crash-animation.gif'
+          name: 'crash-live.png'
         }
       )
     ]
   };
 }
+
+function buildLiveCrashPayload(
+  message,
+  game
+) {
+  return {
+    embeds: [
+      buildGameEmbed(
+        message,
+        game,
+        true
+      )
+    ],
+    components: buildCrashRow(game),
+    files: [
+      new AttachmentBuilder(
+        buildLiveCanvas(game),
+        {
+          name: 'crash-live.png'
+        }
+      )
+    ],
+    attachments: []
+  };
+}
+
 function buildInstantResultPayload(
   message,
   game
@@ -711,10 +573,6 @@ module.exports = {
   name: 'crash',
   description:
     'Misez des coins et cash out avant le crash.',
-
-  prepareAnimation() {
-    buildCrashAnimation();
-  },
 
   async execute(message, args) {
     const guildId = message.guild.id;
@@ -773,7 +631,7 @@ module.exports = {
         )
       );
 
-      // Référence temporelle commune au GIF et à la logique du jeu.
+      // Référence temporelle commune au Canvas live et à la logique du jeu.
       game.startedAt = Date.now();
     } catch (error) {
       console.error(
@@ -813,7 +671,7 @@ module.exports = {
       clearInterval(timer);
       collector.stop('crashed');
 
-      // Une seule modification à la fin : on retire le GIF
+      // Une seule modification à la fin : on retire le Canvas live
       // et on affiche clairement la perte.
       await gameMessage.edit(
         buildResultPayload(
@@ -864,13 +722,20 @@ module.exports = {
           await finishLoss();
           return;
         }
+
+        await gameMessage.edit(
+          buildLiveCrashPayload(
+            message,
+            game
+          )
+        ).catch(() => {});
       } catch (error) {
         console.error(
           'Crash tick error:',
           error
         );
       }
-    }, 100);
+    }, LIVE_UPDATE_MS);
     collector.on(
       'collect',
       async interaction => {
@@ -916,7 +781,7 @@ module.exports = {
         game.cashoutLocked = true;
         clearInterval(timer);
 
-        // Le x vient de la frame du GIF visible au moment exact du clic.
+        // Le x vient de la frame du Canvas live visible au moment exact du clic.
         const lockedMultiplier =
           getVisualMultiplierAt(
             game.startedAt,
@@ -970,7 +835,14 @@ module.exports = {
 
         await ackPromise;
 
-        // Le GIF est remplacé par une capture Canvas au x exact du clic.
+        // Le live Canvas s'arrête ici : plus aucun update ne peut repartir.
+        await gameMessage.edit(
+          buildInstantResultPayload(
+            message,
+            game
+          )
+        ).catch(() => {});
+
         await gameMessage.edit(
           buildResultPayload(
             message,
