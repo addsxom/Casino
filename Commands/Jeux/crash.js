@@ -155,6 +155,7 @@ function buildLiveGraph(history) {
 function buildCrashEmbed(message, game) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
+
   const displayedMultiplier = lost
     ? game.crashPoint
     : game.status === 'cashed'
@@ -162,26 +163,35 @@ function buildCrashEmbed(message, game) {
       : game.multiplier;
 
   let description =
-    `## x${displayedMultiplier.toFixed(2)}\n` +
-    `\`\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n` +
-    `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
-    `**Gain potentiel :** +${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)} %\n`;
+    `# x${displayedMultiplier.toFixed(2)}\n` +
+    `\`\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n`;
 
   if (playing) {
-    description += `**Gain actuel :** ${formatCoins(game.amount * game.multiplier)} coins🪙\n\nCash Out avant le crash.`;
+    description +=
+      `**${formatCoins(game.amount)} coins🪙** → **${formatCoins(game.amount * game.multiplier)} coins🪙**\n` +
+      `+${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)} %`;
   } else if (lost) {
-    description += `\n💥 Crash à **x${game.crashPoint.toFixed(2)}**\nTu as perdu **${formatCoins(game.amount)} coins🪙**.`;
+    description +=
+      `💥 **Perdu : ${formatCoins(game.amount)} coins🪙**`;
   } else {
-    description += `\n✅ Cash Out à **x${game.cashoutMultiplier.toFixed(2)}**\n**Gain :** ${formatCoins(game.payout)} coins🪙`;
+    description +=
+      `✅ **+${formatCoins(game.payout)} coins🪙**`;
   }
 
-  const embed = new EmbedBuilder()
-    .setTitle(lost ? '💥 CRASH !' : game.status === 'cashed' ? '💰 CASH OUT' : '🚀 CRASH')
+  return new EmbedBuilder()
     .setDescription(description)
-    .setColor(lost ? 0xe91e63 : game.status === 'cashed' ? 0x4caf50 : 0x6b6de6)
-    .setFooter({ text: `${message.author.tag} • ${playing ? 'Clique avant le crash' : 'Partie terminée'}` });
-
-  return embed;
+    .setColor(
+      lost
+        ? 0xe91e63
+        : game.status === 'cashed'
+          ? 0x4caf50
+          : 0x6b6de6
+    )
+    .setFooter({
+      text: playing
+        ? message.author.tag
+        : `${message.author.tag} • Terminé`
+    });
 }
 
 function buildCrashRow(game) {
