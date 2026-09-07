@@ -11,6 +11,9 @@ const UserCoins = require('../../Models/UserCoins.js');
 let canvasModule = null;
 let gifEncoderModule = null;
 let crashAnimationCache = null;
+let crashAnimationFramesCache = null;
+const ANIMATION_FPS = 3;
+const ANIMATION_FRAME_MS = 1000 / ANIMATION_FPS;
 
 function getCreateCanvas() {
   if (!canvasModule) {
@@ -79,7 +82,7 @@ function buildRoundTimeline() {
 }
 
 function buildAnimationFrames(timeline) {
-  const framesPerSecond = 3;
+  const framesPerSecond = ANIMATION_FPS;
   const frames = [];
 
   for (let i = 0; i < timeline.length - 1; i++) {
@@ -102,6 +105,41 @@ function buildAnimationFrames(timeline) {
     frames,
     framesPerSecond
   };
+}
+
+function getAnimationFrames() {
+  if (crashAnimationFramesCache) {
+    return crashAnimationFramesCache;
+  }
+
+  const timeline = buildRoundTimeline();
+  crashAnimationFramesCache =
+    buildAnimationFrames(timeline).frames;
+
+  return crashAnimationFramesCache;
+}
+
+function getVisualMultiplierAt(
+  startedAt,
+  timestamp = Date.now()
+) {
+  const frames = getAnimationFrames();
+
+  const elapsed = Math.max(
+    0,
+    timestamp - startedAt
+  );
+
+  const frameIndex = Math.min(
+    frames.length - 1,
+    Math.floor(
+      elapsed / ANIMATION_FRAME_MS
+    )
+  );
+
+  return Number(
+    frames[frameIndex].toFixed(2)
+  );
 }
 
 function drawCrashFrame(
@@ -324,12 +362,8 @@ function buildCrashAnimation() {
   const width = 500;
   const height = 220;
 
-  const timeline = buildRoundTimeline();
-
-  const {
-    frames,
-    framesPerSecond
-  } = buildAnimationFrames(timeline);
+  const frames = getAnimationFrames();
+  const framesPerSecond = ANIMATION_FPS;
 
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
@@ -719,6 +753,7 @@ module.exports = {
       status: 'playing',
       ended: false,
       cashoutLocked: false,
+      startedAt: null,
       tickCount: 0,
       renderVersion: 0,
       history: [1]
@@ -738,6 +773,9 @@ module.exports = {
           game
         )
       );
+
+      // Référence temporelle commune au GIF et à la logique du jeu.
+      game.startedAt = Date.now();
     } catch (error) {
       console.error(
         'Crash animation error:',
@@ -789,53 +827,56 @@ module.exports = {
     const timer = setInterval(async () => {
       if (
         game.ended ||
-        game.cashoutLocked
+        game.cashoutLocked ||
+        !game.startedAt
       ) return;
 
       try {
-        game.tickCount++;
-
-        const nextMultiplier =
-          getNextMultiplier(
-            game.multiplier,
-            game.tickCount
+        const visualMultiplier =
+          getVisualMultiplierAt(
+            game.startedAt
           );
 
         if (
-          nextMultiplier >=
-          game.crashPoint
+          visualMultiplier <=
+          game.multiplier
         ) {
-          game.multiplier =
-            game.crashPoint;
-
-          game.history.push(
-            game.crashPoint
-          );
-
-          await finishLoss();
           return;
         }
 
         game.multiplier =
-          nextMultiplier;
+          visualMultiplier;
 
         game.history.push(
           game.multiplier
         );
 
-        // Aucun edit Discord pendant la montée.
-        // Le GIF Canvas est l'unique affichage live.
+        if (
+          game.multiplier >=
+          game.crashPoint
+        ) {
+          game.multiplier =
+            game.crashPoint;
+
+          game.history[
+            game.history.length - 1
+          ] = game.crashPoint;
+
+          await finishLoss();
+          return;
+        }
       } catch (error) {
         console.error(
           'Crash tick error:',
           error
         );
       }
-    }, TICK_MS);
-
+    }, 100);
     collector.on(
       'collect',
       async interaction => {
+        const clickedAt = Date.now();
+
         if (
           interaction.customId !==
           'crash_cashout'
@@ -843,9 +884,7 @@ module.exports = {
           return;
         }
 
-        // On envoie l'ACK à Discord dès l'arrivée du clic.
-        // La requête part avant les calculs, le stop du collector
-        // et la génération du Canvas final.
+        // ACK envoyé immédiatement, sans calcul synchrone lourd avant.
         const ackPromise =
           interaction.deferUpdate().catch(
             error => {
@@ -867,23 +906,59 @@ module.exports = {
 
         if (
           game.ended ||
-          game.cashoutLocked
+          game.cashoutLocked ||
+          !game.startedAt
         ) {
           await ackPromise;
           return;
         }
 
-        // Verrouillage synchrone immédiat.
+        // Verrouillage immédiat dès réception du clic.
         game.cashoutLocked = true;
-
-        const lockedMultiplier =
-          game.multiplier;
-
         clearInterval(timer);
 
+        // Le x vient de la frame du GIF visible au moment exact du clic.
+        const lockedMultiplier =
+          getVisualMultiplierAt(
+            game.startedAt,
+            clickedAt
+          );
+
+        // Si le crash était déjà atteint sur cette même frame,
+        // le Cash Out est trop tard.
+        if (
+          lockedMultiplier >=
+          game.crashPoint
+        ) {
+          game.multiplier =
+            game.crashPoint;
+
+          game.history.push(
+            game.crashPoint
+          );
+
+          game.cashoutLocked = false;
+
+          await ackPromise;
+          await finishLoss();
+          return;
+        }
+
         game.ended = true;
+        game.multiplier =
+          lockedMultiplier;
         game.cashoutMultiplier =
           lockedMultiplier;
+
+        if (
+          game.history[
+            game.history.length - 1
+          ] !== lockedMultiplier
+        ) {
+          game.history.push(
+            lockedMultiplier
+          );
+        }
 
         game.payout = Math.floor(
           game.amount *
@@ -894,19 +969,9 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // On attend seulement maintenant la confirmation Discord.
-        const acknowledged =
-          await ackPromise;
+        await ackPromise;
 
-        // Même si Discord refuse exceptionnellement l'ACK,
-        // la partie reste figée et le paiement est conservé.
-        await gameMessage.edit(
-          buildInstantResultPayload(
-            message,
-            game
-          )
-        ).catch(() => {});
-
+        // Le GIF est remplacé par une capture Canvas au x exact du clic.
         await gameMessage.edit(
           buildResultPayload(
             message,
@@ -928,7 +993,6 @@ module.exports = {
         }
       }
     );
-
     collector.on(
       'end',
       async (_, reason) => {
