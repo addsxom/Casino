@@ -2,9 +2,6 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ContainerBuilder,
-  TextDisplayBuilder,
-  SeparatorBuilder,
   EmbedBuilder,
   AttachmentBuilder
 } = require('discord.js');
@@ -12,6 +9,7 @@ const {
 const UserCoins = require('../../Models/UserCoins.js');
 
 let canvasModule = null;
+let gifEncoderModule = null;
 
 function getCreateCanvas() {
   if (!canvasModule) {
@@ -19,6 +17,14 @@ function getCreateCanvas() {
   }
 
   return canvasModule.createCanvas;
+}
+
+function getGifEncoder() {
+  if (!gifEncoderModule) {
+    gifEncoderModule = require('gif-encoder-2');
+  }
+
+  return gifEncoderModule;
 }
 
 const HOUSE_EDGE = 0.03;
@@ -38,8 +44,6 @@ function generateCrashPoint() {
 }
 
 function getNextMultiplier(current, tickCount) {
-  // La croissance accélère avec le temps :
-  // ~3 % au début, puis le pourcentage augmente progressivement.
   const growthPercent = Math.min(
     0.18,
     0.03 + tickCount * 0.0035
@@ -50,104 +54,295 @@ function getNextMultiplier(current, tickCount) {
   return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
-function buildProgressBar(multiplier) {
-  const width = 18;
+function buildRoundTimeline(crashPoint) {
+  const values = [1];
+  let multiplier = 1;
+  let tickCount = 0;
 
-  // Echelle logarithmique : la barre reste lisible de x1 à x100.
-  const normalized = Math.max(
-    0,
-    Math.min(
-      1,
-      Math.log10(Math.max(1, multiplier)) /
-        Math.log10(MAX_CRASH)
-    )
-  );
+  while (multiplier < crashPoint && tickCount < 180) {
+    tickCount++;
 
-  const position = Math.min(
-    width - 1,
-    Math.round(normalized * (width - 1))
-  );
+    const next = getNextMultiplier(
+      multiplier,
+      tickCount
+    );
 
-  const left = '━'.repeat(position);
-  const right = '─'.repeat(width - position - 1);
+    if (next >= crashPoint) {
+      values.push(crashPoint);
+      break;
+    }
 
-  return left + '●' + right;
+    multiplier = next;
+    values.push(multiplier);
+  }
+
+  return values;
 }
 
-function buildStaticCrashCanvas() {
-  const createCanvas = getCreateCanvas();
-  const width = 900;
-  const height = 360;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
+function buildAnimationFrames(timeline) {
+  const framesPerSecond = 5;
+  const frames = [];
+
+  for (let i = 0; i < timeline.length - 1; i++) {
+    const from = timeline[i];
+    const to = timeline[i + 1];
+
+    for (let step = 0; step < framesPerSecond; step++) {
+      const t = step / framesPerSecond;
+      const eased = t * t * (3 - 2 * t);
+
+      frames.push(
+        from + (to - from) * eased
+      );
+    }
+  }
+
+  frames.push(timeline[timeline.length - 1]);
+
+  return {
+    frames,
+    framesPerSecond
+  };
+}
+
+function drawCrashFrame(
+  ctx,
+  width,
+  height,
+  allFrames,
+  frameIndex,
+  crashPoint
+) {
+  const isCrash = frameIndex === allFrames.length - 1;
+  const multiplier = allFrames[frameIndex];
+
+  const accent = isCrash
+    ? '#ef476f'
+    : '#8b8df8';
 
   ctx.fillStyle = '#0f1118';
   ctx.fillRect(0, 0, width, height);
 
-  const left = 54;
-  const right = width - 34;
+  const left = 48;
+  const right = width - 28;
   const top = 30;
-  const bottom = height - 44;
+  const bottom = height - 42;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.055)';
   ctx.lineWidth = 1;
 
   for (let i = 0; i <= 4; i++) {
     const y = top + ((bottom - top) * i) / 4;
+
     ctx.beginPath();
     ctx.moveTo(left, y);
     ctx.lineTo(right, y);
     ctx.stroke();
   }
 
-  for (let i = 0; i <= 8; i++) {
-    const x = left + ((right - left) * i) / 8;
+  for (let i = 0; i <= 7; i++) {
+    const x = left + ((right - left) * i) / 7;
+
     ctx.beginPath();
     ctx.moveTo(x, top);
     ctx.lineTo(x, bottom);
     ctx.stroke();
   }
 
-  // Courbe-guide fixe : elle donne l'aspect Crash sans être rechargée à chaque tick.
-  ctx.beginPath();
-  ctx.moveTo(left, bottom);
+  const maxGraphMultiplier = Math.max(
+    1.2,
+    crashPoint * 1.08
+  );
+  const range = Math.max(
+    0.2,
+    maxGraphMultiplier - 1
+  );
 
-  const steps = 64;
-  for (let i = 1; i <= steps; i++) {
-    const t = i / steps;
-    const x = left + (right - left) * t;
-    const eased = Math.pow(t, 2.15);
-    const y = bottom - (bottom - top) * eased;
-    ctx.lineTo(x, y);
+  const progressPoints = [];
+
+  for (let i = 0; i <= frameIndex; i++) {
+    const x = allFrames.length <= 1
+      ? left
+      : left +
+        ((right - left) * i) /
+          (allFrames.length - 1);
+
+    const normalized = Math.max(
+      0,
+      Math.min(
+        1,
+        (allFrames[i] - 1) / range
+      )
+    );
+
+    const y =
+      bottom -
+      normalized * (bottom - top);
+
+    progressPoints.push({ x, y });
   }
 
-  ctx.strokeStyle = '#8b8df8';
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.shadowColor = '#8b8df8';
-  ctx.shadowBlur = 14;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
+  if (progressPoints.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(
+      progressPoints[0].x,
+      progressPoints[0].y
+    );
 
-  const gradient = ctx.createLinearGradient(0, top, 0, bottom);
-  gradient.addColorStop(0, 'rgba(139,141,248,0.20)');
-  gradient.addColorStop(1, 'rgba(139,141,248,0.00)');
+    for (
+      let i = 1;
+      i < progressPoints.length - 1;
+      i++
+    ) {
+      const current = progressPoints[i];
+      const next = progressPoints[i + 1];
 
-  ctx.lineTo(right, bottom);
-  ctx.lineTo(left, bottom);
-  ctx.closePath();
-  ctx.fillStyle = gradient;
-  ctx.fill();
+      ctx.quadraticCurveTo(
+        current.x,
+        current.y,
+        (current.x + next.x) / 2,
+        (current.y + next.y) / 2
+      );
+    }
 
-  ctx.fillStyle = 'rgba(255,255,255,0.55)';
-  ctx.font = '500 18px Arial';
-  ctx.fillText('RISK ↑', left, 24);
+    const last =
+      progressPoints[progressPoints.length - 1];
 
-  return canvas.toBuffer('image/png');
+    ctx.lineTo(last.x, last.y);
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 14;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    const gradient = ctx.createLinearGradient(
+      0,
+      top,
+      0,
+      bottom
+    );
+
+    gradient.addColorStop(
+      0,
+      isCrash
+        ? 'rgba(239,71,111,0.25)'
+        : 'rgba(139,141,248,0.24)'
+    );
+    gradient.addColorStop(
+      1,
+      'rgba(15,17,24,0)'
+    );
+
+    ctx.lineTo(last.x, bottom);
+    ctx.lineTo(progressPoints[0].x, bottom);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+  }
+
+  if (progressPoints.length) {
+    const last =
+      progressPoints[progressPoints.length - 1];
+
+    ctx.beginPath();
+    ctx.arc(
+      last.x,
+      last.y,
+      isCrash ? 10 : 7,
+      0,
+      Math.PI * 2
+    );
+    ctx.fillStyle = accent;
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 18;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 42px Arial';
+  ctx.fillText(
+    `x${multiplier.toFixed(2)}`,
+    left,
+    58
+  );
+
+  ctx.fillStyle = isCrash
+    ? '#ef476f'
+    : 'rgba(255,255,255,0.55)';
+  ctx.font = '600 17px Arial';
+
+  ctx.fillText(
+    isCrash
+      ? 'CRASH'
+      : `+${Math.max(
+          0,
+          (multiplier - 1) * 100
+        ).toFixed(1)}%`,
+    left,
+    86
+  );
 }
 
-function buildCrashEmbed(message, game) {
+function buildCrashAnimation(crashPoint) {
+  const createCanvas = getCreateCanvas();
+  const GIFEncoder = getGifEncoder();
+
+  const width = 680;
+  const height = 300;
+
+  const timeline =
+    buildRoundTimeline(crashPoint);
+
+  const {
+    frames,
+    framesPerSecond
+  } = buildAnimationFrames(timeline);
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const encoder = new GIFEncoder(
+    width,
+    height,
+    'neuquant',
+    true,
+    frames.length
+  );
+
+  encoder.start();
+  encoder.setDelay(
+    Math.round(1000 / framesPerSecond)
+  );
+  encoder.setQuality(12);
+
+  for (let i = 0; i < frames.length; i++) {
+    drawCrashFrame(
+      ctx,
+      width,
+      height,
+      frames,
+      i,
+      crashPoint
+    );
+
+    encoder.addFrame(ctx);
+  }
+
+  encoder.finish();
+
+  return encoder.out.getData();
+}
+
+function buildCrashEmbed(
+  message,
+  game,
+  showAnimation = true
+) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
 
@@ -158,13 +353,15 @@ function buildCrashEmbed(message, game) {
       : game.multiplier;
 
   let description =
-    `# x${displayedMultiplier.toFixed(2)}\n` +
-    `${buildProgressBar(displayedMultiplier)}\n`;
+    `# x${displayedMultiplier.toFixed(2)}\n`;
 
   if (playing) {
     description +=
       `**${formatCoins(game.amount)} coins🪙** → **${formatCoins(game.amount * game.multiplier)} coins🪙**\n` +
-      `+${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)} %`;
+      `+${Math.max(
+        0,
+        (displayedMultiplier - 1) * 100
+      ).toFixed(1)} %`;
   } else if (lost) {
     description +=
       `💥 **Perdu : ${formatCoins(game.amount)} coins🪙**`;
@@ -173,9 +370,8 @@ function buildCrashEmbed(message, game) {
       `✅ **+${formatCoins(game.payout)} coins🪙** à **x${displayedMultiplier.toFixed(2)}**`;
   }
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setDescription(description)
-    .setImage('attachment://crash-board.png')
     .setColor(
       lost
         ? 0xef476f
@@ -188,6 +384,14 @@ function buildCrashEmbed(message, game) {
         ? message.author.tag
         : `${message.author.tag} • Terminé`
     });
+
+  if (showAnimation) {
+    embed.setImage(
+      'attachment://crash-animation.gif'
+    );
+  }
+
+  return embed;
 }
 
 function buildCrashRow(game) {
@@ -197,27 +401,50 @@ function buildCrashRow(game) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('crash_cashout')
-        .setLabel(`Cash Out • x${game.multiplier.toFixed(2)}`)
+        .setLabel(
+          `Cash Out • x${game.multiplier.toFixed(2)}`
+        )
         .setEmoji('💰')
         .setStyle(ButtonStyle.Success)
     )
   ];
 }
 
-function buildCrashPayload(message, game) {
+function buildCrashPayload(
+  message,
+  game,
+  showAnimation = true
+) {
   return {
-    embeds: [buildCrashEmbed(message, game)],
+    embeds: [
+      buildCrashEmbed(
+        message,
+        game,
+        showAnimation
+      )
+    ],
     components: buildCrashRow(game)
   };
 }
 
-function buildInitialCrashPayload(message, game) {
+function buildInitialCrashPayload(
+  message,
+  game
+) {
   return {
-    ...buildCrashPayload(message, game),
+    ...buildCrashPayload(
+      message,
+      game,
+      true
+    ),
     files: [
       new AttachmentBuilder(
-        buildStaticCrashCanvas(),
-        { name: 'crash-board.png' }
+        buildCrashAnimation(
+          game.crashPoint
+        ),
+        {
+          name: 'crash-animation.gif'
+        }
       )
     ]
   };
@@ -225,25 +452,33 @@ function buildInitialCrashPayload(message, game) {
 
 module.exports = {
   name: 'crash',
-  description: 'Misez des coins et cash out avant le crash.',
+  description:
+    'Misez des coins et cash out avant le crash.',
 
   async execute(message, args) {
     const guildId = message.guild.id;
     const amount = Number(args[0]);
 
-
-    if (!Number.isInteger(amount) || amount <= 0) {
+    if (
+      !Number.isInteger(amount) ||
+      amount <= 0
+    ) {
       return message.reply(
-        '❌・Utilisation : **+crash <mise>**\nExemple : **+crash 1000**'
+        '❌・Utilisation : **+crash <mise>**\n' +
+        'Exemple : **+crash 1000**'
       );
     }
 
-    let userCoins = await UserCoins.findOne({
-      userId: message.author.id,
-      guildId
-    });
+    let userCoins =
+      await UserCoins.findOne({
+        userId: message.author.id,
+        guildId
+      });
 
-    if (!userCoins || userCoins.coins < amount) {
+    if (
+      !userCoins ||
+      userCoins.coins < amount
+    ) {
       return message.reply(
         '❌・Vous n\'avez pas assez de coins pour cette mise.'
       );
@@ -269,25 +504,32 @@ module.exports = {
 
     try {
       gameMessage = await message.reply(
-        buildInitialCrashPayload(message, game)
+        buildInitialCrashPayload(
+          message,
+          game
+        )
       );
     } catch (error) {
-      console.error('Crash Canvas error:', error);
+      console.error(
+        'Crash animation error:',
+        error
+      );
 
-      // Rembourse la mise si Canvas ne peut pas être rendu.
       userCoins.coins += amount;
       await userCoins.save();
 
       return message.reply(
-        '❌・Le moteur Canvas du Crash ne fonctionne pas. Fais **npm install** puis redémarre le bot.'
+        '❌・Impossible de générer l\'animation du Crash. ' +
+        'Fais **npm install** puis redémarre le bot.'
       );
     }
 
     let tickRunning = false;
 
-    const collector = gameMessage.createMessageComponentCollector({
-      time: 180000
-    });
+    const collector =
+      gameMessage.createMessageComponentCollector({
+        time: 180000
+      });
 
     const finishLoss = async () => {
       if (game.ended) return;
@@ -298,124 +540,165 @@ module.exports = {
       clearInterval(timer);
       collector.stop('crashed');
 
-      await gameMessage.edit(buildCrashPayload(message, game)).catch(() => {});
+      await gameMessage.edit(
+        buildCrashPayload(
+          message,
+          game,
+          true
+        )
+      ).catch(() => {});
     };
 
     const timer = setInterval(async () => {
-      if (game.ended || tickRunning) return;
+      if (
+        game.ended ||
+        tickRunning
+      ) {
+        return;
+      }
+
       tickRunning = true;
 
       try {
         game.tickCount++;
-        const nextMultiplier = getNextMultiplier(
-          game.multiplier,
-          game.tickCount
-        );
 
-        if (nextMultiplier >= game.crashPoint) {
-          game.multiplier = game.crashPoint;
-          game.history.push(game.crashPoint);
+        const nextMultiplier =
+          getNextMultiplier(
+            game.multiplier,
+            game.tickCount
+          );
+
+        if (
+          nextMultiplier >=
+          game.crashPoint
+        ) {
+          game.multiplier =
+            game.crashPoint;
+
+          game.history.push(
+            game.crashPoint
+          );
+
           await finishLoss();
           return;
         }
 
-        game.multiplier = nextMultiplier;
-        game.history.push(game.multiplier);
+        game.multiplier =
+          nextMultiplier;
 
-        const version = game.renderVersion;
+        game.history.push(
+          game.multiplier
+        );
+
+        const version =
+          game.renderVersion;
 
         if (game.ended) return;
 
         await gameMessage.edit(
-          buildCrashPayload(message, game)
+          buildCrashPayload(
+            message,
+            game,
+            true
+          )
         );
 
-        // Si un Cash Out est arrivé pendant cet edit,
-        // cet ancien rendu ne doit jamais rester affiché.
         if (
           game.ended ||
-          version !== game.renderVersion
+          version !==
+            game.renderVersion
         ) {
-          await gameMessage.edit(
-            buildCrashPayload(message, game)
-          ).catch(() => {});
           return;
         }
       } catch (error) {
-        console.error('Crash tick error:', error);
+        console.error(
+          'Crash tick error:',
+          error
+        );
       } finally {
         tickRunning = false;
       }
     }, TICK_MS);
 
-    collector.on('collect', async interaction => {
-      if (interaction.user.id !== message.author.id) {
-        return interaction.reply({
-          content: '❌・Cette partie ne vous appartient pas.',
-          ephemeral: true
+    collector.on(
+      'collect',
+      async interaction => {
+        if (
+          interaction.user.id !==
+          message.author.id
+        ) {
+          return interaction.reply({
+            content:
+              '❌・Cette partie ne vous appartient pas.',
+            ephemeral: true
+          });
+        }
+
+        if (
+          interaction.customId !==
+          'crash_cashout'
+        ) {
+          return;
+        }
+
+        if (game.ended) {
+          return interaction
+            .deferUpdate()
+            .catch(() => {});
+        }
+
+        game.ended = true;
+        game.renderVersion++;
+
+        clearInterval(timer);
+
+        game.cashoutMultiplier =
+          game.multiplier;
+
+        game.payout = Math.floor(
+          game.amount *
+          game.cashoutMultiplier
+        );
+
+        game.status = 'cashed';
+
+        collector.stop('cashed');
+
+        // On retire simplement le GIF :
+        // aucune nouvelle image n'est chargée.
+        await interaction.update({
+          ...buildCrashPayload(
+            message,
+            game,
+            false
+          ),
+          attachments: []
         });
+
+        userCoins =
+          await UserCoins.findOne({
+            userId: message.author.id,
+            guildId
+          });
+
+        if (userCoins) {
+          userCoins.coins +=
+            game.payout;
+
+          await userCoins.save();
+        }
       }
+    );
 
-      if (interaction.customId !== 'crash_cashout') return;
+    collector.on(
+      'end',
+      async (_, reason) => {
+        if (game.ended) return;
 
-      if (game.ended) {
-        return interaction.deferUpdate().catch(() => {});
+        if (reason === 'time') {
+          await finishLoss();
+        }
       }
-
-      // On fige le jeu immédiatement dès le clic.
-      game.ended = true;
-      game.renderVersion++;
-      clearInterval(timer);
-
-      game.cashoutMultiplier = game.multiplier;
-      game.payout = Math.floor(
-        game.amount * game.cashoutMultiplier
-      );
-      game.status = 'cashed';
-
-      collector.stop('cashed');
-
-      // Un seul aller-retour Discord : le bouton disparaît immédiatement
-      // et l'UI affiche le résultat avant la sauvegarde Mongo.
-      await interaction.update(
-        buildCrashPayload(message, game)
-      );
-
-      // Un tick Discord pouvait déjà être en vol au moment du clic.
-      // On réaffirme l'état final juste après pour empêcher
-      // tout ancien rendu de reprendre la main.
-      if (tickRunning) {
-        await new Promise(resolve => {
-          const check = setInterval(() => {
-            if (!tickRunning) {
-              clearInterval(check);
-              resolve();
-            }
-          }, 10);
-        });
-
-        await gameMessage.edit(
-          buildCrashPayload(message, game)
-        ).catch(() => {});
-      }
-
-      userCoins = await UserCoins.findOne({
-        userId: message.author.id,
-        guildId
-      });
-
-      if (userCoins) {
-        userCoins.coins += game.payout;
-        await userCoins.save();
-      }
-    });
-
-    collector.on('end', async (_, reason) => {
-      if (game.ended) return;
-
-      if (reason === 'time') {
-        await finishLoss();
-      }
-    });
+    );
   }
 };
