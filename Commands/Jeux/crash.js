@@ -40,18 +40,9 @@ function getNextMultiplier(current, tickCount) {
 }
 
 function buildLiveGraph(history) {
-  const charWidth = 28;
-  const charHeight = 8;
-
-  // Chaque caractère braille contient une grille de 2×4 points.
-  const dotWidth = charWidth * 2;
-  const dotHeight = charHeight * 4;
-  const values = history.slice(-dotWidth);
-
-  const dots = Array.from(
-    { length: dotHeight },
-    () => Array(dotWidth).fill(false)
-  );
+  const width = 30;
+  const height = 7;
+  const values = history.slice(-width);
 
   if (!values.length) values.push(1);
 
@@ -59,11 +50,16 @@ function buildLiveGraph(history) {
   const max = Math.max(...values, 1.15);
   const range = Math.max(0.15, max - min);
 
+  const grid = Array.from(
+    { length: height },
+    () => Array(width).fill('·')
+  );
+
   const points = values.map((value, index) => {
     const x = values.length <= 1
       ? 0
       : Math.round(
-          (index / (values.length - 1)) * (dotWidth - 1)
+          (index / (values.length - 1)) * (width - 1)
         );
 
     const normalized = Math.max(
@@ -72,84 +68,57 @@ function buildLiveGraph(history) {
     );
 
     const y =
-      dotHeight - 1 -
-      Math.round(normalized * (dotHeight - 1));
+      height - 1 -
+      Math.round(normalized * (height - 1));
 
     return { x, y };
   });
 
-  const setDot = (x, y) => {
+  const drawPoint = (x, y, char) => {
     if (
       x >= 0 &&
       y >= 0 &&
-      x < dotWidth &&
-      y < dotHeight
+      x < width &&
+      y < height
     ) {
-      dots[y][x] = true;
+      grid[y][x] = char;
     }
   };
 
   for (let i = 1; i < points.length; i++) {
-    const a = points[i - 1];
-    const b = points[i];
+    const from = points[i - 1];
+    const to = points[i];
 
     const steps = Math.max(
-      Math.abs(b.x - a.x),
-      Math.abs(b.y - a.y),
+      Math.abs(to.x - from.x),
+      Math.abs(to.y - from.y),
       1
     );
 
     for (let step = 0; step <= steps; step++) {
       const t = step / steps;
-      const x = Math.round(a.x + (b.x - a.x) * t);
-      const y = Math.round(a.y + (b.y - a.y) * t);
+      const x = Math.round(
+        from.x + (to.x - from.x) * t
+      );
+      const y = Math.round(
+        from.y + (to.y - from.y) * t
+      );
 
-      setDot(x, y);
-      setDot(x, y + 1);
+      let char = '─';
+
+      if (to.y < from.y) char = '╱';
+      if (to.y > from.y) char = '╲';
+
+      drawPoint(x, y, char);
     }
   }
 
-  const brailleBit = (localX, localY) => {
-    const map = [
-      [0x01, 0x08],
-      [0x02, 0x10],
-      [0x04, 0x20],
-      [0x40, 0x80]
-    ];
+  const last = points[points.length - 1];
+  drawPoint(last.x, last.y, '●');
 
-    return map[localY][localX];
-  };
-
-  const lines = [];
-
-  for (let cy = 0; cy < charHeight; cy++) {
-    let line = '';
-
-    for (let cx = 0; cx < charWidth; cx++) {
-      let mask = 0;
-
-      for (let ly = 0; ly < 4; ly++) {
-        for (let lx = 0; lx < 2; lx++) {
-          const x = cx * 2 + lx;
-          const y = cy * 4 + ly;
-
-          if (dots[y][x]) {
-            mask |= brailleBit(lx, ly);
-          }
-        }
-      }
-
-      line += String.fromCharCode(0x2800 + mask);
-    }
-
-    lines.push('│' + line + '│');
-  }
-
-  return [
-    '┌' + '─'.repeat(charWidth) + '┐',
-    ...lines,
-    '└' + '─'.repeat(charWidth) + '┘'
-  ].join('\n');
+  return grid
+    .map(row => row.join(''))
+    .join('\n');
 }
 
 function buildCrashEmbed(message, game) {
