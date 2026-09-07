@@ -50,6 +50,30 @@ function getNextMultiplier(current, tickCount) {
   return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
+function buildProgressBar(multiplier) {
+  const width = 18;
+
+  // Echelle logarithmique : la barre reste lisible de x1 à x100.
+  const normalized = Math.max(
+    0,
+    Math.min(
+      1,
+      Math.log10(Math.max(1, multiplier)) /
+        Math.log10(MAX_CRASH)
+    )
+  );
+
+  const position = Math.min(
+    width - 1,
+    Math.round(normalized * (width - 1))
+  );
+
+  const left = '━'.repeat(position);
+  const right = '─'.repeat(width - position - 1);
+
+  return left + '●' + right;
+}
+
 function buildStaticCrashCanvas() {
   const createCanvas = getCreateCanvas();
   const width = 900;
@@ -134,7 +158,8 @@ function buildCrashEmbed(message, game) {
       : game.multiplier;
 
   let description =
-    `# x${displayedMultiplier.toFixed(2)}\n`;
+    `# x${displayedMultiplier.toFixed(2)}\n` +
+    `${buildProgressBar(displayedMultiplier)}\n`;
 
   if (playing) {
     description +=
