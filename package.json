@@ -40,7 +40,6 @@
     "soundcloud-scraper": "^5.0.3",
     "table": "^6.8.1",
     "update": "^0.7.4",
-    "ytdl-core": "^4.11.5",
-    "@napi-rs/canvas": "^1.0.8"
+    "ytdl-core": "^4.11.5"
   }
 }
