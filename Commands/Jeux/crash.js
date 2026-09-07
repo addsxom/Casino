@@ -10,6 +10,7 @@ const UserCoins = require('../../Models/UserCoins.js');
 
 let canvasModule = null;
 let gifEncoderModule = null;
+let crashAnimationCache = null;
 
 function getCreateCanvas() {
   if (!canvasModule) {
@@ -108,9 +109,7 @@ function drawCrashFrame(
   width,
   height,
   allFrames,
-  frameIndex,
-  crashPoint,
-  amount
+  frameIndex
 ) {
   const multiplier = allFrames[frameIndex];
   const accent = '#8b8df8';
@@ -273,24 +272,27 @@ function drawCrashFrame(
     86
   );
 
-  ctx.fillStyle = 'rgba(255,255,255,0.78)';
-  ctx.font = '600 18px Arial';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.font = '600 16px Arial';
   ctx.fillText(
-    `${formatCoins(amount)} → ${formatCoins(amount * multiplier)} coins`,
+    'CASH OUT AVANT LE CRASH',
     left,
     height - 16
   );
 }
 
-function buildCrashAnimation(crashPoint, amount) {
+function buildCrashAnimation() {
+  if (crashAnimationCache) {
+    return crashAnimationCache;
+  }
+
   const createCanvas = getCreateCanvas();
   const GIFEncoder = getGifEncoder();
 
-  const width = 560;
-  const height = 250;
+  const width = 500;
+  const height = 220;
 
-  const timeline =
-    buildRoundTimeline();
+  const timeline = buildRoundTimeline();
 
   const {
     frames,
@@ -312,7 +314,7 @@ function buildCrashAnimation(crashPoint, amount) {
   encoder.setDelay(
     Math.round(1000 / framesPerSecond)
   );
-  encoder.setQuality(20);
+  encoder.setQuality(30);
 
   for (let i = 0; i < frames.length; i++) {
     drawCrashFrame(
@@ -320,9 +322,7 @@ function buildCrashAnimation(crashPoint, amount) {
       width,
       height,
       frames,
-      i,
-      crashPoint,
-      amount
+      i
     );
 
     encoder.addFrame(ctx);
@@ -330,7 +330,156 @@ function buildCrashAnimation(crashPoint, amount) {
 
   encoder.finish();
 
-  return encoder.out.getData();
+  crashAnimationCache = encoder.out.getData();
+
+  return crashAnimationCache;
+}
+
+function buildResultCanvas(game) {
+  const createCanvas = getCreateCanvas();
+  const width = 700;
+  const height = 320;
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+
+  const won = game.status === 'cashed';
+  const accent = won
+    ? '#46d18c'
+    : '#ef476f';
+
+  ctx.fillStyle = '#0f1118';
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '700 34px Arial';
+  ctx.fillText(
+    won ? 'CASH OUT' : 'CRASH',
+    34,
+    48
+  );
+
+  ctx.fillStyle = accent;
+  ctx.font = '700 26px Arial';
+  ctx.fillText(
+    won
+      ? `x${game.cashoutMultiplier.toFixed(2)}`
+      : `x${game.crashPoint.toFixed(2)}`,
+    34,
+    82
+  );
+
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.font = '600 17px Arial';
+  ctx.fillText(
+    `Mise : ${formatCoins(game.amount)} coins`,
+    34,
+    112
+  );
+
+  ctx.fillStyle = won
+    ? '#46d18c'
+    : '#ef476f';
+  ctx.fillText(
+    won
+      ? `Gain : +${formatCoins(game.payout)} coins`
+      : `Perte : -${formatCoins(game.amount)} coins`,
+    34,
+    140
+  );
+
+  const left = 34;
+  const right = width - 32;
+  const top = 172;
+  const bottom = height - 30;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+
+  for (let i = 0; i <= 3; i++) {
+    const y = top + ((bottom - top) * i) / 3;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+  }
+
+  const values = game.history.length
+    ? game.history
+    : [1];
+
+  const maxValue = Math.max(
+    1.1,
+    ...values
+  );
+
+  const range = Math.max(
+    0.1,
+    maxValue - 1
+  );
+
+  const points = values.map(
+    (value, index) => {
+      const x = values.length <= 1
+        ? left
+        : left +
+          ((right - left) * index) /
+            (values.length - 1);
+
+      const normalized = Math.max(
+        0,
+        Math.min(
+          1,
+          (value - 1) / range
+        )
+      );
+
+      const y =
+        bottom -
+        normalized * (bottom - top);
+
+      return { x, y };
+    }
+  );
+
+  if (points.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(
+      points[0].x,
+      points[0].y
+    );
+
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(
+        points[i].x,
+        points[i].y
+      );
+    }
+
+    ctx.strokeStyle = accent;
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.shadowColor = accent;
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  const last = points[points.length - 1];
+
+  ctx.beginPath();
+  ctx.arc(
+    last.x,
+    last.y,
+    6,
+    0,
+    Math.PI * 2
+  );
+  ctx.fillStyle = accent;
+  ctx.fill();
+
+  return canvas.toBuffer('image/png');
 }
 
 function buildGameEmbed(message, game, showAnimation = true) {
@@ -419,10 +568,7 @@ function buildInitialCrashPayload(
     ),
     files: [
       new AttachmentBuilder(
-        buildCrashAnimation(
-          game.crashPoint,
-          game.amount
-        ),
+        buildCrashAnimation(),
         {
           name: 'crash-animation.gif'
         }
@@ -430,6 +576,33 @@ function buildInitialCrashPayload(
     ]
   };
 }
+function buildResultPayload(
+  message,
+  game
+) {
+  return {
+    embeds: [
+      buildGameEmbed(
+        message,
+        game,
+        false
+      ).setImage(
+        'attachment://crash-result.png'
+      )
+    ],
+    components: [],
+    files: [
+      new AttachmentBuilder(
+        buildResultCanvas(game),
+        {
+          name: 'crash-result.png'
+        }
+      )
+    ],
+    attachments: []
+  };
+}
+
 
 module.exports = {
   name: 'crash',
@@ -484,7 +657,12 @@ module.exports = {
     let gameMessage;
 
     try {
+      // Réponse immédiate : l'utilisateur voit la commande sans attendre l'encodage.
       gameMessage = await message.reply(
+        '🎰・Préparation du Crash...'
+      );
+
+      await gameMessage.edit(
         buildInitialCrashPayload(
           message,
           game
@@ -499,9 +677,15 @@ module.exports = {
       userCoins.coins += amount;
       await userCoins.save();
 
+      if (gameMessage) {
+        return gameMessage.edit(
+          '❌・Impossible de générer l\'animation du Crash. ' +
+          'Fais **npm install** puis redémarre le bot.'
+        );
+      }
+
       return message.reply(
-        '❌・Impossible de générer l\'animation du Crash. ' +
-        'Fais **npm install** puis redémarre le bot.'
+        '❌・Impossible de générer l\'animation du Crash.'
       );
     }
 
@@ -521,14 +705,12 @@ module.exports = {
 
       // Une seule modification à la fin : on retire le GIF
       // et on affiche clairement la perte.
-      await gameMessage.edit({
-        ...buildCrashPayload(
+      await gameMessage.edit(
+        buildResultPayload(
           message,
-          game,
-          false
-        ),
-        attachments: []
-      }).catch(() => {});
+          game
+        )
+      ).catch(() => {});
     };
 
     const timer = setInterval(async () => {
@@ -621,14 +803,12 @@ module.exports = {
 
         // Seule modification du message pendant une partie :
         // le clic Cash Out. Le GIF est retiré au même moment.
-        await interaction.update({
-          ...buildCrashPayload(
+        await interaction.update(
+          buildResultPayload(
             message,
-            game,
-            false
-          ),
-          attachments: []
-        });
+            game
+          )
+        );
 
         userCoins =
           await UserCoins.findOne({
