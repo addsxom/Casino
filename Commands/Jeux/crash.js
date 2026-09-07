@@ -38,14 +38,30 @@ function getNextMultiplier(current) {
   return Number((current + increase).toFixed(2));
 }
 
-function buildCrashChartUrl(game, frame) {
+function buildLiveGraph(history) {
+  const chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+  const values = history.slice(-32);
+
+  if (!values.length) return '▁';
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = Math.max(0.01, max - min);
+
+  return values.map(value => {
+    const normalized = (value - min) / range;
+    const index = Math.min(
+      chars.length - 1,
+      Math.max(0, Math.round(normalized * (chars.length - 1)))
+    );
+    return chars[index];
+  }).join('');
+}
+
+function buildFinalChartUrl(game) {
   const values = game.history.slice(-40);
   const labels = values.map((_, i) => i + 1);
-  const lineColor = game.status === 'lost'
-    ? '#e91e63'
-    : game.status === 'cashed'
-      ? '#4caf50'
-      : '#6b6de6';
+  const lineColor = game.status === 'lost' ? '#e91e63' : '#4caf50';
 
   const config = {
     type: 'line',
@@ -76,20 +92,17 @@ function buildCrashChartUrl(game, frame) {
           gridLines: { color: 'rgba(255,255,255,0.08)' },
           ticks: {
             min: 1,
-            fontColor: '#c7c9d3',
-            callback: value => 'x' + Number(value).toFixed(2)
+            fontColor: '#c7c9d3'
           }
         }]
-      },
-      layout: { padding: 18 }
+      }
     }
   };
 
-  const encoded = encodeURIComponent(JSON.stringify(config));
-  return `https://quickchart.io/chart?width=900&height=430&backgroundColor=%2311131c&c=${encoded}&v=${frame}`;
+  return `https://quickchart.io/chart?width=900&height=430&backgroundColor=%2311131c&c=${encodeURIComponent(JSON.stringify(config))}`;
 }
 
-function buildCrashEmbed(message, game, frame) {
+function buildCrashEmbed(message, game) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
   const displayedMultiplier = lost
@@ -99,8 +112,9 @@ function buildCrashEmbed(message, game, frame) {
       : game.multiplier;
 
   let description =
-    `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
-    `**Multiplicateur :** x${displayedMultiplier.toFixed(2)}\n`;
+    `## x${displayedMultiplier.toFixed(2)}\n` +
+    `\`${buildLiveGraph(game.history)}\`\n\n` +
+    `**Mise :** ${formatCoins(game.amount)} coins🪙\n`;
 
   if (playing) {
     description += `**Gain actuel :** ${formatCoins(game.amount * game.multiplier)} coins🪙\n\nCash Out avant le crash.`;
@@ -110,12 +124,17 @@ function buildCrashEmbed(message, game, frame) {
     description += `\n✅ Cash Out à **x${game.cashoutMultiplier.toFixed(2)}**\n**Gain :** ${formatCoins(game.payout)} coins🪙`;
   }
 
-  return new EmbedBuilder()
+  const embed = new EmbedBuilder()
     .setTitle(lost ? '💥 CRASH !' : game.status === 'cashed' ? '💰 CASH OUT' : '🚀 CRASH')
     .setDescription(description)
-    .setImage(buildCrashChartUrl(game, frame))
     .setColor(lost ? 0xe91e63 : game.status === 'cashed' ? 0x4caf50 : 0x6b6de6)
     .setFooter({ text: `${message.author.tag} • ${playing ? 'Clique avant le crash' : 'Partie terminée'}` });
+
+  if (!playing) {
+    embed.setImage(buildFinalChartUrl(game));
+  }
+
+  return embed;
 }
 
 function buildCrashRow(game) {
@@ -132,9 +151,9 @@ function buildCrashRow(game) {
   ];
 }
 
-function buildCrashPayload(message, game, frame) {
+function buildCrashPayload(message, game) {
   return {
-    embeds: [buildCrashEmbed(message, game, frame)],
+    embeds: [buildCrashEmbed(message, game)],
     components: buildCrashRow(game)
   };
 }
@@ -178,8 +197,7 @@ module.exports = {
       history: [1]
     };
 
-    let frame = 0;
-    const gameMessage = await message.reply(buildCrashPayload(message, game, frame++));
+    const gameMessage = await message.reply(buildCrashPayload(message, game));
 
     let tickRunning = false;
 
@@ -196,7 +214,7 @@ module.exports = {
       clearInterval(timer);
       collector.stop('crashed');
 
-      await gameMessage.edit(buildCrashPayload(message, game, frame++)).catch(() => {});
+      await gameMessage.edit(buildCrashPayload(message, game)).catch(() => {});
     };
 
     const timer = setInterval(async () => {
@@ -216,7 +234,7 @@ module.exports = {
         game.multiplier = nextMultiplier;
         game.history.push(game.multiplier);
 
-        await gameMessage.edit(buildCrashPayload(message, game, frame++));
+        await gameMessage.edit(buildCrashPayload(message, game));
       } catch (error) {
         console.error('Crash tick error:', error);
       } finally {
@@ -257,7 +275,7 @@ module.exports = {
 
       collector.stop('cashed');
 
-      await gameMessage.edit(buildCrashPayload(message, game, frame++)).catch(() => {});
+      await gameMessage.edit(buildCrashPayload(message, game)).catch(() => {});
     });
 
     collector.on('end', async (_, reason) => {
