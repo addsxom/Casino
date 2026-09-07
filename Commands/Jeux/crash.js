@@ -168,30 +168,33 @@ function drawCrashFrame(
 
   const progressPoints = [];
 
-  // Graphe "scrolling" :
-  // le point actuel reste à droite et l'historique glisse vers la gauche.
+  // La courbe naît à gauche et progresse vers la droite.
+  // Une fois la largeur remplie, on conserve les points les plus récents.
   const maxVisiblePoints = 42;
   const startIndex = Math.max(
     0,
     frameIndex - maxVisiblePoints + 1
   );
+
   const visibleCount =
     frameIndex - startIndex + 1;
-  const stepX =
-    (right - left) /
-    Math.max(1, maxVisiblePoints - 1);
 
   for (
     let i = startIndex;
     i <= frameIndex;
     i++
   ) {
-    const distanceFromCurrent =
-      frameIndex - i;
+    const localIndex =
+      i - startIndex;
 
-    const x =
-      right -
-      distanceFromCurrent * stepX;
+    const x = visibleCount <= 1
+      ? left
+      : left +
+        ((right - left) * localIndex) /
+          Math.max(
+            maxVisiblePoints - 1,
+            visibleCount - 1
+          );
 
     const normalized = Math.max(
       0,
@@ -207,7 +210,6 @@ function drawCrashFrame(
 
     progressPoints.push({ x, y });
   }
-
   if (progressPoints.length > 1) {
     ctx.beginPath();
     ctx.moveTo(
@@ -626,6 +628,23 @@ function buildInitialCrashPayload(
     ]
   };
 }
+function buildInstantResultPayload(
+  message,
+  game
+) {
+  return {
+    embeds: [
+      buildGameEmbed(
+        message,
+        game,
+        false
+      )
+    ],
+    components: [],
+    attachments: []
+  };
+}
+
 function buildResultPayload(
   message,
   game
@@ -868,14 +887,23 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // À partir d'ici le résultat ne peut plus changer,
-        // même si Discord met du temps à confirmer visuellement.
+        // On fige VISUELLEMENT tout de suite :
+        // GIF retiré + bouton supprimé avant de générer le Canvas final.
         await interaction.update(
-          buildResultPayload(
+          buildInstantResultPayload(
             message,
             game
           )
         );
+
+        // Le graphique de résumé est généré ensuite,
+        // sans laisser le GIF continuer pendant ce temps.
+        await gameMessage.edit(
+          buildResultPayload(
+            message,
+            game
+          )
+        ).catch(() => {});
 
         userCoins =
           await UserCoins.findOne({
