@@ -5,10 +5,21 @@ const {
   ContainerBuilder,
   TextDisplayBuilder,
   SeparatorBuilder,
-  EmbedBuilder
+  EmbedBuilder,
+  AttachmentBuilder
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
+
+let canvasModule = null;
+
+function getCreateCanvas() {
+  if (!canvasModule) {
+    canvasModule = require('@napi-rs/canvas');
+  }
+
+  return canvasModule.createCanvas;
+}
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -39,46 +50,77 @@ function getNextMultiplier(current, tickCount) {
   return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
-function buildLiveGraph(history) {
-  const width = 28;
-  const height = 7;
-  const values = history.slice(-width);
+function buildStaticCrashCanvas() {
+  const createCanvas = getCreateCanvas();
+  const width = 900;
+  const height = 360;
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
 
-  if (!values.length) values.push(1);
+  ctx.fillStyle = '#0f1118';
+  ctx.fillRect(0, 0, width, height);
 
-  const min = 1;
-  const max = Math.max(...values, 1.15);
-  const range = Math.max(0.15, max - min);
+  const left = 54;
+  const right = width - 34;
+  const top = 30;
+  const bottom = height - 44;
 
-  const grid = Array.from(
-    { length: height },
-    () => Array(width).fill(' ')
-  );
+  ctx.strokeStyle = 'rgba(255,255,255,0.055)';
+  ctx.lineWidth = 1;
 
-  values.forEach((value, index) => {
-    const x = values.length <= 1
-      ? 0
-      : Math.round(
-          (index / (values.length - 1)) * (width - 1)
-        );
+  for (let i = 0; i <= 4; i++) {
+    const y = top + ((bottom - top) * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(left, y);
+    ctx.lineTo(right, y);
+    ctx.stroke();
+  }
 
-    const normalized = Math.max(
-      0,
-      Math.min(1, (value - min) / range)
-    );
+  for (let i = 0; i <= 8; i++) {
+    const x = left + ((right - left) * i) / 8;
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
+    ctx.stroke();
+  }
 
-    const y =
-      height - 1 -
-      Math.round(normalized * (height - 1));
+  // Courbe-guide fixe : elle donne l'aspect Crash sans être rechargée à chaque tick.
+  ctx.beginPath();
+  ctx.moveTo(left, bottom);
 
-    for (let row = y; row < height; row++) {
-      grid[row][x] = row === y ? '▓' : '░';
-    }
-  });
+  const steps = 64;
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const x = left + (right - left) * t;
+    const eased = Math.pow(t, 2.15);
+    const y = bottom - (bottom - top) * eased;
+    ctx.lineTo(x, y);
+  }
 
-  return grid
-    .map(row => row.join(''))
-    .join('\n');
+  ctx.strokeStyle = '#8b8df8';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = '#8b8df8';
+  ctx.shadowBlur = 14;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const gradient = ctx.createLinearGradient(0, top, 0, bottom);
+  gradient.addColorStop(0, 'rgba(139,141,248,0.20)');
+  gradient.addColorStop(1, 'rgba(139,141,248,0.00)');
+
+  ctx.lineTo(right, bottom);
+  ctx.lineTo(left, bottom);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.font = '500 18px Arial';
+  ctx.fillText('RISK ↑', left, 24);
+
+  return canvas.toBuffer('image/png');
 }
 
 function buildCrashEmbed(message, game) {
@@ -92,8 +134,7 @@ function buildCrashEmbed(message, game) {
       : game.multiplier;
 
   let description =
-    `# x${displayedMultiplier.toFixed(2)}\n` +
-    `\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n`;
+    `# x${displayedMultiplier.toFixed(2)}\n`;
 
   if (playing) {
     description +=
@@ -109,6 +150,7 @@ function buildCrashEmbed(message, game) {
 
   return new EmbedBuilder()
     .setDescription(description)
+    .setImage('attachment://crash-board.png')
     .setColor(
       lost
         ? 0xef476f
@@ -141,6 +183,18 @@ function buildCrashPayload(message, game) {
   return {
     embeds: [buildCrashEmbed(message, game)],
     components: buildCrashRow(game)
+  };
+}
+
+function buildInitialCrashPayload(message, game) {
+  return {
+    ...buildCrashPayload(message, game),
+    files: [
+      new AttachmentBuilder(
+        buildStaticCrashCanvas(),
+        { name: 'crash-board.png' }
+      )
+    ]
   };
 }
 
@@ -186,9 +240,23 @@ module.exports = {
       history: [1]
     };
 
-    const gameMessage = await message.reply(
-      buildCrashPayload(message, game)
-    );
+    let gameMessage;
+
+    try {
+      gameMessage = await message.reply(
+        buildInitialCrashPayload(message, game)
+      );
+    } catch (error) {
+      console.error('Crash Canvas error:', error);
+
+      // Rembourse la mise si Canvas ne peut pas être rendu.
+      userCoins.coins += amount;
+      await userCoins.save();
+
+      return message.reply(
+        '❌・Le moteur Canvas du Crash ne fonctionne pas. Fais **npm install** puis redémarre le bot.'
+      );
+    }
 
     let tickRunning = false;
 
