@@ -10,7 +10,31 @@ const {
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
-const { createCanvas } = require('@napi-rs/canvas');
+
+let canvasModule = null;
+
+function getCreateCanvas() {
+  if (!canvasModule) {
+    canvasModule = require('@napi-rs/canvas');
+  }
+
+  return canvasModule.createCanvas;
+}
+
+function testCanvasRenderer() {
+  const createCanvas = getCreateCanvas();
+  const canvas = createCanvas(2, 2);
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, 2, 2);
+
+  const buffer = canvas.toBuffer('image/png');
+
+  if (!Buffer.isBuffer(buffer) || buffer.length === 0) {
+    throw new Error('Canvas n\'a pas généré de PNG valide.');
+  }
+}
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -44,6 +68,7 @@ function getNextMultiplier(current, tickCount) {
 function buildCrashCanvas(game) {
   const width = 900;
   const height = 420;
+  const createCanvas = getCreateCanvas();
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
 
@@ -282,6 +307,18 @@ module.exports = {
   async execute(message, args) {
     const guildId = message.guild.id;
     const amount = Number(args[0]);
+
+    try {
+      testCanvasRenderer();
+    } catch (error) {
+      console.error('Crash Canvas error:', error);
+
+      return message.reply(
+        '❌・Le moteur Canvas du Crash ne fonctionne pas. ' +
+        'Fais **npm install** puis redémarre le bot.\n' +
+        `-# ${error.message}`
+      );
+    }
 
     if (!Number.isInteger(amount) || amount <= 0) {
       return message.reply(
