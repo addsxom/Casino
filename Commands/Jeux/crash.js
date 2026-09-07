@@ -40,80 +40,115 @@ function getNextMultiplier(current, tickCount) {
 }
 
 function buildLiveGraph(history) {
-  const width = 26;
-  const height = 7;
-  const values = history.slice(-width);
+  const charWidth = 28;
+  const charHeight = 8;
 
-  const emptyGraph = [
-    '┌' + '─'.repeat(width) + '┐',
-    ...Array.from(
-      { length: height },
-      () => '│' + ' '.repeat(width) + '│'
-    ),
-    '└' + '─'.repeat(width) + '┘'
-  ].join('\n');
+  // Chaque caractère braille contient une grille de 2×4 points.
+  const dotWidth = charWidth * 2;
+  const dotHeight = charHeight * 4;
+  const values = history.slice(-dotWidth);
 
-  if (!values.length) return emptyGraph;
-
-  const min = 1;
-  const max = Math.max(...values, 1.2);
-  const range = Math.max(0.2, max - min);
-
-  const grid = Array.from(
-    { length: height },
-    () => Array(width).fill(' ')
+  const dots = Array.from(
+    { length: dotHeight },
+    () => Array(dotWidth).fill(false)
   );
 
+  if (!values.length) values.push(1);
+
+  const min = 1;
+  const max = Math.max(...values, 1.15);
+  const range = Math.max(0.15, max - min);
+
   const points = values.map((value, index) => {
-    const x = index;
+    const x = values.length <= 1
+      ? 0
+      : Math.round(
+          (index / (values.length - 1)) * (dotWidth - 1)
+        );
+
     const normalized = Math.max(
       0,
       Math.min(1, (value - min) / range)
     );
+
     const y =
-      height - 1 - Math.round(normalized * (height - 1));
+      dotHeight - 1 -
+      Math.round(normalized * (dotHeight - 1));
 
     return { x, y };
   });
 
+  const setDot = (x, y) => {
+    if (
+      x >= 0 &&
+      y >= 0 &&
+      x < dotWidth &&
+      y < dotHeight
+    ) {
+      dots[y][x] = true;
+    }
+  };
+
   for (let i = 1; i < points.length; i++) {
-    const previous = points[i - 1];
-    const current = points[i];
+    const a = points[i - 1];
+    const b = points[i];
 
-    let x = previous.x;
-    let y = previous.y;
+    const steps = Math.max(
+      Math.abs(b.x - a.x),
+      Math.abs(b.y - a.y),
+      1
+    );
 
-    while (x < current.x) {
-      x++;
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps;
+      const x = Math.round(a.x + (b.x - a.x) * t);
+      const y = Math.round(a.y + (b.y - a.y) * t);
 
-      if (y > current.y) {
-        y--;
-        grid[y][x] = '╱';
-      } else if (y < current.y) {
-        y++;
-        grid[y][x] = '╲';
-      } else {
-        grid[y][x] = '─';
-      }
+      setDot(x, y);
+      setDot(x, y + 1);
     }
   }
 
-  points.forEach((point, index) => {
-    if (
-      point.x >= 0 &&
-      point.x < width &&
-      point.y >= 0 &&
-      point.y < height
-    ) {
-      grid[point.y][point.x] =
-        index === points.length - 1 ? '●' : '•';
+  const brailleBit = (localX, localY) => {
+    const map = [
+      [0x01, 0x08],
+      [0x02, 0x10],
+      [0x04, 0x20],
+      [0x40, 0x80]
+    ];
+
+    return map[localY][localX];
+  };
+
+  const lines = [];
+
+  for (let cy = 0; cy < charHeight; cy++) {
+    let line = '';
+
+    for (let cx = 0; cx < charWidth; cx++) {
+      let mask = 0;
+
+      for (let ly = 0; ly < 4; ly++) {
+        for (let lx = 0; lx < 2; lx++) {
+          const x = cx * 2 + lx;
+          const y = cy * 4 + ly;
+
+          if (dots[y][x]) {
+            mask |= brailleBit(lx, ly);
+          }
+        }
+      }
+
+      line += String.fromCharCode(0x2800 + mask);
     }
-  });
+
+    lines.push('│' + line + '│');
+  }
 
   return [
-    '┌' + '─'.repeat(width) + '┐',
-    ...grid.map(row => '│' + row.join('') + '│'),
-    '└' + '─'.repeat(width) + '┘'
+    '┌' + '─'.repeat(charWidth) + '┐',
+    ...lines,
+    '└' + '─'.repeat(charWidth) + '┘'
   ].join('\n');
 }
 
@@ -129,7 +164,8 @@ function buildCrashEmbed(message, game) {
   let description =
     `## x${displayedMultiplier.toFixed(2)}\n` +
     `\`\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n` +
-    `**Mise :** ${formatCoins(game.amount)} coins🪙\n`;
+    `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
+    `**Gain potentiel :** +${Math.max(0, (displayedMultiplier - 1) * 100).toFixed(1)} %\n`;
 
   if (playing) {
     description += `**Gain actuel :** ${formatCoins(game.amount * game.multiplier)} coins🪙\n\nCash Out avant le crash.`;
@@ -259,7 +295,17 @@ module.exports = {
           buildCrashPayload(message, game)
         );
 
-        if (version !== game.renderVersion) return;
+        // Si un Cash Out est arrivé pendant cet edit,
+        // cet ancien rendu ne doit jamais rester affiché.
+        if (
+          game.ended ||
+          version !== game.renderVersion
+        ) {
+          await gameMessage.edit(
+            buildCrashPayload(message, game)
+          ).catch(() => {});
+          return;
+        }
       } catch (error) {
         console.error('Crash tick error:', error);
       } finally {
@@ -299,6 +345,24 @@ module.exports = {
       await interaction.update(
         buildCrashPayload(message, game)
       );
+
+      // Un tick Discord pouvait déjà être en vol au moment du clic.
+      // On réaffirme l'état final juste après pour empêcher
+      // tout ancien rendu de reprendre la main.
+      if (tickRunning) {
+        await new Promise(resolve => {
+          const check = setInterval(() => {
+            if (!tickRunning) {
+              clearInterval(check);
+              resolve();
+            }
+          }, 10);
+        });
+
+        await gameMessage.edit(
+          buildCrashPayload(message, game)
+        ).catch(() => {});
+      }
 
       userCoins = await UserCoins.findOne({
         userId: message.author.id,
