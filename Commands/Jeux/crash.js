@@ -54,33 +54,31 @@ function getNextMultiplier(current, tickCount) {
   return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
-function buildRoundTimeline(crashPoint) {
+function buildRoundTimeline() {
   const values = [1];
   let multiplier = 1;
   let tickCount = 0;
 
-  while (multiplier < crashPoint && tickCount < 180) {
+  while (multiplier < MAX_CRASH && tickCount < 180) {
     tickCount++;
 
-    const next = getNextMultiplier(
+    multiplier = getNextMultiplier(
       multiplier,
       tickCount
     );
 
-    if (next >= crashPoint) {
-      values.push(crashPoint);
+    values.push(multiplier);
+
+    if (multiplier >= MAX_CRASH) {
       break;
     }
-
-    multiplier = next;
-    values.push(multiplier);
   }
 
   return values;
 }
 
 function buildAnimationFrames(timeline) {
-  const framesPerSecond = 5;
+  const framesPerSecond = 3;
   const frames = [];
 
   for (let i = 0; i < timeline.length - 1; i++) {
@@ -114,12 +112,8 @@ function drawCrashFrame(
   crashPoint,
   amount
 ) {
-  const isCrash = frameIndex === allFrames.length - 1;
   const multiplier = allFrames[frameIndex];
-
-  const accent = isCrash
-    ? '#ef476f'
-    : '#8b8df8';
+  const accent = '#8b8df8';
 
   ctx.fillStyle = '#0f1118';
   ctx.fillRect(0, 0, width, height);
@@ -150,10 +144,7 @@ function drawCrashFrame(
     ctx.stroke();
   }
 
-  const maxGraphMultiplier = Math.max(
-    1.2,
-    crashPoint * 1.08
-  );
+  const maxGraphMultiplier = MAX_CRASH;
   const range = Math.max(
     0.2,
     maxGraphMultiplier - 1
@@ -253,7 +244,7 @@ function drawCrashFrame(
     ctx.arc(
       last.x,
       last.y,
-      isCrash ? 10 : 7,
+      7,
       0,
       Math.PI * 2
     );
@@ -272,50 +263,36 @@ function drawCrashFrame(
     58
   );
 
-  ctx.fillStyle = isCrash
-    ? '#ef476f'
-    : 'rgba(255,255,255,0.55)';
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
   ctx.font = '600 17px Arial';
 
   ctx.fillText(
-    isCrash
-      ? 'CRASH'
-      : `+${Math.max(
-          0,
-          (multiplier - 1) * 100
-        ).toFixed(1)}%`,
+    `+${Math.max(
+      0,
+      (multiplier - 1) * 100
+    ).toFixed(1)}%`,
     left,
     86
   );
 
-  if (!isCrash) {
-    ctx.fillStyle = 'rgba(255,255,255,0.78)';
-    ctx.font = '600 18px Arial';
-    ctx.fillText(
-      `${formatCoins(amount)} → ${formatCoins(amount * multiplier)} coins`,
-      left,
-      height - 16
-    );
-  } else {
-    ctx.fillStyle = '#ef476f';
-    ctx.font = '700 18px Arial';
-    ctx.fillText(
-      `Perdu : ${formatCoins(amount)} coins`,
-      left,
-      height - 16
-    );
-  }
+  ctx.fillStyle = 'rgba(255,255,255,0.78)';
+  ctx.font = '600 18px Arial';
+  ctx.fillText(
+    `${formatCoins(amount)} → ${formatCoins(amount * multiplier)} coins`,
+    left,
+    height - 16
+  );
 }
 
 function buildCrashAnimation(crashPoint, amount) {
   const createCanvas = getCreateCanvas();
   const GIFEncoder = getGifEncoder();
 
-  const width = 680;
-  const height = 300;
+  const width = 560;
+  const height = 250;
 
   const timeline =
-    buildRoundTimeline(crashPoint);
+    buildRoundTimeline();
 
   const {
     frames,
@@ -337,7 +314,7 @@ function buildCrashAnimation(crashPoint, amount) {
   encoder.setDelay(
     Math.round(1000 / framesPerSecond)
   );
-  encoder.setQuality(12);
+  encoder.setQuality(20);
 
   for (let i = 0; i < frames.length; i++) {
     drawCrashFrame(
@@ -346,7 +323,8 @@ function buildCrashAnimation(crashPoint, amount) {
       height,
       frames,
       i,
-      crashPoint
+      crashPoint,
+      amount
     );
 
     encoder.addFrame(ctx);
@@ -541,10 +519,18 @@ module.exports = {
       game.status = 'lost';
 
       clearInterval(timer);
+      collector.stop('crashed');
 
-      // Important : on n'édite PAS le message ici.
-      // Le GIF arrive naturellement à sa frame CRASH
-      // sans jamais redémarrer.
+      // Une seule modification à la fin : on retire le GIF
+      // et on affiche clairement la perte.
+      await gameMessage.edit({
+        ...buildCrashPayload(
+          message,
+          game,
+          false
+        ),
+        attachments: []
+      }).catch(() => {});
     };
 
     const timer = setInterval(async () => {
