@@ -220,9 +220,7 @@ function drawCrashFrame(
 
     gradient.addColorStop(
       0,
-      isCrash
-        ? 'rgba(239,71,111,0.25)'
-        : 'rgba(139,141,248,0.24)'
+      'rgba(139,141,248,0.24)'
     );
     gradient.addColorStop(
       1,
