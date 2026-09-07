@@ -143,9 +143,17 @@ function drawCrashFrame(
     ctx.stroke();
   }
 
+  const scaleStartIndex = Math.max(
+    0,
+    frameIndex - 41
+  );
+
   const currentMax = Math.max(
     1.15,
-    ...allFrames.slice(0, frameIndex + 1)
+    ...allFrames.slice(
+      scaleStartIndex,
+      frameIndex + 1
+    )
   );
 
   // Echelle dynamique : la courbe reste lisible dès x1.05
@@ -160,17 +168,30 @@ function drawCrashFrame(
 
   const progressPoints = [];
 
-  for (let i = 0; i <= frameIndex; i++) {
-    const visibleCount = Math.max(
-      1,
-      frameIndex
-    );
+  // Graphe "scrolling" :
+  // le point actuel reste à droite et l'historique glisse vers la gauche.
+  const maxVisiblePoints = 42;
+  const startIndex = Math.max(
+    0,
+    frameIndex - maxVisiblePoints + 1
+  );
+  const visibleCount =
+    frameIndex - startIndex + 1;
+  const stepX =
+    (right - left) /
+    Math.max(1, maxVisiblePoints - 1);
 
-    const x = frameIndex <= 0
-      ? left
-      : left +
-        ((right - left) * i) /
-          visibleCount;
+  for (
+    let i = startIndex;
+    i <= frameIndex;
+    i++
+  ) {
+    const distanceFromCurrent =
+      frameIndex - i;
+
+    const x =
+      right -
+      distanceFromCurrent * stepX;
 
     const normalized = Math.max(
       0,
@@ -678,6 +699,7 @@ module.exports = {
       payout: 0,
       status: 'playing',
       ended: false,
+      cashoutLocked: false,
       tickCount: 0,
       renderVersion: 0,
       history: [1]
@@ -724,7 +746,10 @@ module.exports = {
       });
 
     const finishLoss = async () => {
-      if (game.ended) return;
+      if (
+        game.ended ||
+        game.cashoutLocked
+      ) return;
 
       game.ended = true;
       game.status = 'lost';
@@ -743,7 +768,10 @@ module.exports = {
     };
 
     const timer = setInterval(async () => {
-      if (game.ended) return;
+      if (
+        game.ended ||
+        game.cashoutLocked
+      ) return;
 
       try {
         game.tickCount++;
@@ -807,7 +835,10 @@ module.exports = {
           return;
         }
 
-        if (game.ended) {
+        if (
+          game.ended ||
+          game.cashoutLocked
+        ) {
           return interaction.reply({
             content:
               '💥・Cette partie est déjà terminée.',
@@ -815,23 +846,30 @@ module.exports = {
           }).catch(() => {});
         }
 
-        game.ended = true;
+        // SECTION CRITIQUE CASH OUT :
+        // aucun await avant que le résultat soit complètement figé.
+        game.cashoutLocked = true;
+
+        const lockedMultiplier =
+          game.multiplier;
+
         clearInterval(timer);
 
+        game.ended = true;
         game.cashoutMultiplier =
-          game.multiplier;
+          lockedMultiplier;
 
         game.payout = Math.floor(
           game.amount *
-          game.cashoutMultiplier
+          lockedMultiplier
         );
 
         game.status = 'cashed';
 
         collector.stop('cashed');
 
-        // Seule modification du message pendant une partie :
-        // le clic Cash Out. Le GIF est retiré au même moment.
+        // À partir d'ici le résultat ne peut plus changer,
+        // même si Discord met du temps à confirmer visuellement.
         await interaction.update(
           buildResultPayload(
             message,
