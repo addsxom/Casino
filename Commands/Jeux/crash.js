@@ -39,23 +39,81 @@ function getNextMultiplier(current) {
 }
 
 function buildLiveGraph(history) {
-  const chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-  const values = history.slice(-32);
+  const width = 26;
+  const height = 7;
+  const values = history.slice(-width);
 
-  if (!values.length) return '▁';
+  const emptyGraph = [
+    '┌' + '─'.repeat(width) + '┐',
+    ...Array.from(
+      { length: height },
+      () => '│' + ' '.repeat(width) + '│'
+    ),
+    '└' + '─'.repeat(width) + '┘'
+  ].join('\n');
 
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = Math.max(0.01, max - min);
+  if (!values.length) return emptyGraph;
 
-  return values.map(value => {
-    const normalized = (value - min) / range;
-    const index = Math.min(
-      chars.length - 1,
-      Math.max(0, Math.round(normalized * (chars.length - 1)))
+  const min = 1;
+  const max = Math.max(...values, 1.2);
+  const range = Math.max(0.2, max - min);
+
+  const grid = Array.from(
+    { length: height },
+    () => Array(width).fill(' ')
+  );
+
+  const points = values.map((value, index) => {
+    const x = index;
+    const normalized = Math.max(
+      0,
+      Math.min(1, (value - min) / range)
     );
-    return chars[index];
-  }).join('');
+    const y =
+      height - 1 - Math.round(normalized * (height - 1));
+
+    return { x, y };
+  });
+
+  for (let i = 1; i < points.length; i++) {
+    const previous = points[i - 1];
+    const current = points[i];
+
+    let x = previous.x;
+    let y = previous.y;
+
+    while (x < current.x) {
+      x++;
+
+      if (y > current.y) {
+        y--;
+        grid[y][x] = '╱';
+      } else if (y < current.y) {
+        y++;
+        grid[y][x] = '╲';
+      } else {
+        grid[y][x] = '─';
+      }
+    }
+  }
+
+  points.forEach((point, index) => {
+    if (
+      point.x >= 0 &&
+      point.x < width &&
+      point.y >= 0 &&
+      point.y < height
+    ) {
+      grid[point.y][point.x] =
+        index === points.length - 1 ? '●' : '•';
+    }
+  });
+
+  return [
+    '┌' + '─'.repeat(width) + '┐',
+    ...grid.map(row => '│' + row.join('') + '│'),
+    '└' + '─'.repeat(width) + '┘'
+  ].join('\n');
 }
 
 function buildFinalChartUrl(game) {
@@ -113,7 +171,7 @@ function buildCrashEmbed(message, game) {
 
   let description =
     `## x${displayedMultiplier.toFixed(2)}\n` +
-    `\`${buildLiveGraph(game.history)}\`\n\n` +
+    `\`\`\`text\n${buildLiveGraph(game.history)}\n\`\`\`\n` +
     `**Mise :** ${formatCoins(game.amount)} coins🪙\n`;
 
   if (playing) {
