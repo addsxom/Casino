@@ -2,11 +2,35 @@ const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const { sleep } = require('../../utils');
 
+const SLOT_CHANNEL_ID = 'REMPLACE_PAR_ID_DU_SALON';
+
+const SLOT_GIF = 'https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif';
+const WIN_GIF = 'https://media.giphy.com/media/Vu5UbNpjpqfMq2UFg0/giphy.gif';
+const LOSE_GIF = 'https://media.giphy.com/media/eJ4j2VnYOZU8qJU3Py/giphy.gif';
+
 module.exports = {
   name: 'slot',
   description: 'Jouez aux machines à sous en misant des coins.',
   async execute(message, args) {
     const guildId = message.guild.id;
+
+    if (message.channel.id !== SLOT_CHANNEL_ID) {
+      const warningMessage = await message.reply(
+        `❌・Les slots sont uniquement disponibles dans <#${SLOT_CHANNEL_ID}>.\n🕒 Suppression dans **5 secondes**.`
+      );
+
+      for (let seconds = 4; seconds >= 1; seconds--) {
+        await sleep(1000);
+        await warningMessage.edit(
+          `❌・Les slots sont uniquement disponibles dans <#${SLOT_CHANNEL_ID}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
+        );
+      }
+
+      await sleep(1000);
+      await warningMessage.delete().catch(() => {});
+      await message.delete().catch(() => {});
+      return;
+    }
 
     try {
       const amount = parseInt(args[0]);
@@ -26,30 +50,40 @@ module.exports = {
 
       const slotEmbed = new EmbedBuilder()
         .setTitle('Slots')
-        .setDescription(`${message.author} vient de lancer les slots en misant ${amount} coins🪙.`)
-        .setThumbnail('https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif')
-        .setFooter({ text: `${message.author.tag} | 10 secondes avant le résultat`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
+        .setDescription(`${message.author} vient de lancer les slots en misant **${amount}** coins🪙.`)
+        .setImage(SLOT_GIF)
+        .setFooter({
+          text: `${message.author.tag} | 5 secondes avant le résultat`,
+          iconURL: message.author.displayAvatarURL({ dynamic: true })
+        })
         .setColor(0x6b6de6);
 
       const sentEmbed = await message.reply({ embeds: [slotEmbed] });
 
-      await sleep(10000);
+      await sleep(5000);
 
       const result = Math.random() < 0.5;
-
-      const resultEmbed = new EmbedBuilder()
-      .setTitle('Slots')
-      .setDescription(result ? `Vous avez gagné **${amount * 2}** coins🪙` : `Vous avez perdu **${amount}** coins🪙`)
-      .setThumbnail('https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif')
-      .setFooter({text: `${message.author.tag} | ${result ? 'Gagné x2' : 'Perdu'}`, iconURL: message.author.displayAvatarURL({ dynamic: true }) })
-      .setColor(result ? 0x4caf50 : 0xe91e63);
 
       if (result) {
         userCoins.coins += amount * 2;
         await userCoins.save();
       }
 
-      message.reply({ embeds: [resultEmbed] });
+      const resultEmbed = new EmbedBuilder()
+        .setTitle(result ? '🎉 YOU WIN' : '💀 YOU LOSE')
+        .setDescription(
+          result
+            ? `Vous avez gagné **${amount * 2}** coins🪙`
+            : `Vous avez perdu **${amount}** coins🪙`
+        )
+        .setImage(result ? WIN_GIF : LOSE_GIF)
+        .setFooter({
+          text: `${message.author.tag} | ${result ? 'Gagné x2' : 'Perdu'}`,
+          iconURL: message.author.displayAvatarURL({ dynamic: true })
+        })
+        .setColor(result ? 0x4caf50 : 0xe91e63);
+
+      await sentEmbed.edit({ embeds: [resultEmbed] });
     } catch (error) {
       console.error(error);
       message.reply('Une erreur s\'est produite lors du jeu aux machines à sous.');
