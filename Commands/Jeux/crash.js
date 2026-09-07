@@ -712,6 +712,10 @@ module.exports = {
   description:
     'Misez des coins et cash out avant le crash.',
 
+  prepareAnimation() {
+    buildCrashAnimation();
+  },
+
   async execute(message, args) {
     const guildId = message.guild.id;
     const amount = Number(args[0]);
@@ -762,12 +766,7 @@ module.exports = {
     let gameMessage;
 
     try {
-      // Réponse immédiate : l'utilisateur voit la commande sans attendre l'encodage.
       gameMessage = await message.reply(
-        '🎰・Préparation du Crash...'
-      );
-
-      await gameMessage.edit(
         buildInitialCrashPayload(
           message,
           game
