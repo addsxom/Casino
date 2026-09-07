@@ -45,7 +45,23 @@ bot.snipe = new Discord.Collection();
 bot.color = "#6B6DE6",
 
 
-bot.login(process.env.TOKEN);
-
 loadCommands(bot);
 loadEvents(bot);
+
+// Pré-génère le GIF du Crash une seule fois au démarrage.
+// Ainsi +crash n'a plus besoin d'attendre l'encodage.
+const crashCommand = bot.commands.get('crash');
+
+if (
+    crashCommand &&
+    typeof crashCommand.prepareAnimation === 'function'
+) {
+    try {
+        crashCommand.prepareAnimation();
+        console.log('Crash • animation preloaded');
+    } catch (error) {
+        console.error('Crash preload error:', error);
+    }
+}
+
+bot.login(process.env.TOKEN);
