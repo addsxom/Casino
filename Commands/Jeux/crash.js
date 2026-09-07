@@ -109,9 +109,6 @@ function buildFlightTrack(multiplier) {
 }
 
 function buildPlayingEmbed(message, game) {
-  const phase =
-    getFlightPhase(game.multiplier);
-
   const potential = Math.floor(
     game.amount * game.multiplier
   );
@@ -119,31 +116,12 @@ function buildPlayingEmbed(message, game) {
   return new EmbedBuilder()
     .setColor(0x8b8df8)
     .setTitle(
-      `🚀 CRASH  •  x${game.multiplier.toFixed(2)}`
+      `🚀 x${game.multiplier.toFixed(2)}`
     )
     .setDescription(
-      `${buildFlightTrack(game.multiplier)}\n\n` +
-      `${phase.icon} **${phase.name}**\n` +
-      `💰 Valeur actuelle : **${formatCoins(potential)} coins🪙**`
-    )
-    .addFields(
-      {
-        name: 'Mise',
-        value:
-          `${formatCoins(game.amount)} coins🪙`,
-        inline: true
-      },
-      {
-        name: 'Multiplicateur',
-        value:
-          `x${game.multiplier.toFixed(2)}`,
-        inline: true
-      },
-      {
-        name: 'Statut',
-        value: '🟢 En vol',
-        inline: true
-      }
+      `**Gain actuel :** ${formatCoins(potential)} coins🪙\n` +
+      `**Mise :** ${formatCoins(game.amount)} coins🪙\n\n` +
+      `🟢 **En cours**`
     )
     .setFooter({
       text:
@@ -156,70 +134,29 @@ function buildResultEmbed(message, game) {
     return new EmbedBuilder()
       .setColor(0xef476f)
       .setTitle(
-        `💥 CRASH  •  x${game.crashPoint.toFixed(2)}`
+        `💥 Crash à x${game.crashPoint.toFixed(2)}`
       )
       .setDescription(
-        'La fusée a explosé avant votre Cash Out.'
-      )
-      .addFields(
-        {
-          name: 'Mise',
-          value:
-            `${formatCoins(game.amount)} coins🪙`,
-          inline: true
-        },
-        {
-          name: 'Perte',
-          value:
-            `-${formatCoins(game.amount)} coins🪙`,
-          inline: true
-        },
-        {
-          name: 'Résultat',
-          value: '🔴 Perdu',
-          inline: true
-        }
+        `**Perte :** -${formatCoins(game.amount)} coins🪙`
       )
       .setFooter({
         text:
-          `${message.author.tag} • Partie terminée`
+          `${message.author.tag} • Terminé`
       });
   }
-
-  const profit =
-    game.payout - game.amount;
 
   return new EmbedBuilder()
     .setColor(0x46d18c)
     .setTitle(
-      `✅ CASH OUT  •  x${game.cashoutMultiplier.toFixed(2)}`
+      `✅ Cash Out à x${game.cashoutMultiplier.toFixed(2)}`
     )
     .setDescription(
-      'Cash Out confirmé. La partie est verrouillée.'
-    )
-    .addFields(
-      {
-        name: 'Mise',
-        value:
-          `${formatCoins(game.amount)} coins🪙`,
-        inline: true
-      },
-      {
-        name: 'Retour',
-        value:
-          `${formatCoins(game.payout)} coins🪙`,
-        inline: true
-      },
-      {
-        name: 'Profit',
-        value:
-          `+${formatCoins(Math.max(0, profit))} coins🪙`,
-        inline: true
-      }
+      `**Gain :** ${formatCoins(game.payout)} coins🪙\n` +
+      `**Mise :** ${formatCoins(game.amount)} coins🪙`
     )
     .setFooter({
       text:
-        `${message.author.tag} • Partie terminée`
+        `${message.author.tag} • Terminé`
     });
 }
 
