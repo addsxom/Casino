@@ -38,12 +38,54 @@ function getNextMultiplier(current) {
   return Number((current + increase).toFixed(2));
 }
 
+function buildCrashGraph(history, status) {
+  const width = 24;
+  const height = 8;
+  const values = history.slice(-width);
+
+  if (values.length === 0) values.push(1);
+
+  const min = 1;
+  const max = Math.max(...values, 1.25);
+  const range = Math.max(0.25, max - min);
+
+  const grid = Array.from(
+    { length: height },
+    () => Array(width).fill(' ')
+  );
+
+  values.forEach((value, x) => {
+    const normalized = Math.max(0, Math.min(1, (value - min) / range));
+    const y = height - 1 - Math.round(normalized * (height - 1));
+
+    grid[y][x] = status === 'lost' && x === values.length - 1 ? '✕' : '●';
+
+    if (x > 0) {
+      const previous = values[x - 1];
+      const previousNormalized = Math.max(0, Math.min(1, (previous - min) / range));
+      const previousY = height - 1 - Math.round(previousNormalized * (height - 1));
+      const from = Math.min(previousY, y);
+      const to = Math.max(previousY, y);
+
+      for (let row = from; row <= to; row++) {
+        if (grid[row][x] === ' ') grid[row][x] = '│';
+      }
+    }
+  });
+
+  const lines = grid.map(row => '│ ' + row.join(''));
+  lines.push('└' + '─'.repeat(width + 1));
+
+  return '```text\n' + lines.join('\n') + '\n```';
+}
 function buildCrashContainer(message, game) {
   let title = '# 🚀 CRASH';
   let color = 0x6b6de6;
+  const graph = buildCrashGraph(game.history, game.status);
   let body =
+    `## x${game.multiplier.toFixed(2)}\n` +
+    graph + '\n' +
     `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
-    `**Multiplicateur :** x${game.multiplier.toFixed(2)}\n` +
     `**Gain actuel :** ${formatCoins(game.amount * game.multiplier)} coins🪙\n` +
     `\u200B\n` +
     `Cash Out avant le crash.`;
@@ -52,6 +94,8 @@ function buildCrashContainer(message, game) {
     title = '# 💥 CRASH !';
     color = 0xe91e63;
     body =
+      `## x${game.crashPoint.toFixed(2)} 💥\n` +
+      graph + '\n' +
       `Le jeu a crash à **x${game.crashPoint.toFixed(2)}**.\n` +
       `Tu as perdu **${formatCoins(game.amount)} coins🪙**.`;
   }
@@ -60,6 +104,8 @@ function buildCrashContainer(message, game) {
     title = '# 💰 CASH OUT';
     color = 0x4caf50;
     body =
+      `## x${game.cashoutMultiplier.toFixed(2)} ✅\n` +
+      graph + '\n' +
       `Tu as encaissé à **x${game.cashoutMultiplier.toFixed(2)}**.\n` +
       `**Gain :** ${formatCoins(game.payout)} coins🪙`;
   }
@@ -132,7 +178,8 @@ module.exports = {
       cashoutMultiplier: 0,
       payout: 0,
       status: 'playing',
-      ended: false
+      ended: false,
+      history: [1]
     };
 
     const gameMessage = await message.reply({
@@ -169,11 +216,13 @@ module.exports = {
 
         if (nextMultiplier >= game.crashPoint) {
           game.multiplier = game.crashPoint;
+          game.history.push(game.crashPoint);
           await finishLoss();
           return;
         }
 
         game.multiplier = nextMultiplier;
+        game.history.push(game.multiplier);
 
         await gameMessage.edit({
           components: [buildCrashContainer(message, game)]
