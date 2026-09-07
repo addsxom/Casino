@@ -26,16 +26,17 @@ function generateCrashPoint() {
   return Math.min(MAX_CRASH, Math.max(1, point));
 }
 
-function getNextMultiplier(current) {
-  let increase = 0.05;
+function getNextMultiplier(current, tickCount) {
+  // La croissance accélère avec le temps :
+  // ~3 % au début, puis le pourcentage augmente progressivement.
+  const growthPercent = Math.min(
+    0.18,
+    0.03 + tickCount * 0.0035
+  );
 
-  if (current >= 2) increase = 0.08;
-  if (current >= 5) increase = 0.15;
-  if (current >= 10) increase = 0.30;
-  if (current >= 25) increase = 0.60;
-  if (current >= 50) increase = 1.00;
+  const next = current * (1 + growthPercent);
 
-  return Number((current + increase).toFixed(2));
+  return Number(Math.min(MAX_CRASH, next).toFixed(2));
 }
 
 function buildLiveGraph(history) {
@@ -116,50 +117,6 @@ function buildLiveGraph(history) {
   ].join('\n');
 }
 
-function buildFinalChartUrl(game) {
-  const values = game.history.slice(-40);
-  const labels = values.map((_, i) => i + 1);
-  const lineColor = game.status === 'lost' ? '#e91e63' : '#4caf50';
-
-  const config = {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data: values,
-        borderColor: lineColor,
-        backgroundColor: 'rgba(107,109,230,0.18)',
-        borderWidth: 4,
-        pointRadius: values.map((_, i) => i === values.length - 1 ? 6 : 0),
-        pointBackgroundColor: lineColor,
-        fill: true,
-        tension: 0.28
-      }]
-    },
-    options: {
-      legend: { display: false },
-      animation: { duration: 0 },
-      scales: {
-        xAxes: [{
-          display: true,
-          gridLines: { color: 'rgba(255,255,255,0.08)' },
-          ticks: { display: false }
-        }],
-        yAxes: [{
-          display: true,
-          gridLines: { color: 'rgba(255,255,255,0.08)' },
-          ticks: {
-            min: 1,
-            fontColor: '#c7c9d3'
-          }
-        }]
-      }
-    }
-  };
-
-  return `https://quickchart.io/chart?width=900&height=430&backgroundColor=%2311131c&c=${encodeURIComponent(JSON.stringify(config))}`;
-}
-
 function buildCrashEmbed(message, game) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
@@ -187,10 +144,6 @@ function buildCrashEmbed(message, game) {
     .setDescription(description)
     .setColor(lost ? 0xe91e63 : game.status === 'cashed' ? 0x4caf50 : 0x6b6de6)
     .setFooter({ text: `${message.author.tag} • ${playing ? 'Clique avant le crash' : 'Partie terminée'}` });
-
-  if (!playing) {
-    embed.setImage(buildFinalChartUrl(game));
-  }
 
   return embed;
 }
@@ -252,6 +205,8 @@ module.exports = {
       payout: 0,
       status: 'playing',
       ended: false,
+      tickCount: 0,
+      renderVersion: 0,
       history: [1]
     };
 
@@ -280,7 +235,11 @@ module.exports = {
       tickRunning = true;
 
       try {
-        const nextMultiplier = getNextMultiplier(game.multiplier);
+        game.tickCount++;
+        const nextMultiplier = getNextMultiplier(
+          game.multiplier,
+          game.tickCount
+        );
 
         if (nextMultiplier >= game.crashPoint) {
           game.multiplier = game.crashPoint;
@@ -292,7 +251,15 @@ module.exports = {
         game.multiplier = nextMultiplier;
         game.history.push(game.multiplier);
 
-        await gameMessage.edit(buildCrashPayload(message, game));
+        const version = game.renderVersion;
+
+        if (game.ended) return;
+
+        await gameMessage.edit(
+          buildCrashPayload(message, game)
+        );
+
+        if (version !== game.renderVersion) return;
       } catch (error) {
         console.error('Crash tick error:', error);
       } finally {
@@ -310,16 +277,28 @@ module.exports = {
 
       if (interaction.customId !== 'crash_cashout') return;
 
-      await interaction.deferUpdate();
+      if (game.ended) {
+        return interaction.deferUpdate().catch(() => {});
+      }
 
-      if (game.ended) return;
-
+      // On fige le jeu immédiatement dès le clic.
       game.ended = true;
+      game.renderVersion++;
       clearInterval(timer);
 
       game.cashoutMultiplier = game.multiplier;
-      game.payout = Math.floor(game.amount * game.cashoutMultiplier);
+      game.payout = Math.floor(
+        game.amount * game.cashoutMultiplier
+      );
       game.status = 'cashed';
+
+      collector.stop('cashed');
+
+      // Un seul aller-retour Discord : le bouton disparaît immédiatement
+      // et l'UI affiche le résultat avant la sauvegarde Mongo.
+      await interaction.update(
+        buildCrashPayload(message, game)
+      );
 
       userCoins = await UserCoins.findOne({
         userId: message.author.id,
@@ -330,10 +309,6 @@ module.exports = {
         userCoins.coins += game.payout;
         await userCoins.save();
       }
-
-      collector.stop('cashed');
-
-      await gameMessage.edit(buildCrashPayload(message, game)).catch(() => {});
     });
 
     collector.on('end', async (_, reason) => {
