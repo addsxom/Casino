@@ -102,49 +102,11 @@ function getVisualMultiplierAt(
   );
 }
 
-function buildLiveCanvas(game) {
-  const createCanvas = getCreateCanvas();
-  const width = 620;
-  const height = 260;
-  const canvas = createCanvas(width, height);
-  const ctx = canvas.getContext('2d');
-
-  ctx.fillStyle = '#0f1118';
-  ctx.fillRect(0, 0, width, height);
-
-  const left = 36;
-  const right = width - 28;
-  const top = 34;
-  const bottom = height - 30;
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
-  ctx.lineWidth = 1;
-
-  for (let i = 0; i <= 4; i++) {
-    const y =
-      top +
-      ((bottom - top) * i) / 4;
-
-    ctx.beginPath();
-    ctx.moveTo(left, y);
-    ctx.lineTo(right, y);
-    ctx.stroke();
-  }
-
-  for (let i = 0; i <= 7; i++) {
-    const x =
-      left +
-      ((right - left) * i) / 7;
-
-    ctx.beginPath();
-    ctx.moveTo(x, top);
-    ctx.lineTo(x, bottom);
-    ctx.stroke();
-  }
-
-  const values = game.history.length
-    ? game.history
-    : [1];
+function buildTextGraph(game) {
+  const width = 28;
+  const height = 8;
+  const values =
+    game.history.slice(-width);
 
   const maxValue = Math.max(
     1.15,
@@ -153,88 +115,74 @@ function buildLiveCanvas(game) {
 
   const range = Math.max(
     0.15,
-    (maxValue - 1) * 1.18
+    maxValue - 1
   );
 
-  const maxVisiblePoints = 30;
-  const visibleValues =
-    values.slice(-maxVisiblePoints);
+  const grid = Array.from(
+    { length: height },
+    () => Array(width).fill(' ')
+  );
 
-  const points = visibleValues.map(
-    (value, index) => {
-      const x =
-        left +
-        ((right - left) * index) /
-          Math.max(
-            maxVisiblePoints - 1,
-            visibleValues.length - 1,
-            1
-          );
+  values.forEach((value, index) => {
+    const normalized = Math.max(
+      0,
+      Math.min(
+        1,
+        (value - 1) / range
+      )
+    );
 
-      const normalized = Math.max(
+    const row =
+      height -
+      1 -
+      Math.round(
+        normalized * (height - 1)
+      );
+
+    grid[row][index] = '●';
+
+    // Relie visuellement les points quand la courbe monte.
+    if (index > 0) {
+      const previous = values[index - 1];
+      const previousNormalized = Math.max(
         0,
         Math.min(
           1,
-          (value - 1) / range
+          (previous - 1) / range
         )
       );
 
-      const y =
-        bottom -
-        normalized * (bottom - top);
+      const previousRow =
+        height -
+        1 -
+        Math.round(
+          previousNormalized * (height - 1)
+        );
 
-      return { x, y };
-    }
-  );
-
-  if (points.length > 1) {
-    ctx.beginPath();
-    ctx.moveTo(
-      points[0].x,
-      points[0].y
-    );
-
-    for (let i = 1; i < points.length; i++) {
-      ctx.lineTo(
-        points[i].x,
-        points[i].y
+      const minRow = Math.min(
+        row,
+        previousRow
       );
+      const maxRow = Math.max(
+        row,
+        previousRow
+      );
+
+      for (
+        let r = minRow + 1;
+        r < maxRow;
+        r++
+      ) {
+        if (grid[r][index] === ' ') {
+          grid[r][index] = '│';
+        }
+      }
     }
+  });
 
-    ctx.strokeStyle = '#8b8df8';
-    ctx.lineWidth = 5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = '#8b8df8';
-    ctx.shadowBlur = 12;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-  }
-
-  const last = points[points.length - 1];
-
-  if (last) {
-    ctx.beginPath();
-    ctx.arc(
-      last.x,
-      last.y,
-      7,
-      0,
-      Math.PI * 2
-    );
-    ctx.fillStyle = '#8b8df8';
-    ctx.fill();
-  }
-
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 38px Arial';
-  ctx.fillText(
-    `x${game.multiplier.toFixed(2)}`,
-    left,
-    55
-  );
-
-  return canvas.toBuffer('image/png');
+  return grid
+    .map(row => row.join(''))
+    .join('\n');
 }
 
 function buildResultCanvas(game) {
@@ -410,8 +358,10 @@ function buildGameEmbed(message, game, showAnimation = true) {
 
   if (playing) {
     description =
-      `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
-      `Le multiplicateur et le gain sont affichés en direct sur le graphique.`;
+      `**x${game.multiplier.toFixed(2)}**  •  ` +
+      `**${formatCoins(game.amount * game.multiplier)} coins🪙**\n` +
+      `Mise : ${formatCoins(game.amount)} coins🪙\n\n` +
+      `\`\`\`\n${buildTextGraph(game)}\n\`\`\``;
   } else if (lost) {
     description =
       `💥 **Crash à x${game.crashPoint.toFixed(2)}**\n` +
@@ -438,10 +388,6 @@ function buildGameEmbed(message, game, showAnimation = true) {
         ? message.author.tag
         : `${message.author.tag} • Terminé`
     });
-
-  if (showAnimation) {
-    embed.setImage('attachment://crash-live.png');
-  }
 
   return embed;
 }
@@ -482,46 +428,22 @@ function buildInitialCrashPayload(
   message,
   game
 ) {
-  return {
-    ...buildCrashPayload(
-      message,
-      game,
-      true
-    ),
-    files: [
-      new AttachmentBuilder(
-        buildLiveCanvas(game),
-        {
-          name: 'crash-live.png'
-        }
-      )
-    ]
-  };
+  return buildCrashPayload(
+    message,
+    game,
+    false
+  );
 }
 
 function buildLiveCrashPayload(
   message,
   game
 ) {
-  return {
-    embeds: [
-      buildGameEmbed(
-        message,
-        game,
-        true
-      )
-    ],
-    components: buildCrashRow(game),
-    files: [
-      new AttachmentBuilder(
-        buildLiveCanvas(game),
-        {
-          name: 'crash-live.png'
-        }
-      )
-    ],
-    attachments: []
-  };
+  return buildCrashPayload(
+    message,
+    game,
+    false
+  );
 }
 
 function buildInstantResultPayload(
@@ -631,11 +553,11 @@ module.exports = {
         )
       );
 
-      // Référence temporelle commune au Canvas live et à la logique du jeu.
+      // Référence temporelle commune à l'affichage live et à la logique du jeu.
       game.startedAt = Date.now();
     } catch (error) {
       console.error(
-        'Crash animation error:',
+        'Crash display error:',
         error
       );
 
@@ -644,13 +566,12 @@ module.exports = {
 
       if (gameMessage) {
         return gameMessage.edit(
-          '❌・Impossible de générer l\'animation du Crash. ' +
-          'Fais **npm install** puis redémarre le bot.'
+          '❌・Impossible d\'afficher le Crash.'
         );
       }
 
       return message.reply(
-        '❌・Impossible de générer l\'animation du Crash.'
+        '❌・Impossible d\'afficher le Crash.'
       );
     }
 
@@ -748,24 +669,15 @@ module.exports = {
           return;
         }
 
-        // ACK envoyé immédiatement, sans calcul synchrone lourd avant.
-        const ackPromise =
-          interaction.deferUpdate().catch(
-            error => {
-              console.error(
-                'Crash cashout ACK error:',
-                error
-              );
-              return null;
-            }
-          );
-
         if (
           interaction.user.id !==
           message.author.id
         ) {
-          await ackPromise;
-          return;
+          return interaction.reply({
+            content:
+              '❌・Cette partie ne vous appartient pas.',
+            ephemeral: true
+          }).catch(() => {});
         }
 
         if (
@@ -773,23 +685,23 @@ module.exports = {
           game.cashoutLocked ||
           !game.startedAt
         ) {
-          await ackPromise;
-          return;
+          return interaction.reply({
+            content:
+              '💥・Cette partie est déjà terminée.',
+            ephemeral: true
+          }).catch(() => {});
         }
 
-        // Verrouillage immédiat dès réception du clic.
+        // Le clic devient immédiatement la source de vérité.
         game.cashoutLocked = true;
         clearInterval(timer);
 
-        // Le x vient de la frame du Canvas live visible au moment exact du clic.
         const lockedMultiplier =
           getVisualMultiplierAt(
             game.startedAt,
             clickedAt
           );
 
-        // Si le crash était déjà atteint sur cette même frame,
-        // le Cash Out est trop tard.
         if (
           lockedMultiplier >=
           game.crashPoint
@@ -803,7 +715,9 @@ module.exports = {
 
           game.cashoutLocked = false;
 
-          await ackPromise;
+          await interaction.deferUpdate()
+            .catch(() => {});
+
           await finishLoss();
           return;
         }
@@ -833,22 +747,13 @@ module.exports = {
 
         collector.stop('cashed');
 
-        await ackPromise;
-
-        // Le live Canvas s'arrête ici : plus aucun update ne peut repartir.
-        await gameMessage.edit(
+        // Confirmation visuelle immédiate : aucune image à générer ici.
+        await interaction.update(
           buildInstantResultPayload(
             message,
             game
           )
-        ).catch(() => {});
-
-        await gameMessage.edit(
-          buildResultPayload(
-            message,
-            game
-          )
-        ).catch(() => {});
+        );
 
         userCoins =
           await UserCoins.findOne({
@@ -862,6 +767,14 @@ module.exports = {
 
           await userCoins.save();
         }
+
+        // Finition uniquement après le Cash Out confirmé.
+        await gameMessage.edit(
+          buildResultPayload(
+            message,
+            game
+          )
+        ).catch(() => {});
       }
     );
     collector.on(
