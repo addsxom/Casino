@@ -111,7 +111,8 @@ function drawCrashFrame(
   height,
   allFrames,
   frameIndex,
-  crashPoint
+  crashPoint,
+  amount
 ) {
   const isCrash = frameIndex === allFrames.length - 1;
   const multiplier = allFrames[frameIndex];
@@ -286,9 +287,27 @@ function drawCrashFrame(
     left,
     86
   );
+
+  if (!isCrash) {
+    ctx.fillStyle = 'rgba(255,255,255,0.78)';
+    ctx.font = '600 18px Arial';
+    ctx.fillText(
+      `${formatCoins(amount)} → ${formatCoins(amount * multiplier)} coins`,
+      left,
+      height - 16
+    );
+  } else {
+    ctx.fillStyle = '#ef476f';
+    ctx.font = '700 18px Arial';
+    ctx.fillText(
+      `Perdu : ${formatCoins(amount)} coins`,
+      left,
+      height - 16
+    );
+  }
 }
 
-function buildCrashAnimation(crashPoint) {
+function buildCrashAnimation(crashPoint, amount) {
   const createCanvas = getCreateCanvas();
   const GIFEncoder = getGifEncoder();
 
@@ -338,41 +357,24 @@ function buildCrashAnimation(crashPoint) {
   return encoder.out.getData();
 }
 
-function buildAnimationEmbed() {
-  return new EmbedBuilder()
-    .setImage('attachment://crash-animation.gif')
-    .setColor(0x8b8df8);
-}
-
-function buildCrashEmbed(
-  message,
-  game
-) {
+function buildGameEmbed(message, game, showAnimation = true) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
 
-  const displayedMultiplier = lost
-    ? game.crashPoint
-    : game.status === 'cashed'
-      ? game.cashoutMultiplier
-      : game.multiplier;
-
-  let description =
-    `# x${displayedMultiplier.toFixed(2)}\n`;
+  let description;
 
   if (playing) {
-    description +=
-      `**${formatCoins(game.amount)} coins🪙** → **${formatCoins(game.amount * game.multiplier)} coins🪙**\n` +
-      `+${Math.max(
-        0,
-        (displayedMultiplier - 1) * 100
-      ).toFixed(1)} %`;
+    description =
+      `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
+      `Le multiplicateur et le gain sont affichés en direct sur le graphique.`;
   } else if (lost) {
-    description +=
-      `💥 **Perdu : ${formatCoins(game.amount)} coins🪙**`;
+    description =
+      `💥 **Crash à x${game.crashPoint.toFixed(2)}**\n` +
+      `Perdu : **${formatCoins(game.amount)} coins🪙**`;
   } else {
-    description +=
-      `✅ **+${formatCoins(game.payout)} coins🪙** à **x${displayedMultiplier.toFixed(2)}**`;
+    description =
+      `✅ **Cash Out à x${game.cashoutMultiplier.toFixed(2)}**\n` +
+      `Gain : **${formatCoins(game.payout)} coins🪙**`;
   }
 
   const embed = new EmbedBuilder()
@@ -390,8 +392,13 @@ function buildCrashEmbed(
         : `${message.author.tag} • Terminé`
     });
 
+  if (showAnimation) {
+    embed.setImage('attachment://crash-animation.gif');
+  }
+
   return embed;
 }
+
 
 function buildCrashRow(game) {
   if (game.status !== 'playing') return [];
@@ -400,9 +407,7 @@ function buildCrashRow(game) {
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('crash_cashout')
-        .setLabel(
-          `Cash Out • x${game.multiplier.toFixed(2)}`
-        )
+        .setLabel('Cash Out')
         .setEmoji('💰')
         .setStyle(ButtonStyle.Success)
     )
@@ -411,26 +416,36 @@ function buildCrashRow(game) {
 
 function buildCrashPayload(
   message,
-  game
+  game,
+  showAnimation = true
 ) {
   return {
     embeds: [
-      buildCrashEmbed(
+      buildGameEmbed(
         message,
-        game
+        game,
+        showAnimation
       )
     ],
     components: buildCrashRow(game)
   };
 }
 
-function buildInitialCrashPayload(game) {
+function buildInitialCrashPayload(
+  message,
+  game
+) {
   return {
-    embeds: [buildAnimationEmbed()],
+    ...buildCrashPayload(
+      message,
+      game,
+      true
+    ),
     files: [
       new AttachmentBuilder(
         buildCrashAnimation(
-          game.crashPoint
+          game.crashPoint,
+          game.amount
         ),
         {
           name: 'crash-animation.gif'
@@ -490,16 +505,11 @@ module.exports = {
       history: [1]
     };
 
-    let animationMessage;
-    let controlMessage;
+    let gameMessage;
 
     try {
-      animationMessage = await message.reply(
-        buildInitialCrashPayload(game)
-      );
-
-      controlMessage = await message.channel.send(
-        buildCrashPayload(
+      gameMessage = await message.reply(
+        buildInitialCrashPayload(
           message,
           game
         )
@@ -519,10 +529,8 @@ module.exports = {
       );
     }
 
-    let tickRunning = false;
-
     const collector =
-      controlMessage.createMessageComponentCollector({
+      gameMessage.createMessageComponentCollector({
         time: 180000
       });
 
@@ -533,25 +541,14 @@ module.exports = {
       game.status = 'lost';
 
       clearInterval(timer);
-      collector.stop('crashed');
 
-      await controlMessage.edit(
-        buildCrashPayload(
-          message,
-          game
-        )
-      ).catch(() => {});
+      // Important : on n'édite PAS le message ici.
+      // Le GIF arrive naturellement à sa frame CRASH
+      // sans jamais redémarrer.
     };
 
     const timer = setInterval(async () => {
-      if (
-        game.ended ||
-        tickRunning
-      ) {
-        return;
-      }
-
-      tickRunning = true;
+      if (game.ended) return;
 
       try {
         game.tickCount++;
@@ -584,32 +581,13 @@ module.exports = {
           game.multiplier
         );
 
-        const version =
-          game.renderVersion;
-
-        if (game.ended) return;
-
-        await controlMessage.edit(
-          buildCrashPayload(
-            message,
-            game
-          )
-        );
-
-        if (
-          game.ended ||
-          version !==
-            game.renderVersion
-        ) {
-          return;
-        }
+        // Aucun edit Discord pendant la montée.
+        // Le GIF Canvas est l'unique affichage live.
       } catch (error) {
         console.error(
           'Crash tick error:',
           error
         );
-      } finally {
-        tickRunning = false;
       }
     }, TICK_MS);
 
@@ -635,14 +613,14 @@ module.exports = {
         }
 
         if (game.ended) {
-          return interaction
-            .deferUpdate()
-            .catch(() => {});
+          return interaction.reply({
+            content:
+              '💥・Cette partie est déjà terminée.',
+            ephemeral: true
+          }).catch(() => {});
         }
 
         game.ended = true;
-        game.renderVersion++;
-
         clearInterval(timer);
 
         game.cashoutMultiplier =
@@ -657,14 +635,16 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // Le GIF est dans un autre message et n'est jamais édité.
-        // Seul le panneau de contrôle est figé au Cash Out.
-        await interaction.update(
-          buildCrashPayload(
+        // Seule modification du message pendant une partie :
+        // le clic Cash Out. Le GIF est retiré au même moment.
+        await interaction.update({
+          ...buildCrashPayload(
             message,
-            game
-          )
-        );
+            game,
+            false
+          ),
+          attachments: []
+        });
 
         userCoins =
           await UserCoins.findOne({
