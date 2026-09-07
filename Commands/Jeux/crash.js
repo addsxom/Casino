@@ -143,20 +143,34 @@ function drawCrashFrame(
     ctx.stroke();
   }
 
-  const maxGraphMultiplier = MAX_CRASH;
+  const currentMax = Math.max(
+    1.15,
+    ...allFrames.slice(0, frameIndex + 1)
+  );
+
+  // Echelle dynamique : la courbe reste lisible dès x1.05
+  // au lieu d'être écrasée par une échelle fixe jusqu'à x100.
+  const maxGraphMultiplier =
+    1 + (currentMax - 1) * 1.18;
+
   const range = Math.max(
-    0.2,
+    0.15,
     maxGraphMultiplier - 1
   );
 
   const progressPoints = [];
 
   for (let i = 0; i <= frameIndex; i++) {
-    const x = allFrames.length <= 1
+    const visibleCount = Math.max(
+      1,
+      frameIndex
+    );
+
+    const x = frameIndex <= 0
       ? left
       : left +
         ((right - left) * i) /
-          (allFrames.length - 1);
+          visibleCount;
 
     const normalized = Math.max(
       0,
@@ -272,13 +286,8 @@ function drawCrashFrame(
     86
   );
 
-  ctx.fillStyle = 'rgba(255,255,255,0.65)';
-  ctx.font = '600 16px Arial';
-  ctx.fillText(
-    'CASH OUT AVANT LE CRASH',
-    left,
-    height - 16
-  );
+  // Le Canvas live reste volontairement minimal :
+  // uniquement la courbe, le multiplicateur et le pourcentage.
 }
 
 function buildCrashAnimation() {
@@ -338,7 +347,7 @@ function buildCrashAnimation() {
 function buildResultCanvas(game) {
   const createCanvas = getCreateCanvas();
   const width = 700;
-  const height = 320;
+  const height = 300;
 
   const canvas = createCanvas(width, height);
   const ctx = canvas.getContext('2d');
@@ -351,56 +360,33 @@ function buildResultCanvas(game) {
   ctx.fillStyle = '#0f1118';
   ctx.fillRect(0, 0, width, height);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.font = '700 34px Arial';
-  ctx.fillText(
-    won ? 'CASH OUT' : 'CRASH',
-    34,
-    48
-  );
-
-  ctx.fillStyle = accent;
-  ctx.font = '700 26px Arial';
-  ctx.fillText(
-    won
-      ? `x${game.cashoutMultiplier.toFixed(2)}`
-      : `x${game.crashPoint.toFixed(2)}`,
-    34,
-    82
-  );
-
-  ctx.fillStyle = 'rgba(255,255,255,0.72)';
-  ctx.font = '600 17px Arial';
-  ctx.fillText(
-    `Mise : ${formatCoins(game.amount)} coins`,
-    34,
-    112
-  );
-
-  ctx.fillStyle = won
-    ? '#46d18c'
-    : '#ef476f';
-  ctx.fillText(
-    won
-      ? `Gain : +${formatCoins(game.payout)} coins`
-      : `Perte : -${formatCoins(game.amount)} coins`,
-    34,
-    140
-  );
-
   const left = 34;
   const right = width - 32;
-  const top = 172;
-  const bottom = height - 30;
+  const top = 34;
+  const bottom = height - 34;
 
   ctx.strokeStyle = 'rgba(255,255,255,0.06)';
   ctx.lineWidth = 1;
 
-  for (let i = 0; i <= 3; i++) {
-    const y = top + ((bottom - top) * i) / 3;
+  for (let i = 0; i <= 4; i++) {
+    const y =
+      top +
+      ((bottom - top) * i) / 4;
+
     ctx.beginPath();
     ctx.moveTo(left, y);
     ctx.lineTo(right, y);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i <= 7; i++) {
+    const x =
+      left +
+      ((right - left) * i) / 7;
+
+    ctx.beginPath();
+    ctx.moveTo(x, top);
+    ctx.lineTo(x, bottom);
     ctx.stroke();
   }
 
@@ -457,13 +443,41 @@ function buildResultCanvas(game) {
     }
 
     ctx.strokeStyle = accent;
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.shadowColor = accent;
-    ctx.shadowBlur = 12;
+    ctx.shadowBlur = 16;
     ctx.stroke();
     ctx.shadowBlur = 0;
+
+    const last =
+      points[points.length - 1];
+
+    const gradient =
+      ctx.createLinearGradient(
+        0,
+        top,
+        0,
+        bottom
+      );
+
+    gradient.addColorStop(
+      0,
+      won
+        ? 'rgba(70,209,140,0.22)'
+        : 'rgba(239,71,111,0.24)'
+    );
+    gradient.addColorStop(
+      1,
+      'rgba(15,17,24,0)'
+    );
+
+    ctx.lineTo(last.x, bottom);
+    ctx.lineTo(points[0].x, bottom);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
   }
 
   const last = points[points.length - 1];
@@ -472,12 +486,25 @@ function buildResultCanvas(game) {
   ctx.arc(
     last.x,
     last.y,
-    6,
+    8,
     0,
     Math.PI * 2
   );
   ctx.fillStyle = accent;
+  ctx.shadowColor = accent;
+  ctx.shadowBlur = 18;
   ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Seulement l'état final sur le Canvas.
+  // Les détails chiffrés restent dans l'embed.
+  ctx.fillStyle = accent;
+  ctx.font = '700 28px Arial';
+  ctx.fillText(
+    won ? 'CASH OUT' : 'CRASH',
+    left,
+    top + 30
+  );
 
   return canvas.toBuffer('image/png');
 }
@@ -495,11 +522,13 @@ function buildGameEmbed(message, game, showAnimation = true) {
   } else if (lost) {
     description =
       `💥 **Crash à x${game.crashPoint.toFixed(2)}**\n` +
-      `Perdu : **${formatCoins(game.amount)} coins🪙**`;
+      `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
+      `**Perte :** -${formatCoins(game.amount)} coins🪙`;
   } else {
     description =
       `✅ **Cash Out à x${game.cashoutMultiplier.toFixed(2)}**\n` +
-      `Gain : **${formatCoins(game.payout)} coins🪙**`;
+      `**Mise :** ${formatCoins(game.amount)} coins🪙\n` +
+      `**Gain :** +${formatCoins(game.payout)} coins🪙`;
   }
 
   const embed = new EmbedBuilder()
