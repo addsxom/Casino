@@ -338,10 +338,15 @@ function buildCrashAnimation(crashPoint) {
   return encoder.out.getData();
 }
 
+function buildAnimationEmbed() {
+  return new EmbedBuilder()
+    .setImage('attachment://crash-animation.gif')
+    .setColor(0x8b8df8);
+}
+
 function buildCrashEmbed(
   message,
-  game,
-  showAnimation = true
+  game
 ) {
   const playing = game.status === 'playing';
   const lost = game.status === 'lost';
@@ -385,12 +390,6 @@ function buildCrashEmbed(
         : `${message.author.tag} • Terminé`
     });
 
-  if (showAnimation) {
-    embed.setImage(
-      'attachment://crash-animation.gif'
-    );
-  }
-
   return embed;
 }
 
@@ -412,31 +411,22 @@ function buildCrashRow(game) {
 
 function buildCrashPayload(
   message,
-  game,
-  showAnimation = true
+  game
 ) {
   return {
     embeds: [
       buildCrashEmbed(
         message,
-        game,
-        showAnimation
+        game
       )
     ],
     components: buildCrashRow(game)
   };
 }
 
-function buildInitialCrashPayload(
-  message,
-  game
-) {
+function buildInitialCrashPayload(game) {
   return {
-    ...buildCrashPayload(
-      message,
-      game,
-      true
-    ),
+    embeds: [buildAnimationEmbed()],
     files: [
       new AttachmentBuilder(
         buildCrashAnimation(
@@ -500,11 +490,16 @@ module.exports = {
       history: [1]
     };
 
-    let gameMessage;
+    let animationMessage;
+    let controlMessage;
 
     try {
-      gameMessage = await message.reply(
-        buildInitialCrashPayload(
+      animationMessage = await message.reply(
+        buildInitialCrashPayload(game)
+      );
+
+      controlMessage = await message.channel.send(
+        buildCrashPayload(
           message,
           game
         )
@@ -527,7 +522,7 @@ module.exports = {
     let tickRunning = false;
 
     const collector =
-      gameMessage.createMessageComponentCollector({
+      controlMessage.createMessageComponentCollector({
         time: 180000
       });
 
@@ -540,11 +535,10 @@ module.exports = {
       clearInterval(timer);
       collector.stop('crashed');
 
-      await gameMessage.edit(
+      await controlMessage.edit(
         buildCrashPayload(
           message,
-          game,
-          true
+          game
         )
       ).catch(() => {});
     };
@@ -595,11 +589,10 @@ module.exports = {
 
         if (game.ended) return;
 
-        await gameMessage.edit(
+        await controlMessage.edit(
           buildCrashPayload(
             message,
-            game,
-            true
+            game
           )
         );
 
@@ -664,16 +657,14 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // On retire simplement le GIF :
-        // aucune nouvelle image n'est chargée.
-        await interaction.update({
-          ...buildCrashPayload(
+        // Le GIF est dans un autre message et n'est jamais édité.
+        // Seul le panneau de contrôle est figé au Cash Out.
+        await interaction.update(
+          buildCrashPayload(
             message,
-            game,
-            false
-          ),
-          attachments: []
-        });
+            game
+          )
+        );
 
         userCoins =
           await UserCoins.findOne({
