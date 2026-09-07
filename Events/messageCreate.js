@@ -34,7 +34,7 @@ module.exports = async (bot, message) => {
       const command = bot.commands.get(commandName);
       if (command) {
         try {
-          command.execute(message, args);
+          await command.execute(message, args);
         } catch (error) {
           console.error(error);
           message.channel.send(
