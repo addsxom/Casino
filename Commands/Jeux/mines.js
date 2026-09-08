@@ -9,6 +9,7 @@ const {
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
 const { sleep } = require('../../utils');
 
@@ -364,7 +365,7 @@ module.exports = {
       return;
     }
 
-    const amount = Number(args[0]);
+    const amount = parseAmount(args[0]);
 
     if (!Number.isInteger(amount) || amount <= 0) {
       return message.reply(
