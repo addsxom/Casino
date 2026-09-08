@@ -281,6 +281,125 @@ async function transferCoins({
   }
 }
 
+function validateAccountField(field) {
+  if (!['coins', 'bank', 'rep', 'messages'].includes(field)) {
+    throw new TypeError('Invalid account field.');
+  }
+
+  return field;
+}
+
+async function incrementAccountField({
+  userId,
+  guildId,
+  field,
+  amount,
+  session = null
+}) {
+  field = validateAccountField(field);
+  amount = validateAmount(amount);
+
+  return UserCoins.findOneAndUpdate(
+    { userId, guildId },
+    {
+      $inc: { [field]: amount },
+      $setOnInsert: {
+        userId,
+        guildId
+      }
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+      session
+    }
+  );
+}
+
+async function removeUpTo({
+  userId,
+  guildId,
+  field,
+  amount
+}) {
+  field = validateAccountField(field);
+  amount = validateAmount(amount);
+
+  const before = await UserCoins.findOneAndUpdate(
+    { userId, guildId },
+    [
+      {
+        $set: {
+          [field]: {
+            $max: [
+              0,
+              {
+                $subtract: [
+                  { $ifNull: [`$${field}`, 0] },
+                  amount
+                ]
+              }
+            ]
+          }
+        }
+      }
+    ],
+    { new: false }
+  );
+
+  if (!before) return null;
+
+  const previousValue = Number(before[field]) || 0;
+  const removed = Math.min(amount, previousValue);
+
+  return {
+    removed,
+    before,
+    after: {
+      coins:
+        field === 'coins'
+          ? previousValue - removed
+          : Number(before.coins) || 0,
+      bank:
+        field === 'bank'
+          ? previousValue - removed
+          : Number(before.bank) || 0,
+      rep:
+        field === 'rep'
+          ? previousValue - removed
+          : Number(before.rep) || 0,
+      messages:
+        field === 'messages'
+          ? previousValue - removed
+          : Number(before.messages) || 0
+    }
+  };
+}
+
+async function resetAccount(userId, guildId) {
+  const before = await UserCoins.findOneAndUpdate(
+    { userId, guildId },
+    {
+      $set: {
+        coins: 0,
+        bank: 0,
+        rep: 0
+      }
+    },
+    { new: false }
+  );
+
+  if (!before) return null;
+
+  return {
+    before,
+    removedCoins:
+      (Number(before.coins) || 0) +
+      (Number(before.bank) || 0)
+  };
+}
+
 module.exports = {
   InsufficientFundsError,
   getAccount,
@@ -289,5 +408,8 @@ module.exports = {
   moveBalance,
   moveAllBalance,
   drainPocket,
-  transferCoins
+  transferCoins,
+  incrementAccountField,
+  removeUpTo,
+  resetAccount
 };
