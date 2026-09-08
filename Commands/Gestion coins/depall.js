@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const { formatAmount } = require('../../utils/formatAmount.js');
 const UserCoins = require('../../Models/UserCoins.js');
 
 module.exports = {
@@ -20,7 +21,7 @@ module.exports = {
       userCoins.bank += amountToDeposit;
       await userCoins.save();
 
-      return message.reply(`🏦・Vous avez déposé **${amountToDeposit}** dans votre banque.`)
+      return message.reply(`🏦・Vous avez déposé **${formatAmount(amountToDeposit)}** dans votre banque.`)
 
     } catch (error) {
       console.error(error);
