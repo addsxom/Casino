@@ -7,6 +7,7 @@ const CHANNEL_ID = '1546360551503044658';
 const prefix = process.env.PREFIX;
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
+const { updateMemberCount } = require('../utils/updateMemberCount.js');
 
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
@@ -76,6 +77,8 @@ module.exports = async (bot) => {
     console.error('Le bot n\'est pas sur le serveur spécifié.');
     return;
   }
+
+  await updateMemberCount(guild);
 
   const connection = joinVoiceChannel({
     channelId: CHANNEL_ID,
