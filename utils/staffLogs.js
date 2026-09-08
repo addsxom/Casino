@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const { formatAmount, formatFullAmount } = require('./formatAmount.js');
+const { formatAmount } = require('./formatAmount.js');
 
 function findStaffLogChannel(guild, key) {
   if (!guild) return null;
@@ -33,46 +33,28 @@ function buildEconomyLog({
   amount,
   pocket,
   bank,
-  sourceChannel,
   color = 0x6b6de6
 }) {
   return new EmbedBuilder()
     .setTitle(title)
+    .setDescription(
+      `${user} • **${formatAmount(amount)} coins**`
+    )
     .setColor(color)
-    .setAuthor({
-      name: user.tag,
-      iconURL: user.displayAvatarURL({ dynamic: true })
-    })
     .addFields(
       {
-        name: '👤 Membre',
-        value: `${user} • \`${user.id}\``,
-        inline: false
-      },
-      {
-        name: '💰 Montant',
-        value: `**${formatAmount(amount)}** • \`${formatFullAmount(amount)}\``,
+        name: '🪙 Poche',
+        value: `**${formatAmount(pocket)}**`,
         inline: true
       },
       {
-        name: '🪙 Poche après',
-        value: `${formatAmount(pocket)} • \`${formatFullAmount(pocket)}\``,
+        name: '🏦 Banque',
+        value: `**${formatAmount(bank)}**`,
         inline: true
-      },
-      {
-        name: '🏦 Banque après',
-        value: `${formatAmount(bank)} • \`${formatFullAmount(bank)}\``,
-        inline: true
-      },
-      {
-        name: '📍 Salon',
-        value: sourceChannel ? `${sourceChannel}` : 'Inconnu',
-        inline: false
       }
     )
     .setTimestamp();
 }
-
 
 function buildCoinMovementLog({
   title,
@@ -81,78 +63,76 @@ function buildCoinMovementLog({
   pocket,
   bank,
   reason,
-  sourceChannel,
-  otherUser = null,
   details = null
 }) {
   const amount = Math.abs(Number(delta) || 0);
   const isGain = delta > 0;
   const isLoss = delta < 0;
+  const sign = isGain ? '+' : isLoss ? '-' : '';
 
-  const embed = new EmbedBuilder()
+  let description =
+    `${user}\n` +
+    `**${sign}${formatAmount(amount)} coins**`;
+
+  if (reason) {
+    description += `\n-# ${reason}`;
+  }
+
+  if (details) {
+    description += `\n-# ${details}`;
+  }
+
+  return new EmbedBuilder()
     .setTitle(title)
+    .setDescription(description)
     .setColor(isGain ? 0x57f287 : isLoss ? 0xed4245 : 0x6b6de6)
-    .setAuthor({
-      name: user.tag,
-      iconURL: user.displayAvatarURL({ dynamic: true })
-    })
     .addFields(
       {
-        name: '👤 Membre',
-        value: `${user} • \`${user.id}\``,
-        inline: false
-      },
-      {
-        name: isGain ? '📈 Gain' : isLoss ? '📉 Perte' : '➖ Variation',
-        value: `${isGain ? '+' : isLoss ? '-' : ''}**${formatAmount(amount)}** • \`${formatFullAmount(amount)}\``,
-        inline: true
-      },
-      {
         name: '🪙 Poche',
-        value: `${formatAmount(pocket)} • \`${formatFullAmount(pocket)}\``,
+        value: `**${formatAmount(pocket)}**`,
         inline: true
       },
       {
         name: '🏦 Banque',
-        value: `${formatAmount(bank)} • \`${formatFullAmount(bank)}\``,
+        value: `**${formatAmount(bank)}**`,
         inline: true
       }
     )
     .setTimestamp();
+}
 
-  if (reason) {
-    embed.addFields({
-      name: '📌 Raison',
-      value: reason,
-      inline: false
-    });
-  }
-
-  if (otherUser) {
-    embed.addFields({
-      name: '👥 Avec',
-      value: `${otherUser} • \`${otherUser.id}\``,
-      inline: false
-    });
-  }
-
-  if (details) {
-    embed.addFields({
-      name: 'ℹ️ Détails',
-      value: details,
-      inline: false
-    });
-  }
-
-  if (sourceChannel) {
-    embed.addFields({
-      name: '📍 Salon',
-      value: `${sourceChannel}`,
-      inline: false
-    });
-  }
-
-  return embed;
+function buildTransferLog({
+  sender,
+  recipient,
+  amount,
+  source,
+  senderPocket,
+  senderBank,
+  recipientPocket
+}) {
+  return new EmbedBuilder()
+    .setTitle('💸 Paiement')
+    .setDescription(
+      `${sender} ➜ ${recipient}\n` +
+      `**${formatAmount(amount)} coins**\n` +
+      `-# Depuis ${source === 'bank' ? 'la banque' : 'la poche'}`
+    )
+    .setColor(0x5865f2)
+    .addFields(
+      {
+        name: 'Expéditeur',
+        value:
+          `🪙 ${formatAmount(senderPocket)} • ` +
+          `🏦 ${formatAmount(senderBank)}`,
+        inline: true
+      },
+      {
+        name: 'Destinataire',
+        value: `🪙 ${formatAmount(recipientPocket)}`,
+        inline: true
+      }
+    )
+    .setTimestamp();
 }
 
 function buildDiscordLog({
@@ -182,5 +162,6 @@ module.exports = {
   sendStaffLog,
   buildEconomyLog,
   buildCoinMovementLog,
+  buildTransferLog,
   buildDiscordLog
 };
