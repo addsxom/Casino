@@ -96,50 +96,26 @@ function buildSuccessEmbed({
   stolenPercent,
   jackpot
 }) {
+  const jackpotLine = jackpot
+    ? '\n💎 **JACKPOT !**'
+    : '';
+
   return new EmbedBuilder()
     .setTitle(
       jackpot
-        ? '💎 JACKPOT ROB'
-        : '🦹 BRAQUAGE RÉUSSI'
+        ? '💎 Jackpot !'
+        : '🦹 Braquage réussi'
     )
     .setDescription(
-      `${message.author} a réussi son braquage contre ${targetUser}.`
+      `${message.author} ➜ ${targetUser}\n\n` +
+      `💰 **${formatAmount(stolenCoins)} coins**\n` +
+      `-# ${stolenPercent}% de la poche${jackpotLine}\n\n` +
+      '🛡️ Victime protégée **1s**'
     )
     .setThumbnail(
       targetUser.displayAvatarURL({
         dynamic: true
       })
-    )
-    .addFields(
-      {
-        name: '💰 Butin',
-        value: `**${formatAmount(stolenCoins)} coins**`,
-        inline: true
-      },
-      {
-        name: '📊 Part volée',
-        value: `**${stolenPercent}%** de sa poche`,
-        inline: true
-      },
-      {
-        name: '🎲 Type de braquage',
-        value: jackpot
-          ? '💎 **JACKPOT**\n-# Chance spéciale : 5%'
-          : '🎯 **Classique**\n-# Plage normale : 1% à 40%',
-        inline: true
-      },
-      {
-        name: '🛡️ Protection de la victime',
-        value:
-          'La victime est maintenant **invulnérable pendant 1 seconde**.',
-        inline: false
-      },
-      {
-        name: '⏳ Prochaine tentative',
-        value:
-          'Ton prochain +rob sera disponible dans **1 seconde**.',
-        inline: false
-      }
     )
     .setColor(
       jackpot
@@ -147,13 +123,12 @@ function buildSuccessEmbed({
         : 0x57f287
     )
     .setFooter({
-      text: 'Kuromi Coins • Système de braquage',
+      text: 'Prochain rob dans 1s • Kuromi Coins',
       iconURL:
         message.client.user.displayAvatarURL({
           dynamic: true
         })
-    })
-    .setTimestamp();
+    });
 }
 
 function buildFailureEmbed({
@@ -161,63 +136,35 @@ function buildFailureEmbed({
   targetUser,
   fineApplied,
   finePercent,
-  fineAmount,
-  robberCoins
+  fineAmount
 }) {
-  const fineText = fineApplied
-    ? fineAmount > 0
-      ? `**-${formatAmount(fineAmount)} coins**\n-# Amende : ${finePercent}% de ta poche`
-      : `**0 coin payé**\n-# Amende tirée : ${finePercent}%, mais ta poche était vide`
-    : '**Aucune amende**\n-# Tu as eu de la chance cette fois-ci';
+  let resultText = '🍀 **Aucune amende**';
+
+  if (fineApplied) {
+    resultText = fineAmount > 0
+      ? `🚨 **-${formatAmount(fineAmount)} coins**\n-# Amende de ${finePercent}%`
+      : `🚨 **Amende de ${finePercent}%**\n-# Aucun coin en poche à payer`;
+  }
 
   return new EmbedBuilder()
-    .setTitle('🚔 BRAQUAGE RATÉ')
+    .setTitle('🚔 Braquage raté')
     .setDescription(
-      `${message.author} n’a pas réussi à braquer ${targetUser}.`
+      `${message.author} ➜ ${targetUser}\n\n` +
+      resultText
     )
     .setThumbnail(
       targetUser.displayAvatarURL({
         dynamic: true
       })
     )
-    .addFields(
-      {
-        name: '🎯 Résultat',
-        value: '**Échec du braquage**',
-        inline: true
-      },
-      {
-        name: '🚨 Sanction',
-        value: fineText,
-        inline: true
-      },
-      {
-        name: '🪙 Ta poche après le braquage',
-        value: `**${formatAmount(robberCoins.coins)} coins**`,
-        inline: true
-      },
-      {
-        name: '🛡️ Victime',
-        value:
-          'La victime **ne reçoit pas de protection** après une tentative ratée.',
-        inline: false
-      },
-      {
-        name: '⏳ Prochaine tentative',
-        value:
-          'Ton prochain +rob sera disponible dans **1 seconde**.',
-        inline: false
-      }
-    )
     .setColor(0xed4245)
     .setFooter({
-      text: 'Kuromi Coins • Système de braquage',
+      text: 'Prochain rob dans 1s • Kuromi Coins',
       iconURL:
         message.client.user.displayAvatarURL({
           dynamic: true
         })
-    })
-    .setTimestamp();
+    });
 }
 
 module.exports = {
@@ -532,8 +479,7 @@ module.exports = {
         targetUser,
         fineApplied,
         finePercent,
-        fineAmount,
-        robberCoins
+        fineAmount
       });
 
       return message.reply({
