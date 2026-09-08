@@ -36,8 +36,18 @@ userCoinsSchema.methods.checkMessageThreshold = async function () {
     const coinsPerThreshold = coinsPerThresholds[i];
 
     if (this.messages % messageThreshold === 0) {
-      this.bank += coinsPerThreshold;
-      await this.save();
+      const updatedAccount = await this.constructor.findOneAndUpdate(
+        { _id: this._id },
+        { $inc: { bank: coinsPerThreshold } },
+        { new: true }
+      );
+
+      if (!updatedAccount) {
+        return null;
+      }
+
+      this.bank = updatedAccount.bank;
+      this.coins = updatedAccount.coins;
 
       return {
         coins: coinsPerThreshold,
