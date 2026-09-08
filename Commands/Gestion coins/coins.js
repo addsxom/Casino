@@ -43,9 +43,38 @@ module.exports = {
       }
 
       const embed = new EmbedBuilder()
-        .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
-        .setDescription(`🪙 **${formatCompact(userCoins.coins)}** coins en poche\n🏦 **${formatCompact(userCoins.bank)}** coins en banque\n:small_red_triangle: **${formatCompact(userCoins.rep)}** Réputation`)
-        .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
+        .setAuthor({
+          name: targetUser.tag,
+          iconURL: targetUser.displayAvatarURL({ dynamic: true })
+        })
+        .setTitle('💰 Solde')
+        .addFields(
+          {
+            name: '🪙 Poche',
+            value:
+              `**${formatCompact(userCoins.coins)}**\n` +
+              `\`${Number(userCoins.coins).toLocaleString('fr-FR')}\``,
+            inline: true
+          },
+          {
+            name: '🏦 Banque',
+            value:
+              `**${formatCompact(userCoins.bank)}**\n` +
+              `\`${Number(userCoins.bank).toLocaleString('fr-FR')}\``,
+            inline: true
+          },
+          {
+            name: '🔺 Réputation',
+            value:
+              `**${formatCompact(userCoins.rep)}**\n` +
+              `\`${Number(userCoins.rep).toLocaleString('fr-FR')}\``,
+            inline: true
+          }
+        )
+        .setFooter({
+          text: 'Kuromi Coins',
+          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
+        })
         .setColor(0x6b6de6);
 
       message.reply({ embeds: [embed] });
