@@ -7,6 +7,29 @@ const UserRobCooldown = require('../Models/UserRobCooldown.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
 
+async function hasUserGuildUniqueIndex(Model) {
+  try {
+    const indexes = await Model.collection.indexes();
+
+    return indexes.some(index => {
+      const keys = Object.keys(index.key || {});
+
+      return (
+        index.unique === true &&
+        keys.length === 2 &&
+        index.key.userId === 1 &&
+        index.key.guildId === 1
+      );
+    });
+  } catch (error) {
+    if (error?.code === 26) {
+      return false;
+    }
+
+    throw error;
+  }
+}
+
 async function mergeUserCoinDuplicates() {
   const duplicates = await UserCoins.aggregate([
     {
@@ -157,18 +180,39 @@ async function createDeclaredIndexes() {
 }
 
 async function ensureDatabaseIntegrity() {
-  const results = {
-    userCoins: await mergeUserCoinDuplicates(),
+  const indexed = {
+    userCoins: await hasUserGuildUniqueIndex(UserCoins),
     dailyCooldowns:
-      await mergeNumericCooldownDuplicates(UserDailyCooldown),
+      await hasUserGuildUniqueIndex(UserDailyCooldown),
     workCooldowns:
-      await mergeNumericCooldownDuplicates(UserWorkCooldown),
+      await hasUserGuildUniqueIndex(UserWorkCooldown),
     repCooldowns:
-      await mergeNumericCooldownDuplicates(UserRepCooldown),
+      await hasUserGuildUniqueIndex(UserRepCooldown),
     robCooldowns:
-      await mergeNumericCooldownDuplicates(UserRobCooldown),
+      await hasUserGuildUniqueIndex(UserRobCooldown),
     minesCooldowns:
-      await mergeMinesCooldownDuplicates()
+      await hasUserGuildUniqueIndex(MinesCooldown)
+  };
+
+  const results = {
+    userCoins: indexed.userCoins
+      ? 0
+      : await mergeUserCoinDuplicates(),
+    dailyCooldowns: indexed.dailyCooldowns
+      ? 0
+      : await mergeNumericCooldownDuplicates(UserDailyCooldown),
+    workCooldowns: indexed.workCooldowns
+      ? 0
+      : await mergeNumericCooldownDuplicates(UserWorkCooldown),
+    repCooldowns: indexed.repCooldowns
+      ? 0
+      : await mergeNumericCooldownDuplicates(UserRepCooldown),
+    robCooldowns: indexed.robCooldowns
+      ? 0
+      : await mergeNumericCooldownDuplicates(UserRobCooldown),
+    minesCooldowns: indexed.minesCooldowns
+      ? 0
+      : await mergeMinesCooldownDuplicates()
   };
 
   await createDeclaredIndexes();
