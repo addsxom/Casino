@@ -14,6 +14,12 @@ const { sleep } = require('../../utils');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
+const {
+  tryAcquireActiveGame,
+  updateActiveGame,
+  releaseActiveGame,
+  buildActiveGameEmbed
+} = require('../../utils/activeGameLock.js');
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
@@ -510,6 +516,8 @@ module.exports = {
 
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
+    const userId = message.author.id;
+    let activeGameToken = null;
 
     if (message.channel.id !== MINES_CHANNEL_ID) {
       const warningMessage = await message.reply(
@@ -552,16 +560,62 @@ module.exports = {
       );
     }
 
-    const gameMessage = await message.reply({
-      flags: MessageFlags.IsComponentsV2,
-      components: [
-        allIn
-          ? buildAllWarningContainer(
-              message,
-              amount
-            )
-          : buildModeContainer(message, amount)
-      ]
+    const activeGame = tryAcquireActiveGame({
+      userId,
+      guildId,
+      game: allIn ? 'Mines ALL' : 'Mines',
+      channelId: message.channel.id
+    });
+
+    if (!activeGame.acquired) {
+      return message.reply({
+        embeds: [
+          buildActiveGameEmbed(
+            message,
+            activeGame.activeGame
+          )
+        ]
+      });
+    }
+
+    activeGameToken = activeGame.token;
+
+    const releaseGameLock = () => {
+      if (!activeGameToken) return;
+
+      releaseActiveGame({
+        userId,
+        guildId,
+        token: activeGameToken
+      });
+      activeGameToken = null;
+    };
+
+    let gameMessage;
+
+    try {
+      gameMessage = await message.reply({
+        flags: MessageFlags.IsComponentsV2,
+        components: [
+          allIn
+            ? buildAllWarningContainer(
+                message,
+                amount
+              )
+            : buildModeContainer(message, amount)
+        ]
+      });
+    } catch (error) {
+      releaseGameLock();
+      throw error;
+    }
+
+    updateActiveGame({
+      userId,
+      guildId,
+      token: activeGameToken,
+      channelId: message.channel.id,
+      messageId: gameMessage.id
     });
 
     if (allIn) {
@@ -571,7 +625,10 @@ module.exports = {
         amount
       );
 
-      if (!accepted) return;
+      if (!accepted) {
+        releaseGameLock();
+        return;
+      }
     }
 
     const modeCollector = gameMessage.createMessageComponentCollector({
@@ -599,7 +656,11 @@ module.exports = {
 
       const modeKey = interaction.customId.replace('mines_mode_', '');
       const mode = MODES[modeKey];
-      if (!mode) return;
+
+      if (!mode) {
+        releaseGameLock();
+        return;
+      }
 
       if (allIn) {
         const drained = await drainPocket(
@@ -608,6 +669,8 @@ module.exports = {
         );
 
         if (!drained || drained.amount <= 0) {
+          releaseGameLock();
+
           return gameMessage.edit({
             components: [
               buildStatusContainer(
@@ -633,6 +696,8 @@ module.exports = {
         });
 
         if (!userCoins) {
+          releaseGameLock();
+
           return gameMessage.edit({
             components: [
               buildStatusContainer(
@@ -742,12 +807,16 @@ module.exports = {
             Math.floor(game.amount * game.currentMultiplier)
           );
 
-          userCoins = await creditBalance({
-            userId: message.author.id,
-            guildId,
-            target: 'coins',
-            amount: game.payout
-          });
+          try {
+            userCoins = await creditBalance({
+              userId,
+              guildId,
+              target: 'coins',
+              amount: game.payout
+            });
+          } finally {
+            releaseGameLock();
+          }
 
           if (userCoins) {
             await sendStaffLog(
@@ -928,6 +997,7 @@ module.exports = {
         if (game.minePositions.has(index)) {
           game.gameOver = true;
           game.status = 'lost';
+          releaseGameLock();
 
           userCoins = await getAccount(
             message.author.id,
@@ -992,12 +1062,16 @@ module.exports = {
             Math.floor(game.amount * game.currentMultiplier)
           );
 
-          userCoins = await creditBalance({
-            userId: message.author.id,
-            guildId,
-            target: 'coins',
-            amount: game.payout
-          });
+          try {
+            userCoins = await creditBalance({
+              userId,
+              guildId,
+              target: 'coins',
+              amount: game.payout
+            });
+          } finally {
+            releaseGameLock();
+          }
 
           if (userCoins) {
             await sendStaffLog(
@@ -1040,12 +1114,16 @@ module.exports = {
             )
           : game.amount;
 
-        userCoins = await creditBalance({
-          userId: message.author.id,
-          guildId,
-          target: 'coins',
-          amount: payout
-        });
+        try {
+          userCoins = await creditBalance({
+            userId,
+            guildId,
+            target: 'coins',
+            amount: payout
+          });
+        } finally {
+          releaseGameLock();
+        }
 
         if (userCoins) {
           const net = payout - game.amount;
@@ -1085,6 +1163,8 @@ module.exports = {
 
     modeCollector.on('end', async (_, reason) => {
       if (reason !== 'time' || modeSelected) return;
+
+      releaseGameLock();
 
       await gameMessage.edit({
         components: [
