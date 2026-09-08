@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require("discord.js");
-const UserCoins = require('../../Models/UserCoins.js');
 const UserWorkCooldown = require('../../Models/UserWorkCooldown.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { creditBalance } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'work',
@@ -31,14 +31,12 @@ module.exports = {
 
       const coinsEarned = Math.floor(Math.random() * (1000 - 15 + 1)) + 15;
 
-      let userCoins = await UserCoins.findOne({ userId, guildId });
-
-      if (!userCoins) {
-        userCoins = await UserCoins.create({ userId, guildId });
-      }
-
-      userCoins.coins += coinsEarned;
-      await userCoins.save();
+      const userCoins = await creditBalance({
+        userId,
+        guildId,
+        target: 'coins',
+        amount: coinsEarned
+      });
 
       await sendStaffLog(
         message.guild,
@@ -54,12 +52,11 @@ module.exports = {
         })
       );
 
-      if (userWorkCooldown) {
-        userWorkCooldown.cooldown = Date.now() + 60 * 60 * 1000;
-        await userWorkCooldown.save();
-      } else {
-        await UserWorkCooldown.create({ userId, guildId, cooldown: Date.now() + 60 * 60 * 1000 });
-      }
+      await UserWorkCooldown.findOneAndUpdate(
+        { userId, guildId },
+        { $set: { cooldown: Date.now() + 60 * 60 * 1000 } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       const embed = new EmbedBuilder()
         .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true })})
