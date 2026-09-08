@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -179,7 +180,7 @@ module.exports = {
 
   async execute(message, args) {
     const guildId = message.guild.id;
-    const amount = Number(args[0]);
+    const amount = parseAmount(args[0]);
 
     if (
       !Number.isInteger(amount) ||
