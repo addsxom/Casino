@@ -3,11 +3,14 @@ const ServerPrefix = require("../Models/ServerPrefix");
 const UserCoins = require("../Models/UserCoins");
 const { formatAmount } = require("../utils/formatAmount.js");
 const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
+const { cacheMessage } = require("../utils/messageCache.js");
 
 // Créez un ensemble pour stocker les utilisateurs ayant déjà reçu des pièces pour la session actuelle
 const usersReceivedCoins = new Set();
 
 module.exports = async (bot, message) => {
+  cacheMessage(message);
+
   try {
     const defaultPrefix = process.env.PREFIX || "!";
     let prefix = defaultPrefix;

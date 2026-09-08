@@ -112,6 +112,30 @@ function buildTransferLog({
     .setTimestamp();
 }
 
+function buildBankTransferLog({
+  title,
+  user,
+  amount,
+  bankBefore,
+  bankAfter,
+  pocketBefore,
+  pocketAfter
+}) {
+  return new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(
+      `${user}\n` +
+      `**${formatAmount(amount)} coins**\n` +
+      `-# Banque → Poche\n\n` +
+      `**Banque**\n` +
+      `${formatAmount(bankBefore)} → **${formatAmount(bankAfter)}**\n\n` +
+      `**Poche**\n` +
+      `${formatAmount(pocketBefore)} → **${formatAmount(pocketAfter)}**`
+    )
+    .setColor(0xfee75c)
+    .setTimestamp();
+}
+
 function buildDiscordLog({
   title,
   description,
@@ -140,5 +164,6 @@ module.exports = {
   buildEconomyLog,
   buildCoinMovementLog,
   buildTransferLog,
+  buildBankTransferLog,
   buildDiscordLog
 };

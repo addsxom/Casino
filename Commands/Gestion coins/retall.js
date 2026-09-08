@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
-const { sendStaffLog, buildEconomyLog } = require('../../utils/staffLogs.js');
+const { sendStaffLog, buildBankTransferLog } = require('../../utils/staffLogs.js');
 const UserCoins = require('../../Models/UserCoins.js');
 
 module.exports = {
@@ -17,6 +17,8 @@ module.exports = {
       }
 
       const amountToWithdraw = userCoins.bank;
+      const bankBefore = userCoins.bank;
+      const pocketBefore = userCoins.coins;
 
       userCoins.coins += amountToWithdraw;
       userCoins.bank = 0;
@@ -25,14 +27,14 @@ module.exports = {
       await sendStaffLog(
         message.guild,
         'withdraw-logs',
-        buildEconomyLog({
+        buildBankTransferLog({
           title: '📤 Retrait total de la banque',
           user: message.author,
           amount: amountToWithdraw,
-          pocket: userCoins.coins,
-          bank: userCoins.bank,
-          sourceChannel: message.channel,
-          color: 0xfee75c
+          bankBefore,
+          bankAfter: userCoins.bank,
+          pocketBefore,
+          pocketAfter: userCoins.coins
         })
       );
 

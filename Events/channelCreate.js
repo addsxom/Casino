@@ -16,7 +16,7 @@ module.exports = async (_bot, channel) => {
     buildDiscordLog({
       title: '➕ Salon créé',
       description:
-        `${channel} **${channel.name}**\n` +
+        `${channel}\n` +
         `-# Créé par ${executor || 'Inconnu'}`,
       color: 0x57f287
     })
