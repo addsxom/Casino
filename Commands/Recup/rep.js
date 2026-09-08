@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const UserRepCooldown = require('../../Models/UserRepCooldown.js');
 const { incrementAccountField } = require('../../utils/economyService.js');
+const { tryAcquireCooldown, releaseCooldown } = require('../../utils/cooldownService.js');
 
 const cooldowns = new Map();
 
@@ -21,33 +22,50 @@ module.exports = {
       if (targetUser.id === message.author.id) {
         return message.reply('Vous ne pouvez pas vous donner de point de réputation.');
       }
-      const userCooldown = await UserRepCooldown.findOne({ userId: message.author.id, guildId });
+      const cooldown = await tryAcquireCooldown(
+        UserRepCooldown,
+        {
+          userId: message.author.id,
+          guildId,
+          durationMs: this.cooldown * 1000
+        }
+      );
 
-      if (userCooldown && Date.now() < userCooldown.cooldown) {
-        const timeLeft = userCooldown.cooldown - Date.now();
+      if (!cooldown.acquired) {
+        const timeLeft = Math.max(
+          0,
+          cooldown.availableAt - Date.now()
+        );
         const formattedTimeLeft = formatCooldown(timeLeft);
 
         const colldown = new EmbedBuilder()
-        .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
-        .setDescription(`❌・Réessayez dans ${formattedTimeLeft}`)
-        .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
-        .setColor(0x6b6de6);
+          .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
+          .setDescription(`❌・Réessayez dans ${formattedTimeLeft}`)
+          .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
+          .setColor(0x6b6de6);
 
-     return message.reply({ embeds: [colldown] });
-    }
+        return message.reply({ embeds: [colldown] });
+      }
 
-      await incrementAccountField({
-        userId: targetUser.id,
-        guildId,
-        field: 'rep',
-        amount: 1
-      });
+      try {
+        await incrementAccountField({
+          userId: targetUser.id,
+          guildId,
+          field: 'rep',
+          amount: 1
+        });
+      } catch (error) {
+        await releaseCooldown(
+          UserRepCooldown,
+          {
+            userId: message.author.id,
+            guildId,
+            availableAt: cooldown.availableAt
+          }
+        );
 
-      await UserRepCooldown.findOneAndUpdate(
-        { userId: message.author.id, guildId },
-        { $set: { cooldown: Date.now() + this.cooldown * 1000 } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
-      );
+        throw error;
+      }
 
       const embed = new EmbedBuilder()
         .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
