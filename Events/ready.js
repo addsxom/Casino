@@ -1,21 +1,17 @@
 const { ActivityType } = require("discord.js");
 const colors = require("colors");
 const mongoose = require("mongoose");
-const {
-  joinVoiceChannel,
-  entersState,
-  VoiceConnectionStatus
-} = require('@discordjs/voice');
+const { joinVoiceChannel } = require('@discordjs/voice');
 const GUILD_ID = '1546311652830351450';
+const BOT_VOICE_CHANNEL = {
+  id: '1546360551503044658',
+  name: '╰・BOT STATUT'
+};
 const WELCOME_CHANNEL_ID = '1546311653388189718';
 const prefix = process.env.PREFIX;
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
-const {
-  findBotStatusChannel,
-  updateBotStatusChannel
-} = require('../utils/updateBotStatus.js');
 const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
 
 module.exports = async (bot) => {
@@ -115,44 +111,29 @@ module.exports = async (bot) => {
     });
   }, MEMBER_COUNT_RESYNC_MS);
 
-  const botStatusChannel = await findBotStatusChannel(guild);
+  let botVoiceChannel =
+    guild.channels.cache.get(BOT_VOICE_CHANNEL.id) ||
+    await guild.channels.fetch(BOT_VOICE_CHANNEL.id).catch(() => null);
 
-  if (!botStatusChannel) {
-    console.error('Impossible de trouver le vocal BOT STATUS.');
+  if (!botVoiceChannel) {
+    await guild.channels.fetch().catch(() => null);
+
+    botVoiceChannel = guild.channels.cache.find(
+      channel => channel.name === BOT_VOICE_CHANNEL.name
+    ) || null;
+  }
+
+  if (!botVoiceChannel) {
+    console.error(
+      `Vocal ${BOT_VOICE_CHANNEL.name} introuvable (ID: ${BOT_VOICE_CHANNEL.id}).`
+    );
     return;
   }
 
-  const connection = joinVoiceChannel({
-    channelId: botStatusChannel.id,
+  joinVoiceChannel({
+    channelId: botVoiceChannel.id,
     guildId: guild.id,
     adapterCreator: guild.voiceAdapterCreator
   });
-
-  connection.on('stateChange', (_oldState, newState) => {
-    if (newState.status === VoiceConnectionStatus.Ready) {
-      updateBotStatusChannel(guild, true).catch(() => {});
-    }
-
-    if (newState.status === VoiceConnectionStatus.Destroyed) {
-      updateBotStatusChannel(guild, false).catch(() => {});
-    }
-  });
-
-  try {
-    await entersState(
-      connection,
-      VoiceConnectionStatus.Ready,
-      15000
-    );
-
-    await updateBotStatusChannel(guild, true);
-  } catch (error) {
-    await updateBotStatusChannel(guild, false);
-
-    console.error(
-      'Erreur connexion BOT STATUS :',
-      error?.code || error?.message || error
-    );
-  }
 };
 

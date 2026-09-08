@@ -1,30 +1,10 @@
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
-const {
-  findBotStatusChannel,
-  updateBotStatusChannel
-} = require('../utils/updateBotStatus.js');
 
-module.exports = async (bot, oldState, newState) => {
+module.exports = async (_bot, oldState, newState) => {
   if (oldState.channelId === newState.channelId) return;
 
   const member = newState.member || oldState.member;
-  if (!member) return;
-
-  if (member.id === bot.user.id) {
-    const statusChannel =
-      await findBotStatusChannel(member.guild);
-
-    if (statusChannel) {
-      await updateBotStatusChannel(
-        member.guild,
-        newState.channelId === statusChannel.id
-      );
-    }
-
-    return;
-  }
-
-  if (member.user?.bot) return;
+  if (!member || member.user?.bot) return;
 
   let title;
   let description;
