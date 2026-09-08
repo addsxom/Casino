@@ -47,29 +47,19 @@ module.exports = {
           name: targetUser.tag,
           iconURL: targetUser.displayAvatarURL({ dynamic: true })
         })
-        .setTitle('💰 Solde')
-        .addFields(
-          {
-            name: '🪙 Poche',
-            value:
-              `**${formatCompact(userCoins.coins)}**\n` +
-              `\`${Number(userCoins.coins).toLocaleString('fr-FR')}\``,
-            inline: true
-          },
-          {
-            name: '🏦 Banque',
-            value:
-              `**${formatCompact(userCoins.bank)}**\n` +
-              `\`${Number(userCoins.bank).toLocaleString('fr-FR')}\``,
-            inline: true
-          },
-          {
-            name: '🔺 Réputation',
-            value:
-              `**${formatCompact(userCoins.rep)}**\n` +
-              `\`${Number(userCoins.rep).toLocaleString('fr-FR')}\``,
-            inline: true
-          }
+        .setTitle('📊 Profil financier')
+        .setDescription(
+          `🪙 **Poche**\n` +
+          `**${formatCompact(userCoins.coins)}**\n` +
+          `\`${Number(userCoins.coins).toLocaleString('fr-FR')}\`\n\n` +
+          `────────────\n\n` +
+          `🏦 **Banque**\n` +
+          `**${formatCompact(userCoins.bank)}**\n` +
+          `\`${Number(userCoins.bank).toLocaleString('fr-FR')}\`\n\n` +
+          `────────────\n\n` +
+          `🔺 **Réputation**\n` +
+          `**${formatCompact(userCoins.rep)}**\n` +
+          `\`${Number(userCoins.rep).toLocaleString('fr-FR')}\``
         )
         .setFooter({
           text: 'Kuromi Coins',
