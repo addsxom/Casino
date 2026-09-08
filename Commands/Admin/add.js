@@ -1,6 +1,7 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const Owner = require("../../Models/Owner.js");
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'add',
@@ -37,15 +38,15 @@ module.exports = {
       if (type === 'rep') {
         userCoins.rep += amount;
         await userCoins.save();
-        return message.reply(`Vous avez ajouté ${amount} points de réputation à ${targetUser.tag}.`);
+        return message.reply(`Vous avez ajouté ${formatAmount(amount)} points de réputation à ${targetUser.tag}.`);
       } else if (type === 'bank') {
         userCoins.bank += amount;
         await userCoins.save();
-        return message.reply(`Vous avez ajouté ${amount} coins en bank à ${targetUser.tag}.`);
+        return message.reply(`Vous avez ajouté ${formatAmount(amount)} coins en bank à ${targetUser.tag}.`);
       } else if (type === 'coins') {
         userCoins.coins += amount;
         await userCoins.save();
-        return message.reply(`Vous avez ajouté ${amount} coins à ${targetUser.tag}.`);
+        return message.reply(`Vous avez ajouté ${formatAmount(amount)} coins à ${targetUser.tag}.`);
       } else {
         return message.reply('Type invalide. Veuillez spécifier "rep", "bank" ou "coins".');
       }
