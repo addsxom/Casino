@@ -29,12 +29,15 @@ module.exports = async (_bot, member) => {
           name: 'Nouveau membre',
           iconURL: member.guild.iconURL({ dynamic: true }) || undefined
         })
-        .setTitle(`👋 Bienvenue ${member.user.username} !`)
+        .setTitle(`Bienvenue ${member.user.username} !`)
         .setDescription(
-          `${member.user}, bienvenue sur **${member.guild.name}** ! 🎀\n\n` +
-          `Avant de commencer, rends-toi dans ${rulesMention} pour lire le règlement.\n` +
-          `Clique ensuite sur **✅ Accepter** pour recevoir le rôle **Member** et accéder au reste du serveur.\n\n` +
-          `**Bonne découverte parmi nous !**`
+          `${member.user}, bienvenue sur **${member.guild.name}** !\n\n` +
+          `Avant de commencer, prends quelques secondes pour lire le règlement du serveur.\n\n` +
+          `Rendez-vous dans ${rulesMention}\n` +
+          `Lis le règlement puis clique sur **Accepter**\n` +
+          `Tu recevras automatiquement le rôle **Member**\n` +
+          `Tu auras ensuite accès au reste du serveur\n\n` +
+          `**Bonne découverte et amuse-toi bien parmi nous !**`
         )
         .setThumbnail(
           member.user.displayAvatarURL({
@@ -44,12 +47,12 @@ module.exports = async (_bot, member) => {
         )
         .addFields(
           {
-            name: '👥 Membre',
+            name: 'Membre',
             value: `Tu es le **#${member.guild.memberCount}** membre du serveur.`,
             inline: true
           },
           {
-            name: '📅 Compte créé',
+            name: 'Compte créé',
             value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
             inline: true
           }
