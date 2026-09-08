@@ -87,18 +87,26 @@ function buildTransferLog({
   recipient,
   amount,
   source,
-  senderPocket,
-  senderBank,
-  recipientPocket
+  senderBefore,
+  senderAfter,
+  recipientBefore,
+  recipientAfter
 }) {
+  const sourceLabel = source === 'bank' ? 'Banque' : 'Poche';
+  const senderLabel = source === 'bank'
+    ? 'Expéditeur — Banque'
+    : 'Expéditeur — Poche';
+
   return new EmbedBuilder()
     .setTitle('💸 Paiement')
     .setDescription(
       `${sender} ➜ ${recipient}\n` +
       `**${formatAmount(amount)} coins**\n` +
-      `-# ${source === 'bank' ? 'Banque' : 'Poche'} → Poche\n` +
-      `-# Expéditeur : 🪙 ${formatAmount(senderPocket)} • 🏦 ${formatAmount(senderBank)}\n` +
-      `-# Destinataire : 🪙 ${formatAmount(recipientPocket)}`
+      `-# ${sourceLabel} → Poche\n\n` +
+      `**${senderLabel}**\n` +
+      `${formatAmount(senderBefore)} → **${formatAmount(senderAfter)}**\n\n` +
+      `**Destinataire — Poche**\n` +
+      `${formatAmount(recipientBefore)} → **${formatAmount(recipientAfter)}**`
     )
     .setColor(0x5865f2)
     .setTimestamp();
