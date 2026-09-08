@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require("discord.js");
-const UserCoins = require('../../Models/UserCoins.js');
 const UserDailyCooldown = require('../../Models/UserDailyCooldown.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { creditBalance } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'daily',
@@ -30,14 +30,12 @@ module.exports = {
 
       const coinsEarned = Math.floor(Math.random() * (500 - 100 + 1)) + 100;
 
-      let userCoins = await UserCoins.findOne({ userId, guildId });
-
-      if (!userCoins) {
-        userCoins = await UserCoins.create({ userId, guildId });
-      }
-
-      userCoins.coins += coinsEarned;
-      await userCoins.save();
+      const userCoins = await creditBalance({
+        userId,
+        guildId,
+        target: 'coins',
+        amount: coinsEarned
+      });
 
       await sendStaffLog(
         message.guild,
@@ -53,12 +51,11 @@ module.exports = {
         })
       );
 
-      if (userDailyCooldown) {
-        userDailyCooldown.cooldown = Date.now() + 24 * 60 * 60 * 1000;
-        await userDailyCooldown.save();
-      } else {
-        await UserDailyCooldown.create({ userId, guildId, cooldown: Date.now() + 24 * 60 * 60 * 1000 });
-      }
+      await UserDailyCooldown.findOneAndUpdate(
+        { userId, guildId },
+        { $set: { cooldown: Date.now() + 24 * 60 * 60 * 1000 } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       const embed = new EmbedBuilder()
       .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true })})
