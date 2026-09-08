@@ -152,9 +152,15 @@ async function openTicket(bot, interaction) {
     components: [closeRow]
   });
 
-  return interaction.editReply(
+  await interaction.editReply(
     `✅・Ton ticket a été créé : ${channel}`
   );
+
+  setTimeout(() => {
+    interaction.deleteReply().catch(() => {});
+  }, 3000);
+
+  return;
 }
 
 async function closeTicket(interaction) {
