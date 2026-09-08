@@ -13,7 +13,7 @@ const MinesCooldown = require('../../Models/MinesCooldown.js');
 const { sleep } = require('../../utils');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
-const { debitBalance, creditBalance, getAccount } = require('../../utils/economyService.js');
+const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
@@ -129,7 +129,8 @@ function buildGridRows(game) {
     safeOpened,
     revealAvailableAt,
     revealCost,
-    revealSelecting
+    revealSelecting,
+    allIn
   } = game;
 
   const rows = [];
@@ -215,19 +216,22 @@ function buildGridRows(game) {
           return new ButtonBuilder()
             .setCustomId('mines_reveal')
             .setLabel(
-              revealSelecting
-                ? 'Choisis une case...'
-                : cooldownActive
-                  ? `Reveal • ${formatCooldown(remainingMs)}`
-                  : `Reveal • ${formatCoins(revealCost)}`
+              allIn
+                ? 'Reveal indisponible'
+                : revealSelecting
+                  ? 'Choisis une case...'
+                  : cooldownActive
+                    ? `Reveal • ${formatCooldown(remainingMs)}`
+                    : `Reveal • ${formatCoins(revealCost)}`
             )
             .setEmoji('🔍')
             .setStyle(
-              cooldownActive
+              allIn || cooldownActive
                 ? ButtonStyle.Secondary
                 : ButtonStyle.Primary
             )
             .setDisabled(
+              allIn ||
               revealSelecting ||
               cooldownActive ||
               !hasRevealTarget
@@ -249,22 +253,24 @@ function buildGameContainer(message, game) {
     currentMultiplier,
     revealAvailableAt,
     revealCost,
-    revealFees,
+    allIn,
     status,
     payout
   } = game;
 
   const currentGain = Math.max(
     0,
-    Math.floor(amount * currentMultiplier) - revealFees
+    Math.floor(amount * currentMultiplier)
   );
 
   const remainingRevealMs = Math.max(0, revealAvailableAt - Date.now());
-  const revealStatus = game.revealSelecting
-    ? 'choisis une case cachée'
-    : remainingRevealMs > 0
-      ? `cooldown **${formatCooldown(remainingRevealMs)}**`
-      : 'disponible maintenant';
+  const revealStatus = allIn
+    ? 'indisponible avec **+minesall**'
+    : game.revealSelecting
+      ? 'choisis une case cachée'
+      : remainingRevealMs > 0
+        ? `cooldown **${formatCooldown(remainingRevealMs)}**`
+        : 'disponible maintenant';
 
   let title = '# 💣 MINES';
   let body =
@@ -323,7 +329,9 @@ function buildGameContainer(message, game) {
           ? `-# ${message.author.tag} • Partie terminée`
           : game.revealSelecting
             ? `-# ${message.author.tag} • 🔍 Clique maintenant sur la case que tu veux Reveal`
-            : `-# ${message.author.tag} • ⭐ normal • 🍀 bonus • 🔍 Reveal = 20 % de la mise`
+            : allIn
+              ? `-# ${message.author.tag} • Mode ALL • 🔍 Reveal indisponible`
+              : `-# ${message.author.tag} • ⭐ normal • 🍀 bonus • 🔍 Reveal = 20 % de la mise`
       )
     );
 
@@ -338,11 +346,169 @@ function buildStatusContainer(title, text, color = 0x95a5a6) {
     );
 }
 
+function getMaxBetWithReveal(balance) {
+  let amount = Math.floor(
+    balance / (1 + REVEAL_COST_PERCENT)
+  );
+
+  while (
+    amount > 0 &&
+    amount +
+      Math.max(
+        1,
+        Math.ceil(amount * REVEAL_COST_PERCENT)
+      ) > balance
+  ) {
+    amount--;
+  }
+
+  return Math.max(0, amount);
+}
+
+function buildAllWarningContainer(message, pocketAmount) {
+  const suggestedBet = getMaxBetWithReveal(
+    pocketAmount
+  );
+  const revealReserve = suggestedBet > 0
+    ? Math.max(
+        1,
+        Math.ceil(
+          suggestedBet * REVEAL_COST_PERCENT
+        )
+      )
+    : 0;
+
+  const buttons = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('mines_all_accept')
+      .setLabel('Accepter')
+      .setEmoji('✅')
+      .setStyle(ButtonStyle.Success),
+    new ButtonBuilder()
+      .setCustomId('mines_all_refuse')
+      .setLabel('Refuser')
+      .setEmoji('❌')
+      .setStyle(ButtonStyle.Danger)
+  );
+
+  let tip =
+    'Si tu veux garder Reveal, utilise plutôt **+mines <montant>** et garde assez de coins en poche.';
+
+  if (suggestedBet > 0) {
+    tip =
+      `Avec ta poche actuelle, tu peux par exemple faire **+mines ${formatCoins(suggestedBet)}** ` +
+      `et garder environ **${formatCoins(revealReserve)} coins** pour 1 Reveal.`;
+  }
+
+  return new ContainerBuilder()
+    .setAccentColor(0xf1c40f)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `# ⚠️ MINES ALL\n` +
+        `Tu vas miser **toute ta poche : ${formatCoins(pocketAmount)} coins🪙**.\n` +
+        `\u200B\n` +
+        `🔍 Un Reveal coûte **20 % de la mise**. Avec **+minesall**, il ne restera aucun coin pour le payer, donc **Reveal sera désactivé pendant cette partie**.\n` +
+        `\u200B\n` +
+        tip
+      )
+    )
+    .addSeparatorComponents(
+      new SeparatorBuilder().setDivider(true)
+    )
+    .addActionRowComponents(buttons)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder().setContent(
+        `-# ${message.author.tag} • Confirme le ALL IN`
+      )
+    );
+}
+
+async function confirmMinesAll(
+  message,
+  gameMessage,
+  amount
+) {
+  return new Promise(resolve => {
+    let settled = false;
+    const collector =
+      gameMessage.createMessageComponentCollector({
+        time: 60000
+      });
+
+    collector.on('collect', async interaction => {
+      if (
+        ![
+          'mines_all_accept',
+          'mines_all_refuse'
+        ].includes(interaction.customId)
+      ) {
+        return;
+      }
+
+      if (interaction.user.id !== message.author.id) {
+        return interaction.reply({
+          content:
+            '❌・Cette confirmation ne vous appartient pas.',
+          flags: MessageFlags.Ephemeral
+        }).catch(() => {});
+      }
+
+      if (settled) return;
+      settled = true;
+
+      if (
+        interaction.customId ===
+        'mines_all_refuse'
+      ) {
+        await interaction.update({
+          components: [
+            buildStatusContainer(
+              '❌ ALL IN annulé',
+              'Aucun coin n’a été retiré.'
+            )
+          ]
+        }).catch(() => {});
+
+        collector.stop('refused');
+        resolve(false);
+        return;
+      }
+
+      await interaction.update({
+        components: [
+          buildModeContainer(message, amount)
+        ]
+      }).catch(() => {});
+
+      collector.stop('accepted');
+      resolve(true);
+    });
+
+    collector.on('end', async (_, reason) => {
+      if (settled) return;
+      settled = true;
+
+      if (reason === 'time') {
+        await gameMessage.edit({
+          components: [
+            buildStatusContainer(
+              '⌛ Confirmation expirée',
+              'Aucun coin n’a été retiré.'
+            )
+          ]
+        }).catch(() => {});
+      }
+
+      resolve(false);
+    });
+  });
+}
+
 module.exports = {
   name: 'mines',
   description: 'Jouez au Mines avec une mise et plusieurs niveaux de difficulté.',
 
-  async execute(message, args) {
+  async execute(message, args, options = {}) {
     const guildId = message.guild.id;
 
     if (message.channel.id !== MINES_CHANNEL_ID) {
@@ -363,18 +529,22 @@ module.exports = {
       return;
     }
 
-    const amount = parseAmount(args[0]);
-
-    if (!Number.isInteger(amount) || amount <= 0) {
-      return message.reply(
-        '❌・Utilisation : **+mines <mise>**\nExemple : **+mines 500**'
-      );
-    }
-
+    const allIn = options.all === true;
     let userCoins = await getAccount(
       message.author.id,
       guildId
     );
+    let amount = allIn
+      ? Number(userCoins?.coins) || 0
+      : parseAmount(args[0]);
+
+    if (!Number.isInteger(amount) || amount <= 0) {
+      return message.reply(
+        allIn
+          ? '❌・Vous n\'avez aucun coin en poche pour faire **+minesall**.'
+          : '❌・Utilisation : **+mines <mise>**\nExemple : **+mines 500**'
+      );
+    }
 
     if (!userCoins || userCoins.coins < amount) {
       return message.reply(
@@ -384,8 +554,25 @@ module.exports = {
 
     const gameMessage = await message.reply({
       flags: MessageFlags.IsComponentsV2,
-      components: [buildModeContainer(message, amount)]
+      components: [
+        allIn
+          ? buildAllWarningContainer(
+              message,
+              amount
+            )
+          : buildModeContainer(message, amount)
+      ]
     });
+
+    if (allIn) {
+      const accepted = await confirmMinesAll(
+        message,
+        gameMessage,
+        amount
+      );
+
+      if (!accepted) return;
+    }
 
     const modeCollector = gameMessage.createMessageComponentCollector({
       time: 60000
@@ -414,23 +601,48 @@ module.exports = {
       const mode = MODES[modeKey];
       if (!mode) return;
 
-      userCoins = await debitBalance({
-        userId: message.author.id,
-        guildId,
-        source: 'coins',
-        amount
-      });
+      if (allIn) {
+        const drained = await drainPocket(
+          message.author.id,
+          guildId
+        );
 
-      if (!userCoins) {
-        return gameMessage.edit({
-          components: [
-            buildStatusContainer(
-              '❌ Mise impossible',
-              'Vous n\'avez plus assez de coins pour démarrer cette partie.',
-              0xe91e63
-            )
-          ]
+        if (!drained || drained.amount <= 0) {
+          return gameMessage.edit({
+            components: [
+              buildStatusContainer(
+                '❌ Mise impossible',
+                'Vous n\'avez plus assez de coins pour démarrer cette partie.',
+                0xe91e63
+              )
+            ]
+          });
+        }
+
+        amount = drained.amount;
+        userCoins = await getAccount(
+          message.author.id,
+          guildId
+        );
+      } else {
+        userCoins = await debitBalance({
+          userId: message.author.id,
+          guildId,
+          source: 'coins',
+          amount
         });
+
+        if (!userCoins) {
+          return gameMessage.edit({
+            components: [
+              buildStatusContainer(
+                '❌ Mise impossible',
+                'Vous n\'avez plus assez de coins pour démarrer cette partie.',
+                0xe91e63
+              )
+            ]
+          });
+        }
       }
 
       const totalCells = mode.rows * mode.cols;
@@ -448,7 +660,7 @@ module.exports = {
         bonusOpened: 0,
         currentMultiplier: 1,
         revealCost: Math.max(1, Math.ceil(amount * REVEAL_COST_PERCENT)),
-        revealFees: 0,
+        allIn,
         revealAvailableAt: 0,
         revealSelecting: false,
         gameOver: false,
@@ -527,7 +739,7 @@ module.exports = {
           game.status = 'cashout';
           game.payout = Math.max(
             0,
-            Math.floor(game.amount * game.currentMultiplier) - game.revealFees
+            Math.floor(game.amount * game.currentMultiplier)
           );
 
           userCoins = await creditBalance({
@@ -563,6 +775,11 @@ module.exports = {
         }
 
         if (interaction.customId === 'mines_reveal') {
+          if (game.allIn) {
+            await render();
+            return;
+          }
+
           const now = Date.now();
 
           const cooldownDoc = await MinesCooldown.findOne({
@@ -640,10 +857,46 @@ module.exports = {
             return;
           }
 
+          const revealPayment = await debitBalance({
+            userId: message.author.id,
+            guildId,
+            source: 'coins',
+            amount: game.revealCost
+          });
+
+          if (!revealPayment) {
+            game.revealSelecting = false;
+            await render();
+
+            await interaction.followUp({
+              content:
+                `❌・Il te faut **${formatCoins(game.revealCost)} coins** en poche pour utiliser Reveal.`,
+              flags: MessageFlags.Ephemeral
+            }).catch(() => {});
+            return;
+          }
+
+          userCoins = revealPayment;
+
+          await sendStaffLog(
+            message.guild,
+            'economy-logs',
+            buildCoinMovementLog({
+              title: '🔍 Mines — Reveal',
+              user: message.author,
+              delta: -game.revealCost,
+              pocket: userCoins.coins,
+              bank: userCoins.bank,
+              reason: '+mines • Reveal',
+              sourceChannel: message.channel,
+              details:
+                `Mode : ${game.mode.label} • Coût : ${formatCoins(game.revealCost)}`
+            })
+          );
+
           // La case choisie est seulement dévoilée : elle reste grise.
           game.peeked.add(index);
           game.revealSelecting = false;
-          game.revealFees += game.revealCost;
           game.revealAvailableAt = now + REVEAL_COOLDOWN_MS;
           ensureCooldownTimer();
 
@@ -734,7 +987,7 @@ module.exports = {
           game.status = 'cleared';
           game.payout = Math.max(
             0,
-            Math.floor(game.amount * game.currentMultiplier) - game.revealFees
+            Math.floor(game.amount * game.currentMultiplier)
           );
 
           userCoins = await creditBalance({
@@ -781,8 +1034,7 @@ module.exports = {
         const payout = game.safeOpened > 0
           ? Math.max(
               0,
-              Math.floor(game.amount * game.currentMultiplier) -
-                game.revealFees
+              Math.floor(game.amount * game.currentMultiplier)
             )
           : game.amount;
 
