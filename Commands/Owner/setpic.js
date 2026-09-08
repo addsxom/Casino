@@ -1,4 +1,3 @@
-const Owner = require("../../Models/Owner.js");
 
 function restoreClientToken(client, token) {
   if (!token) return;
@@ -7,15 +6,15 @@ function restoreClientToken(client, token) {
   client.rest.setToken(token);
 }
 
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+
 module.exports = {
   name: "setpic",
   description: "Change la photo de profil du bot.",
   async execute(message, args) {
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
+    if (!(await requireBotOwner(message))) return;
 
-    if (!isOwner) return;
-
-    if (!args.length && !message.attachments.size) {
+if (!args.length && !message.attachments.size) {
       return message.channel.send(
         "Veuillez fournir une URL d'image ou une image en pièce jointe pour mettre à jour la photo de profil du bot."
       );
