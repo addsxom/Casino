@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
-const { formatAmount, formatFullAmount } = require('../../utils/formatAmount.js');
+const { formatAmount, formatAmountPrecise, formatFullAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'coins',
@@ -75,7 +75,7 @@ module.exports = {
           {
             name: '💰 Fortune totale',
             value:
-              `**${formatAmount(total)} coins**  •  ` +
+              `**${formatAmountPrecise(total)} coins**  •  ` +
               `\`${formatFullAmount(total)}\``,
             inline: false
           }
