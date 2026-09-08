@@ -9,6 +9,12 @@ const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
+const {
+  tryAcquireActiveGame,
+  updateActiveGame,
+  releaseActiveGame,
+  buildActiveGameEmbed
+} = require('../../utils/activeGameLock.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -178,28 +184,13 @@ module.exports = {
 
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
+    const userId = message.author.id;
     const allIn = options.all === true;
     let amount;
     let userCoins;
+    let activeGameToken = null;
 
-    if (allIn) {
-      const drained = await drainPocket(
-        message.author.id,
-        guildId
-      );
-
-      if (!drained || drained.amount <= 0) {
-        return message.reply(
-          '❌・Vous n\'avez pas assez de coins pour cette mise.'
-        );
-      }
-
-      amount = drained.amount;
-      userCoins = await getAccount(
-        message.author.id,
-        guildId
-      );
-    } else {
+    if (!allIn) {
       amount = parseAmount(args[0]);
 
       if (
@@ -211,15 +202,68 @@ module.exports = {
           'Exemple : **+crash 1000**'
         );
       }
+    }
 
+    const activeGame = tryAcquireActiveGame({
+      userId,
+      guildId,
+      game: allIn ? 'Crash ALL' : 'Crash',
+      channelId: message.channel.id
+    });
+
+    if (!activeGame.acquired) {
+      return message.reply({
+        embeds: [
+          buildActiveGameEmbed(
+            message,
+            activeGame.activeGame
+          )
+        ]
+      });
+    }
+
+    activeGameToken = activeGame.token;
+
+    if (allIn) {
+      const drained = await drainPocket(
+        userId,
+        guildId
+      );
+
+      if (!drained || drained.amount <= 0) {
+        releaseActiveGame({
+          userId,
+          guildId,
+          token: activeGameToken
+        });
+        activeGameToken = null;
+
+        return message.reply(
+          '❌・Vous n\'avez pas assez de coins pour cette mise.'
+        );
+      }
+
+      amount = drained.amount;
+      userCoins = await getAccount(
+        userId,
+        guildId
+      );
+    } else {
       userCoins = await debitBalance({
-        userId: message.author.id,
+        userId,
         guildId,
         source: 'coins',
         amount
       });
 
       if (!userCoins) {
+        releaseActiveGame({
+          userId,
+          guildId,
+          token: activeGameToken
+        });
+        activeGameToken = null;
+
         return message.reply(
           '❌・Vous n\'avez pas assez de coins pour cette mise.'
         );
@@ -252,11 +296,20 @@ module.exports = {
       });
     } catch (error) {
       await creditBalance({
-        userId: message.author.id,
+        userId,
         guildId,
         target: 'coins',
         amount
       });
+
+      if (activeGameToken) {
+        releaseActiveGame({
+          userId,
+          guildId,
+          token: activeGameToken
+        });
+        activeGameToken = null;
+      }
 
       console.error(
         'Crash start error:',
@@ -267,6 +320,14 @@ module.exports = {
         '❌・Impossible de lancer le Crash.'
       );
     }
+
+    updateActiveGame({
+      userId,
+      guildId,
+      token: activeGameToken,
+      channelId: message.channel.id,
+      messageId: gameMessage.id
+    });
 
     // L'horloge commence quand le message est réellement envoyé.
     game.startedAt = Date.now();
@@ -299,26 +360,37 @@ module.exports = {
         components: []
       }).catch(() => {});
 
-      const latestCoins = await getAccount(
-        message.author.id,
-        guildId
-      );
-
-      if (latestCoins) {
-        await sendStaffLog(
-          message.guild,
-          'economy-logs',
-          buildCoinMovementLog({
-            title: '🚀 Crash — Perte',
-            user: message.author,
-            delta: -game.amount,
-            pocket: latestCoins.coins,
-            bank: latestCoins.bank,
-            reason: allIn ? '+crashall' : '+crash',
-            sourceChannel: message.channel,
-            details: `Mise : ${formatCoins(game.amount)} • Crash : x${game.crashPoint.toFixed(2)}`
-          })
+      try {
+        const latestCoins = await getAccount(
+          userId,
+          guildId
         );
+
+        if (latestCoins) {
+          await sendStaffLog(
+            message.guild,
+            'economy-logs',
+            buildCoinMovementLog({
+              title: '🚀 Crash — Perte',
+              user: message.author,
+              delta: -game.amount,
+              pocket: latestCoins.coins,
+              bank: latestCoins.bank,
+              reason: allIn ? '+crashall' : '+crash',
+              sourceChannel: message.channel,
+              details: `Mise : ${formatCoins(game.amount)} • Crash : x${game.crashPoint.toFixed(2)}`
+            })
+          );
+        }
+      } finally {
+        if (activeGameToken) {
+          releaseActiveGame({
+            userId,
+            guildId,
+            token: activeGameToken
+          });
+          activeGameToken = null;
+        }
       }
     };
 
@@ -448,31 +520,42 @@ module.exports = {
           components: []
         });
 
-        userCoins = await creditBalance({
-          userId: message.author.id,
-          guildId,
-          target: 'coins',
-          amount: game.payout
-        });
+        try {
+          userCoins = await creditBalance({
+            userId,
+            guildId,
+            target: 'coins',
+            amount: game.payout
+          });
 
-        if (userCoins) {
-          await sendStaffLog(
-            message.guild,
-            'economy-logs',
-            buildCoinMovementLog({
-              title: '🚀 Crash — Cash Out',
-              user: message.author,
-              delta: game.payout - game.amount,
-              pocket: userCoins.coins,
-              bank: userCoins.bank,
-              reason: allIn ? '+crashall' : '+crash',
-              sourceChannel: message.channel,
-              details:
-                `Mise : ${formatCoins(game.amount)} • ` +
-                `Payout : ${formatCoins(game.payout)} • ` +
-                `x${game.cashoutMultiplier.toFixed(2)}`
-            })
-          );
+          if (userCoins) {
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: '🚀 Crash — Cash Out',
+                user: message.author,
+                delta: game.payout - game.amount,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: allIn ? '+crashall' : '+crash',
+                sourceChannel: message.channel,
+                details:
+                  `Mise : ${formatCoins(game.amount)} • ` +
+                  `Payout : ${formatCoins(game.payout)} • ` +
+                  `x${game.cashoutMultiplier.toFixed(2)}`
+              })
+            );
+          }
+        } finally {
+          if (activeGameToken) {
+            releaseActiveGame({
+              userId,
+              guildId,
+              token: activeGameToken
+            });
+            activeGameToken = null;
+          }
         }
       }
     );
