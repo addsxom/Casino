@@ -2,36 +2,106 @@ const { EmbedBuilder } = require('discord.js');
 const { formatAmount } = require('./formatAmount.js');
 
 const STAFF_LOG_CHANNELS = {
-  'warn': '1546311653933580418',
-  'economy-logs': '1546959903271157851',
-  'bank-logs': '1546959947395371089',
-  'transaction-logs': '1546959992207450193',
-  'message-logs': '1546960057168691291',
-  'server-logs': '1546960115914121276',
-  'voice-logs': '1546960169374720081',
-  'moderation-logs': '1546960328502546484'
+  'warn': {
+    id: '1546311653933580418',
+    name: 'warn'
+  },
+  'economy-logs': {
+    id: '1546959903271157851',
+    name: 'economy-logs'
+  },
+  'bank-logs': {
+    id: '1546959947395371089',
+    name: 'bank-logs'
+  },
+  'transaction-logs': {
+    id: '1546959992207450193',
+    name: 'transaction-logs'
+  },
+  'message-logs': {
+    id: '1546960057168691291',
+    name: 'message-logs'
+  },
+  'server-logs': {
+    id: '1546960115914121276',
+    name: 'server-logs'
+  },
+  'voice-logs': {
+    id: '1546960169374720081',
+    name: 'voice-logs'
+  },
+  'moderation-logs': {
+    id: '1546960328502546484',
+    name: 'moderation-logs'
+  }
 };
+
+function normalizeChannelName(name) {
+  return String(name || '').toLowerCase().trim();
+}
+
+function channelNameMatches(channel, expectedName) {
+  const actual = normalizeChannelName(channel?.name);
+  const expected = normalizeChannelName(expectedName);
+
+  return actual === expected || actual.endsWith(expected);
+}
 
 function findStaffLogChannel(guild, key) {
   if (!guild) return null;
 
-  const channelId = STAFF_LOG_CHANNELS[key];
-  if (!channelId) return null;
+  const config = STAFF_LOG_CHANNELS[key];
+  if (!config) return null;
 
-  const channel = guild.channels.cache.get(channelId);
-  return channel?.isTextBased?.() ? channel : null;
+  const channelById = guild.channels.cache.get(config.id);
+
+  if (channelById?.isTextBased?.()) {
+    if (!channelNameMatches(channelById, config.name)) {
+      console.warn(
+        `Salon de log ${key} trouvé par ID mais renommé : ${channelById.name}`
+      );
+    }
+
+    return channelById;
+  }
+
+  return guild.channels.cache.find(channel =>
+    channel?.isTextBased?.() &&
+    channelNameMatches(channel, config.name)
+  ) || null;
 }
 
 async function sendStaffLog(guild, key, embed) {
   try {
-    const channelId = STAFF_LOG_CHANNELS[key];
-    if (!guild || !channelId) return false;
+    const config = STAFF_LOG_CHANNELS[key];
+    if (!guild || !config) return false;
 
-    const channel =
-      findStaffLogChannel(guild, key) ||
-      await guild.channels.fetch(channelId).catch(() => null);
+    let channel = findStaffLogChannel(guild, key);
 
-    if (!channel?.isTextBased?.()) return false;
+    if (!channel) {
+      const fetchedById =
+        await guild.channels.fetch(config.id).catch(() => null);
+
+      if (fetchedById?.isTextBased?.()) {
+        channel = fetchedById;
+      }
+    }
+
+    if (!channel) {
+      await guild.channels.fetch().catch(() => null);
+
+      channel = guild.channels.cache.find(candidate =>
+        candidate?.isTextBased?.() &&
+        channelNameMatches(candidate, config.name)
+      ) || null;
+    }
+
+    if (!channel?.isTextBased?.()) {
+      console.error(
+        `Salon de log introuvable pour ${key} (ID: ${config.id}, nom: ${config.name})`
+      );
+      return false;
+    }
 
     await channel.send({ embeds: [embed] });
     return true;
@@ -178,6 +248,7 @@ function buildDiscordLog({
 }
 
 module.exports = {
+  STAFF_LOG_CHANNELS,
   findStaffLogChannel,
   sendStaffLog,
   buildEconomyLog,
