@@ -43,5 +43,25 @@ module.exports = [
     emoji: '📘',
     title: 'Guide staff',
     description: 'La commande +helpmod publie le guide des salons staff dans information.'
+  },
+  {
+    emoji: '📜',
+    title: 'Règlement',
+    description: 'La commande +rules publie le règlement avec le bouton Accepter et attribue le rôle Member.'
+  },
+  {
+    emoji: '👋',
+    title: 'Accueil',
+    description: 'Les nouveaux membres reçoivent un message de bienvenue et sont dirigés vers le règlement.'
+  },
+  {
+    emoji: '🧹',
+    title: 'Modération',
+    description: 'La commande +clear permet aux owners de nettoyer un salon et envoie l’action dans moderation-logs.'
+  },
+  {
+    emoji: '🔊',
+    title: 'Vocal du bot',
+    description: 'Le bot rejoint automatiquement le salon vocal ╰・BOT STATUT au démarrage.'
   }
 ];
