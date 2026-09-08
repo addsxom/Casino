@@ -1,17 +1,25 @@
 const { EmbedBuilder } = require('discord.js');
 const { formatAmount } = require('./formatAmount.js');
 
+const STAFF_LOG_CHANNELS = {
+  'warn': '1546311653933580418',
+  'economy-logs': '1546959903271157851',
+  'bank-logs': '1546959947395371089',
+  'transaction-logs': '1546959992207450193',
+  'message-logs': '1546960057168691291',
+  'server-logs': '1546960115914121276',
+  'voice-logs': '1546960169374720081',
+  'moderation-logs': '1546960328502546484'
+};
+
 function findStaffLogChannel(guild, key) {
   if (!guild) return null;
 
-  const needle = String(key).toLowerCase();
+  const channelId = STAFF_LOG_CHANNELS[key];
+  if (!channelId) return null;
 
-  return guild.channels.cache.find(channel => {
-    if (!channel?.isTextBased?.()) return false;
-
-    const name = String(channel.name || '').toLowerCase();
-    return name.includes(needle);
-  }) || null;
+  const channel = guild.channels.cache.get(channelId);
+  return channel?.isTextBased?.() ? channel : null;
 }
 
 async function sendStaffLog(guild, key, embed) {

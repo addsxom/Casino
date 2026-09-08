@@ -142,7 +142,7 @@ module.exports = {
 
       await sendStaffLog(
         message.guild,
-        'discord-logs',
+        'moderation-logs',
         buildDiscordLog({
           title: '🧹 Clear',
           description:

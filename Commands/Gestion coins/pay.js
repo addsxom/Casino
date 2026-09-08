@@ -87,7 +87,7 @@ module.exports = {
 
       await sendStaffLog(
         message.guild,
-        'economy-logs',
+        'transaction-logs',
         buildTransferLog({
           sender: message.author,
           recipient,

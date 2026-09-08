@@ -24,7 +24,7 @@ module.exports = {
 
       await sendStaffLog(
         message.guild,
-        'deposit-logs',
+        'bank-logs',
         buildEconomyLog({
           title: '📥 Dépôt total en banque',
           user: message.author,

@@ -26,7 +26,7 @@ module.exports = {
 
       await sendStaffLog(
         message.guild,
-        'withdraw-logs',
+        'bank-logs',
         buildBankTransferLog({
           title: '📤 Retrait total de la banque',
           user: message.author,
