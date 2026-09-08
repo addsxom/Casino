@@ -32,7 +32,8 @@ module.exports = async (bot, message) => {
       const args = message.content.slice(prefix.length).trim().split(/ +/);
       const commandName = args.shift().toLowerCase();
 
-      const command = bot.commands.get(commandName);
+      const resolvedCommandName = bot.aliases.get(commandName) || commandName;
+      const command = bot.commands.get(resolvedCommandName);
       if (command) {
         try {
           await command.execute(message, args);
