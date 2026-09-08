@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserRepCooldown = require('../../Models/UserRepCooldown.js');
-const UserCoins = require('../../Models/UserCoins.js');
+const { incrementAccountField } = require('../../utils/economyService.js');
 
 const cooldowns = new Map();
 
@@ -36,21 +36,18 @@ module.exports = {
      return message.reply({ embeds: [colldown] });
     }
 
-      let userCoins = await UserCoins.findOne({ userId: targetUser.id, guildId });
+      await incrementAccountField({
+        userId: targetUser.id,
+        guildId,
+        field: 'rep',
+        amount: 1
+      });
 
-      if (!userCoins) {
-        userCoins = await UserCoins.create({ userId: targetUser.id, guildId });
-      }
-
-      userCoins.rep += 1;
-      await userCoins.save();
-
-      if (userCooldown) {
-        userCooldown.cooldown = Date.now() + this.cooldown * 1000;
-        await userCooldown.save();
-      } else {
-        await UserRepCooldown.create({ userId: message.author.id, guildId, cooldown: Date.now() + this.cooldown * 1000 });
-      }
+      await UserRepCooldown.findOneAndUpdate(
+        { userId: message.author.id, guildId },
+        { $set: { cooldown: Date.now() + this.cooldown * 1000 } },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
+      );
 
       const embed = new EmbedBuilder()
         .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
