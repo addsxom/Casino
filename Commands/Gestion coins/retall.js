@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const { formatAmount } = require('../../utils/formatAmount.js');
 const UserCoins = require('../../Models/UserCoins.js');
 
 module.exports = {
@@ -20,7 +21,7 @@ module.exports = {
       userCoins.bank = 0;
       await userCoins.save();
 
-      return message.reply(`🏦・Vous avez retiré **${amountToWithdraw}** de votre banque.`)
+      return message.reply(`🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** de votre banque.`)
 
     } catch (error) {
       console.error(error);
