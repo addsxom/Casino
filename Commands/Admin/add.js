@@ -1,19 +1,18 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
-const Owner = require("../../Models/Owner.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 
 module.exports = {
   name: 'add',
   description: 'Ajouter des rep/coins à un membre',
   usage: 'add <type(rep/bank/coins)> <nombre> <@utilisateur>',
   async execute(message, args) {
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
+    if (!(await requireBotOwner(message))) return;
 
-    if (!isOwner) return;
-
-    if (args.length !== 3) {
+if (args.length !== 3) {
       return message.reply('Utilisation incorrecte. Veuillez spécifier le type (rep/bank/coins), le nombre et mentionner l\'utilisateur.');
     }
 
