@@ -40,10 +40,14 @@ module.exports = {
           iconURL: targetUser.displayAvatarURL({ dynamic: true })
         })
         .setDescription(
-          `🪙 **${formatAmount(pocket)}** \`${formatFullAmount(pocket)}\` coins en poche\n` +
-          `🏦 **${formatAmount(bank)}** \`${formatFullAmount(bank)}\` coins en banque\n` +
-          `🔺 **${formatAmount(rep)}** \`${formatFullAmount(rep)}\` Réputation\n` +
-          `💰 **${formatAmountPrecise(total)}** \`${formatFullAmount(total)}\` Fortune totale`
+          `🪙 **${formatAmount(pocket)}** coins en poche\n` +
+          `-# ${formatFullAmount(pocket)} exactement\n\n` +
+          `🏦 **${formatAmount(bank)}** coins en banque\n` +
+          `-# ${formatFullAmount(bank)} exactement\n\n` +
+          `🔺 **${formatAmount(rep)}** Réputation\n` +
+          `-# ${formatFullAmount(rep)} exactement\n\n` +
+          `💰 **${formatAmountPrecise(total)}** Fortune totale\n` +
+          `-# ${formatFullAmount(total)} exactement`
         )
         .setFooter({
           text: 'Kuromi Coins',
