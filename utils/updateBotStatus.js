@@ -1,10 +1,10 @@
 const BOT_STATUS_CHANNEL = {
   id: '1546360551503044658',
-  name: 'BOT STATUS'
+  name: '╰・BOT STATUT'
 };
 
-const ONLINE_NAME = 'BOT STATUS /🟢';
-const OFFLINE_NAME = 'BOT STATUS /🔴';
+const ONLINE_NAME = '╰・BOT STATUT /🟢';
+const OFFLINE_NAME = '╰・BOT STATUT /🔴';
 
 function normalizeStatusName(name) {
   return String(name || '')
@@ -35,7 +35,7 @@ async function findBotStatusChannel(guild) {
   if (channel) {
     if (!matchesStatusChannelName(channel)) {
       console.warn(
-        `Salon BOT STATUS trouvé par ID mais avec un nom différent : ${channel.name}`
+        `Salon BOT STATUT trouvé par ID mais avec un nom différent : ${channel.name}`
       );
     }
 
@@ -55,7 +55,7 @@ async function updateBotStatusChannel(guild, isConnected) {
 
     if (!channel) {
       console.error(
-        `Salon BOT STATUS introuvable (ID: ${BOT_STATUS_CHANNEL.id}, nom: ${BOT_STATUS_CHANNEL.name})`
+        `Salon BOT STATUT introuvable (ID: ${BOT_STATUS_CHANNEL.id}, nom: ${BOT_STATUS_CHANNEL.name})`
       );
       return false;
     }
@@ -71,14 +71,14 @@ async function updateBotStatusChannel(guild, isConnected) {
     await channel.setName(
       newName,
       isConnected
-        ? 'Bot connecté au vocal BOT STATUS'
-        : 'Bot déconnecté du vocal BOT STATUS'
+        ? 'Bot connecté au vocal BOT STATUT'
+        : 'Bot déconnecté du vocal BOT STATUT'
     );
 
     return true;
   } catch (error) {
     console.error(
-      'Erreur mise à jour BOT STATUS :',
+      'Erreur mise à jour BOT STATUT :',
       error?.code || error?.message || error
     );
 
