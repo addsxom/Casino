@@ -1,5 +1,6 @@
 const { getVoiceConnection, joinVoiceChannel } = require("@discordjs/voice");
-const Owner = require("../../Models/Owner.js");
+
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 
 module.exports = {
   name: "joinvc",
@@ -8,12 +9,9 @@ module.exports = {
   async execute(message, args) {
     const server = message.guild;
     if (!server) return;
+    if (!(await requireBotOwner(message))) return;
 
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
-
-    if (!isOwner) return;
-
-    const voiceChannelId = args[0];
+const voiceChannelId = args[0];
 
     if (!voiceChannelId) {
       return message.channel.send(
