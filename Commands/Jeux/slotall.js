@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const { sleep } = require('../../utils');
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -51,7 +52,7 @@ module.exports = {
       const slotEmbed = new EmbedBuilder()
         .setTitle('Slots')
         .setDescription(
-          `${message.author} vient de lancer les slots en misant **tous ses coins : ${amount} coins🪙**.`
+          `${message.author} vient de lancer les slots en misant **tous ses coins : ${formatAmount(amount)} coins🪙**.`
         )
         .setImage(SLOT_GIF)
         .setFooter({
@@ -75,8 +76,8 @@ module.exports = {
         .setTitle(result ? '🎉 YOU WIN' : '💀 YOU LOSE')
         .setDescription(
           result
-            ? `Vous avez gagné **${amount * 3}** coins🪙`
-            : `Vous avez perdu **${amount}** coins🪙`
+            ? `Vous avez gagné **${formatAmount(amount * 3)}** coins🪙`
+            : `Vous avez perdu **${formatAmount(amount)}** coins🪙`
         )
         .setImage(result ? WIN_GIF : LOSE_GIF)
         .setFooter({
