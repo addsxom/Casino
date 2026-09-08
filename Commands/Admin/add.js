@@ -1,4 +1,5 @@
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 const Owner = require("../../Models/Owner.js");
 
 module.exports = {
@@ -15,7 +16,7 @@ module.exports = {
     }
 
     const type = args[0].toLowerCase();
-    const amount = parseInt(args[1]);
+    const amount = parseAmount(args[1]);
     const targetUser = message.mentions.users.first();
 
     if (!targetUser) {
