@@ -73,6 +73,88 @@ function buildEconomyLog({
     .setTimestamp();
 }
 
+
+function buildCoinMovementLog({
+  title,
+  user,
+  delta,
+  pocket,
+  bank,
+  reason,
+  sourceChannel,
+  otherUser = null,
+  details = null
+}) {
+  const amount = Math.abs(Number(delta) || 0);
+  const isGain = delta > 0;
+  const isLoss = delta < 0;
+
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setColor(isGain ? 0x57f287 : isLoss ? 0xed4245 : 0x6b6de6)
+    .setAuthor({
+      name: user.tag,
+      iconURL: user.displayAvatarURL({ dynamic: true })
+    })
+    .addFields(
+      {
+        name: '👤 Membre',
+        value: `${user} • \`${user.id}\``,
+        inline: false
+      },
+      {
+        name: isGain ? '📈 Gain' : isLoss ? '📉 Perte' : '➖ Variation',
+        value: `${isGain ? '+' : isLoss ? '-' : ''}**${formatAmount(amount)}** • \`${formatFullAmount(amount)}\``,
+        inline: true
+      },
+      {
+        name: '🪙 Poche',
+        value: `${formatAmount(pocket)} • \`${formatFullAmount(pocket)}\``,
+        inline: true
+      },
+      {
+        name: '🏦 Banque',
+        value: `${formatAmount(bank)} • \`${formatFullAmount(bank)}\``,
+        inline: true
+      }
+    )
+    .setTimestamp();
+
+  if (reason) {
+    embed.addFields({
+      name: '📌 Raison',
+      value: reason,
+      inline: false
+    });
+  }
+
+  if (otherUser) {
+    embed.addFields({
+      name: '👥 Avec',
+      value: `${otherUser} • \`${otherUser.id}\``,
+      inline: false
+    });
+  }
+
+  if (details) {
+    embed.addFields({
+      name: 'ℹ️ Détails',
+      value: details,
+      inline: false
+    });
+  }
+
+  if (sourceChannel) {
+    embed.addFields({
+      name: '📍 Salon',
+      value: `${sourceChannel}`,
+      inline: false
+    });
+  }
+
+  return embed;
+}
+
 function buildDiscordLog({
   title,
   description,
@@ -99,5 +181,6 @@ module.exports = {
   findStaffLogChannel,
   sendStaffLog,
   buildEconomyLog,
+  buildCoinMovementLog,
   buildDiscordLog
 };
