@@ -6,7 +6,7 @@ const {
   MessageFlags
 } = require("discord.js");
 
-const UserCoins = require('../../Models/UserCoins.js');
+const { ensureAccount } = require('../../utils/economyService.js');
 const {
   formatAmount,
   formatAmountPrecise,
@@ -98,17 +98,10 @@ module.exports = {
         targetUser = await message.client.users.fetch(userId, false);
       }
 
-      let userCoins = await UserCoins.findOne({
-        userId: targetUser.id,
+      let userCoins = await ensureAccount(
+        targetUser.id,
         guildId
-      });
-
-      if (!userCoins) {
-        userCoins = await UserCoins.create({
-          userId: targetUser.id,
-          guildId
-        });
-      }
+      );
 
       const coinsMessage = await message.reply({
         embeds: [buildSummaryEmbed(message, targetUser, userCoins)],
@@ -130,17 +123,10 @@ module.exports = {
 
           await interaction.deferUpdate();
 
-          userCoins = await UserCoins.findOne({
-            userId: targetUser.id,
+          userCoins = await ensureAccount(
+            targetUser.id,
             guildId
-          });
-
-          if (!userCoins) {
-            userCoins = await UserCoins.create({
-              userId: targetUser.id,
-              guildId
-            });
-          }
+          );
 
           if (interaction.customId === 'coins_details') {
             return coinsMessage.edit({
