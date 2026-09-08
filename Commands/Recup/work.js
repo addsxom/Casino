@@ -3,6 +3,7 @@ const UserWorkCooldown = require('../../Models/UserWorkCooldown.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 const { creditBalance } = require('../../utils/economyService.js');
+const { tryAcquireCooldown, releaseCooldown } = require('../../utils/cooldownService.js');
 
 module.exports = {
   name: 'work',
@@ -14,10 +15,20 @@ module.exports = {
 
     try {
 
-      const userWorkCooldown = await UserWorkCooldown.findOne({ userId, guildId });
+      const cooldown = await tryAcquireCooldown(
+        UserWorkCooldown,
+        {
+          userId,
+          guildId,
+          durationMs: 60 * 60 * 1000
+        }
+      );
 
-      if (userWorkCooldown && Date.now() < userWorkCooldown.cooldown) {
-        const timeLeft = userWorkCooldown.cooldown - Date.now();
+      if (!cooldown.acquired) {
+        const timeLeft = Math.max(
+          0,
+          cooldown.availableAt - Date.now()
+        );
         const formattedTimeLeft = formatCooldown(timeLeft);
 
         const cooldownEmbed = new EmbedBuilder()
@@ -31,12 +42,27 @@ module.exports = {
 
       const coinsEarned = Math.floor(Math.random() * (1000 - 15 + 1)) + 15;
 
-      const userCoins = await creditBalance({
-        userId,
-        guildId,
-        target: 'coins',
-        amount: coinsEarned
-      });
+      let userCoins;
+
+      try {
+        userCoins = await creditBalance({
+          userId,
+          guildId,
+          target: 'coins',
+          amount: coinsEarned
+        });
+      } catch (error) {
+        await releaseCooldown(
+          UserWorkCooldown,
+          {
+            userId,
+            guildId,
+            availableAt: cooldown.availableAt
+          }
+        );
+
+        throw error;
+      }
 
       await sendStaffLog(
         message.guild,
@@ -50,12 +76,6 @@ module.exports = {
           reason: '+work / +wk',
           sourceChannel: message.channel
         })
-      );
-
-      await UserWorkCooldown.findOneAndUpdate(
-        { userId, guildId },
-        { $set: { cooldown: Date.now() + 60 * 60 * 1000 } },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
       );
 
       const embed = new EmbedBuilder()
