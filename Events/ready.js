@@ -14,6 +14,22 @@ const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
 
+const ACTIVITY_TYPES = {
+  PLAYING: ActivityType.Playing,
+  STREAMING: ActivityType.Streaming,
+  LISTENING: ActivityType.Listening,
+  WATCHING: ActivityType.Watching,
+  COMPETING: ActivityType.Competing
+};
+
+function resolveActivityType(value) {
+  if (typeof value === 'number') return value;
+
+  return ACTIVITY_TYPES[
+    String(value || 'LISTENING').toUpperCase()
+  ] ?? ActivityType.Listening;
+}
+
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
   await mongoose.connect(process.env.MONGODB).then(() => {
@@ -23,24 +39,43 @@ module.exports = async (bot) => {
 
   const botInfo = await BotInfo.findOne();
 
-  const botName = botInfo ? botInfo.botName : "Kuromi-Coins 🎀";
-  const activitytext = botInfo ? botInfo.activityText : "Kuromi-Coins 🎀";
-  const activitytext2 = botInfo ? botInfo.activityText : `${prefix}help for ${bot.guilds.cache.reduce((acc, guild) => acc + guild.memberCount,0)} users!`;
-  const activityType = botInfo ? botInfo.activityType : ActivityType.Listening;
-  const status = botInfo ? botInfo.status : "dnd";
-  const guildId = botInfo ? botInfo.guildId : GUILD_ID;
+  const botName = bot.user.username;
+  const activitytext = botInfo?.activityText || "Kuromi-Coins 🎀";
+  const activitytext2 =
+    botInfo?.activityText2 ||
+    `${prefix}help for ${bot.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)} users!`;
+  const activityType = resolveActivityType(
+    botInfo?.activityType
+  );
+  const status = botInfo?.status || "dnd";
+  const guildId = botInfo?.guildId || GUILD_ID;
 
-  const activities = [
-    { name: activitytext, type: activityType },
-    { name: activitytext2, type: activityType },
-  ];
-  bot.user.setActivity(activities[0]);
+  bot.activityRotation = {
+    texts: [activitytext, activitytext2].filter(Boolean),
+    type: activityType,
+    index: 0
+  };
 
-  let i = 1;
+  const firstActivity = bot.activityRotation.texts[0];
+
+  if (firstActivity) {
+    bot.user.setActivity(firstActivity, {
+      type: bot.activityRotation.type
+    });
+  }
+
   setInterval(() => {
-    if (i >= activities.length) i = 0;
-    bot.user.setActivity(activities[i]);
-    i++;
+    const rotation = bot.activityRotation;
+
+    if (!rotation?.texts?.length) return;
+
+    rotation.index =
+      (rotation.index + 1) % rotation.texts.length;
+
+    bot.user.setActivity(
+      rotation.texts[rotation.index],
+      { type: rotation.type }
+    );
   }, 5000);
 
   bot.user.setStatus(status);
