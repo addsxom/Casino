@@ -396,7 +396,7 @@ function buildAllWarningContainer(message, pocketAmount) {
 
   if (suggestedBet > 0) {
     tip =
-      `Avec ta poche actuelle, tu peux par exemple faire **+mines ${formatCoins(suggestedBet)}** ` +
+      `Avec ta poche actuelle, tu peux par exemple faire **+mines ${suggestedBet}** ` +
       `et garder environ **${formatCoins(revealReserve)} coins** pour 1 Reveal.`;
   }
 
@@ -506,7 +506,7 @@ async function confirmMinesAll(
 
 module.exports = {
   name: 'mines',
-  description: 'Jouez au Mines avec une mise et plusieurs niveaux de difficulté.',
+  description: 'Jouez au Mines. Ajoutez `all` au nom pour miser toute votre poche.',
 
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
