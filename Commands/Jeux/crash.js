@@ -5,10 +5,10 @@ const {
   EmbedBuilder
 } = require('discord.js');
 
-const UserCoins = require('../../Models/UserCoins.js');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { debitBalance, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -190,23 +190,18 @@ module.exports = {
       );
     }
 
-    let userCoins =
-      await UserCoins.findOne({
-        userId: message.author.id,
-        guildId
-      });
+    let userCoins = await debitBalance({
+      userId: message.author.id,
+      guildId,
+      source: 'coins',
+      amount
+    });
 
-    if (
-      !userCoins ||
-      userCoins.coins < amount
-    ) {
+    if (!userCoins) {
       return message.reply(
         '❌・Vous n\'avez pas assez de coins pour cette mise.'
       );
     }
-
-    userCoins.coins -= amount;
-    await userCoins.save();
 
     const game = {
       amount,
@@ -233,8 +228,12 @@ module.exports = {
         components: buildCashoutRow()
       });
     } catch (error) {
-      userCoins.coins += amount;
-      await userCoins.save();
+      await creditBalance({
+        userId: message.author.id,
+        guildId,
+        target: 'coins',
+        amount
+      });
 
       console.error(
         'Crash start error:',
@@ -277,10 +276,10 @@ module.exports = {
         components: []
       }).catch(() => {});
 
-      const latestCoins = await UserCoins.findOne({
-        userId: message.author.id,
+      const latestCoins = await getAccount(
+        message.author.id,
         guildId
-      });
+      );
 
       if (latestCoins) {
         await sendStaffLog(
@@ -426,18 +425,14 @@ module.exports = {
           components: []
         });
 
-        userCoins =
-          await UserCoins.findOne({
-            userId: message.author.id,
-            guildId
-          });
+        userCoins = await creditBalance({
+          userId: message.author.id,
+          guildId,
+          target: 'coins',
+          amount: game.payout
+        });
 
         if (userCoins) {
-          userCoins.coins +=
-            game.payout;
-
-          await userCoins.save();
-
           await sendStaffLog(
             message.guild,
             'economy-logs',
