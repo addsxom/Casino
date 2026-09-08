@@ -7,10 +7,7 @@ module.exports = async (_bot, role) => {
     buildDiscordLog({
       title: '➖ Rôle supprimé',
       description: `**${role.name}**`,
-      color: 0xed4245,
-      fields: [
-        { name: 'ID', value: `\`${role.id}\``, inline: true }
-      ]
+      color: 0xed4245
     })
   );
 };
