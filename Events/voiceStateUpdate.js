@@ -1,4 +1,8 @@
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
+const {
+  AuditLogEvent,
+  getRecentAuditExecutor
+} = require('../utils/auditLogs.js');
 
 module.exports = async (_bot, oldState, newState) => {
   if (oldState.channelId === newState.channelId) return;
@@ -8,16 +12,39 @@ module.exports = async (_bot, oldState, newState) => {
 
   let title;
   let description;
+  let color;
 
   if (!oldState.channelId && newState.channelId) {
-    title = '🎙️ Vocal rejoint';
-    description = `${member} → ${newState.channel}`;
+    title = '🟢 Vocal rejoint';
+    description =
+      `${member} a rejoint ${newState.channel}.`;
+    color = 0x57f287;
   } else if (oldState.channelId && !newState.channelId) {
-    title = '🎙️ Vocal quitté';
-    description = `${member} ← ${oldState.channel}`;
+    title = '🔴 Vocal quitté';
+    description =
+      `${member} a quitté ${oldState.channel}.`;
+    color = 0xed4245;
   } else {
-    title = '🎙️ Vocal déplacé';
-    description = `${member}\n${oldState.channel} → ${newState.channel}`;
+    const executor = await getRecentAuditExecutor(
+      member.guild,
+      AuditLogEvent.MemberMove,
+      {
+        targetId: member.id,
+        channelId: newState.channelId,
+        withinMs: 6000,
+        delayMs: 900
+      }
+    );
+
+    title = '🟡 Vocal déplacé';
+    description =
+      `${member}\n` +
+      `${oldState.channel} → ${newState.channel}\n` +
+      (executor
+        ? `-# Déplacé par ${executor}`
+        : '-# Déplacement effectué par le membre');
+
+    color = 0xfee75c;
   }
 
   await sendStaffLog(
@@ -26,7 +53,7 @@ module.exports = async (_bot, oldState, newState) => {
     buildDiscordLog({
       title,
       description,
-      color: 0x5865f2
+      color
     })
   );
 };
