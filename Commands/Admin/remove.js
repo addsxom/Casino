@@ -2,6 +2,7 @@ const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const Owner = require("../../Models/Owner.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'remove',
@@ -41,14 +42,46 @@ module.exports = {
         await userCoins.save();
         return message.reply(`Vous avez retiré ${formatAmount(amount)} points de réputation à ${targetUser.tag}.`);
       } else if (type === 'bank') {
-        userCoins.coins -= amount;
-        if (userCoins.coins < 0) userCoins.coins = 0;
+        const removedAmount = Math.min(amount, userCoins.bank);
+        userCoins.bank -= removedAmount;
         await userCoins.save();
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🛡️ Retrait admin',
+            user: targetUser,
+            delta: -removedAmount,
+            pocket: userCoins.coins,
+            bank: userCoins.bank,
+            reason: 'Retrait admin depuis la banque',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
+
         return message.reply(`Vous avez retiré ${formatAmount(amount)} coins en bank à ${targetUser.tag}.`);
       } else if (type === 'coins') {
-        userCoins.coins -= amount;
-        if (userCoins.coins < 0) userCoins.coins = 0;
+        const removedAmount = Math.min(amount, userCoins.coins);
+        userCoins.coins -= removedAmount;
         await userCoins.save();
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🛡️ Retrait admin',
+            user: targetUser,
+            delta: -removedAmount,
+            pocket: userCoins.coins,
+            bank: userCoins.bank,
+            reason: 'Retrait admin depuis la poche',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
+
         return message.reply(`Vous avez retiré ${formatAmount(amount)} coins à ${targetUser.tag}.`);
       } else {
         return message.reply('Type invalide. Veuillez spécifier "rep", "bank" ou "coins".');
