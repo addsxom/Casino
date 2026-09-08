@@ -4,6 +4,7 @@ const UserDailyCooldown = require('../Models/UserDailyCooldown.js');
 const UserWorkCooldown = require('../Models/UserWorkCooldown.js');
 const UserRepCooldown = require('../Models/UserRepCooldown.js');
 const UserRobCooldown = require('../Models/UserRobCooldown.js');
+const UserRobProtection = require('../Models/UserRobProtection.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
 
@@ -170,6 +171,7 @@ async function createDeclaredIndexes() {
     UserWorkCooldown,
     UserRepCooldown,
     UserRobCooldown,
+    UserRobProtection,
     ServerPrefix,
     Owner
   ];
@@ -190,6 +192,8 @@ async function ensureDatabaseIntegrity() {
       await hasUserGuildUniqueIndex(UserRepCooldown),
     robCooldowns:
       await hasUserGuildUniqueIndex(UserRobCooldown),
+    robProtections:
+      await hasUserGuildUniqueIndex(UserRobProtection),
     minesCooldowns:
       await hasUserGuildUniqueIndex(MinesCooldown)
   };
@@ -210,6 +214,9 @@ async function ensureDatabaseIntegrity() {
     robCooldowns: indexed.robCooldowns
       ? 0
       : await mergeNumericCooldownDuplicates(UserRobCooldown),
+    robProtections: indexed.robProtections
+      ? 0
+      : await mergeNumericCooldownDuplicates(UserRobProtection),
     minesCooldowns: indexed.minesCooldowns
       ? 0
       : await mergeMinesCooldownDuplicates()
