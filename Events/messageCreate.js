@@ -36,11 +36,39 @@ module.exports = async (bot, message) => {
       const args = message.content.slice(prefix.length).trim().split(/ +/);
       const commandName = args.shift().toLowerCase();
 
-      const resolvedCommandName = bot.aliases.get(commandName) || commandName;
-      const command = bot.commands.get(resolvedCommandName);
+      let resolvedCommandName =
+        bot.aliases.get(commandName) || commandName;
+      let command = bot.commands.get(resolvedCommandName);
+      const commandOptions = {
+        all: false,
+        invokedName: commandName
+      };
+
+      if (
+        !command &&
+        commandName.endsWith('all') &&
+        commandName.length > 3
+      ) {
+        const baseName = commandName.slice(0, -3);
+        resolvedCommandName =
+          bot.aliases.get(baseName) || baseName;
+
+        const baseCommand =
+          bot.commands.get(resolvedCommandName);
+
+        if (baseCommand?.category === 'Jeux') {
+          command = baseCommand;
+          commandOptions.all = true;
+        }
+      }
+
       if (command) {
         try {
-          await command.execute(message, args);
+          await command.execute(
+            message,
+            args,
+            commandOptions
+          );
         } catch (error) {
           console.error(error);
           message.channel.send(
