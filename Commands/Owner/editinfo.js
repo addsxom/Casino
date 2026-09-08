@@ -1,208 +1,387 @@
-// const { ActivityType, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
-// const mongoose = require('mongoose');
-// const BotInfo  = require('../../Models/BotInfo');
+const {
+  ActivityType,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  EmbedBuilder
+} = require('discord.js');
 
-// module.exports = {
-//   name: 'editbot',
-//   description: 'Modifier les informations du bot',
-//   async execute(message, args, bot) {
-//     try {
-//       // Vérifier la connexion à la base de données
-//       if (!mongoose.connection.readyState) {
-//         return message.reply('La connexion à la base de données n\'est pas établie.');
-//       }
-
-//       let botInfo = await BotInfo.findOne({ guildId: message.guild.id });
-
-//       if (!botInfo) {
-//         botInfo = {
-//           botName: message.client.user.username,
-//           activityType: ActivityType[message.client.user.presence.activities[0]?.type] || 'LISTENING',
-//           avatarURL: message.client.user.displayAvatarURL(),
-//           status: message.client.user.presence.status,
-//         };
-
-//         await BotInfo.create({
-//           guildId: message.guild.id,
-//           ...botInfo,
-//         });
-//       }
-
-//       const [, field, value] = args;
-
-//       if (!field && !value) {
-//         // Afficher un select menu avec les options disponibles
-//         const selectMenu = new StringSelectMenuBuilder()
-//           .setCustomId('editInfo')
-//           .setPlaceholder('Choisissez un champ à modifier')
-//           .addOptions([
-//             { label: 'Nom du bot', value: 'botName' },
-//             { label: 'Activité', value: 'activity' },
-//             { label: 'Avatar', value: 'avatar' },
-//             { label: 'Statut', value: 'status' },
-//           ]);
-
-//         const row = new ActionRowBuilder().addComponents(selectMenu);
-
-//         const currentInfoEmbed = createInfoEmbed(botInfo);
-
-//         return message.reply({ embeds: [currentInfoEmbed], components: [row] });
-//       }
-
-//       // Modifier le champ sélectionné
-//       switch (field.toLowerCase()) {
-//         case 'botname':
-//           botInfo.botName = value;
-//           break;
-//         case 'activity':
-//           botInfo.activityType = value.toUpperCase();
-//           break;
-//         case 'avatar':
-//           botInfo.avatarURL = value;
-//           break;
-//         case 'status':
-//           botInfo.status = value.toLowerCase();
-//           break;
-//         default:
-//           return message.reply('Champ invalide. Utilisez l\'un des suivants : botname, activity, avatar, status.');
-//       }
-
-//       if (!botInfo._id) {
-//         // Si le modèle n'existe pas dans la base de données, créez-le
-//         await BotInfo.create({
-//           guildId: message.guild.id,
-//           ...botInfo,
-//         });
-//       } else {
-//         await BotInfo.updateOne({ guildId: message.guild.id }, botInfo);
-//       }
-
-//       // Appliquer les modifications
-//       const bot = message.client;
-//       bot.user.setUsername(botInfo.botName);
-//       bot.user.setActivity(botInfo.botName, { type: ActivityType[botInfo.activityType] });
-//       bot.user.setAvatar(botInfo.avatarURL);
-//       bot.user.setStatus(botInfo.status);
-
-//       const updatedInfoEmbed = createInfoEmbed(botInfo);
-//       message.reply({ content: 'Informations mises à jour avec succès:', embeds: [updatedInfoEmbed] });
-//     } catch (error) {
-//       console.error(error);
-//       return message.reply('Une erreur s\'est produite lors de la modification des informations du bot.');
-//     }
-//   },
-// };
-
-// // Fonction pour créer un embed d'informations
-// function createInfoEmbed(botInfo) {
-//   // Créer un embed avec les informations actuelles
-//   return new EmbedBuilder()
-//     .setTitle('Informations du bot')
-//     .setThumbnail(bot.user.displayAvatarURL({ dynamic: true }))
-//     .setDescription(`Nom du bot:\n${botInfo.botName}\nActivité:\n${botInfo.activityType}\nStatut:\n${botInfo.status}`);
-// }
-
-const { ActivityType, ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
 const mongoose = require('mongoose');
-const BotInfo  = require('../../Models/BotInfo');
+const BotInfo = require('../../Models/BotInfo');
+const Owner = require('../../Models/Owner.js');
+
+const ACTIVITY_TYPES = {
+  PLAYING: ActivityType.Playing,
+  STREAMING: ActivityType.Streaming,
+  LISTENING: ActivityType.Listening,
+  WATCHING: ActivityType.Watching,
+  COMPETING: ActivityType.Competing
+};
+
+const VALID_STATUSES = ['online', 'idle', 'dnd', 'invisible'];
+
+async function isBotOwner(userId) {
+  if (userId === process.env.BUYER) return true;
+  return Boolean(await Owner.exists({ userId }));
+}
+
+function restoreClientToken(client, token) {
+  if (!token) return;
+  client.token = token;
+  client.rest.setToken(token);
+}
+
+function resolveActivityType(value) {
+  if (typeof value === 'number') return value;
+
+  const key = String(value || 'LISTENING').toUpperCase();
+  return ACTIVITY_TYPES[key] ?? ActivityType.Listening;
+}
+
+function getActivityTypeName(value) {
+  if (typeof value === 'string') {
+    const key = value.toUpperCase();
+    if (ACTIVITY_TYPES[key] !== undefined) return key;
+  }
+
+  const entry = Object.entries(ACTIVITY_TYPES)
+    .find(([, type]) => type === value);
+
+  return entry?.[0] || 'LISTENING';
+}
+
+function currentActivityText(bot) {
+  return bot.user.presence?.activities?.[0]?.name || bot.user.username;
+}
+
+function buildRuntimeActivity(bot, botInfo) {
+  const text1 = String(botInfo.activityText || '').trim();
+  const text2 = String(botInfo.activityText2 || '').trim();
+
+  bot.activityRotation = {
+    texts: [text1, text2].filter(Boolean),
+    type: resolveActivityType(botInfo.activityType),
+    index: 0
+  };
+
+  const firstText = bot.activityRotation.texts[0];
+
+  if (firstText) {
+    bot.user.setActivity(firstText, {
+      type: bot.activityRotation.type
+    });
+  }
+}
+
+function createInfoEmbed(botInfo, bot) {
+  const text1 = botInfo.activityText || 'Non défini';
+  const text2 = botInfo.activityText2 || 'Non défini';
+  const activityType = getActivityTypeName(botInfo.activityType);
+  const status = botInfo.status || bot.user.presence?.status || 'online';
+
+  return new EmbedBuilder()
+    .setTitle(`Informations de ${bot.user.username}`)
+    .setThumbnail(bot.user.displayAvatarURL({ dynamic: true }))
+    .setColor(0x6b6de6)
+    .addFields(
+      {
+        name: 'Nom du bot',
+        value: `\`${bot.user.username}\``,
+        inline: false
+      },
+      {
+        name: 'Type d’activité',
+        value: `\`${activityType}\``,
+        inline: true
+      },
+      {
+        name: 'Statut',
+        value: `\`${status}\``,
+        inline: true
+      },
+      {
+        name: 'Texte 1',
+        value: `\`${text1}\``,
+        inline: false
+      },
+      {
+        name: 'Texte 2',
+        value: `\`${text2}\``,
+        inline: false
+      }
+    )
+    .setFooter({
+      text: `${bot.user.username} • Configuration`,
+      iconURL: bot.user.displayAvatarURL({ dynamic: true })
+    });
+}
+
+function buildMenu() {
+  return new ActionRowBuilder().addComponents(
+    new StringSelectMenuBuilder()
+      .setCustomId('editInfo')
+      .setPlaceholder('Choisissez ce que vous voulez modifier')
+      .addOptions(
+        {
+          label: 'Nom du bot',
+          value: 'botName',
+          description: 'Modifier le nom actuel du bot'
+        },
+        {
+          label: 'Type d’activité',
+          value: 'activityType',
+          description: 'Playing, Listening, Watching...'
+        },
+        {
+          label: 'Texte 1',
+          value: 'activityText',
+          description: 'Modifier le premier texte d’activité'
+        },
+        {
+          label: 'Texte 2',
+          value: 'activityText2',
+          description: 'Modifier le second texte d’activité'
+        },
+        {
+          label: 'Avatar',
+          value: 'avatar',
+          description: 'Modifier la photo de profil du bot'
+        },
+        {
+          label: 'Statut',
+          value: 'status',
+          description: 'online, idle, dnd ou invisible'
+        }
+      )
+  );
+}
+
+function promptFor(field) {
+  switch (field) {
+    case 'botName':
+      return 'Envoie le nouveau **nom du bot**.';
+    case 'activityType':
+      return 'Envoie le nouveau **type d’activité** : `PLAYING`, `STREAMING`, `LISTENING`, `WATCHING` ou `COMPETING`.';
+    case 'activityText':
+      return 'Envoie le nouveau **Texte 1**.';
+    case 'activityText2':
+      return 'Envoie le nouveau **Texte 2**.';
+    case 'avatar':
+      return 'Envoie la nouvelle **URL de l’avatar**.';
+    case 'status':
+      return 'Envoie le nouveau **statut** : `online`, `idle`, `dnd` ou `invisible`.';
+    default:
+      return 'Envoie la nouvelle valeur.';
+  }
+}
+
+async function applyChange(bot, botInfo, field, value) {
+  const cleanValue = String(value || '').trim();
+
+  if (!cleanValue) {
+    throw new Error('EMPTY_VALUE');
+  }
+
+  if (field === 'botName') {
+    const clientToken = bot.token || process.env.TOKEN;
+    let changeError = null;
+
+    try {
+      await bot.user.setUsername(cleanValue);
+    } catch (error) {
+      changeError = error;
+    } finally {
+      restoreClientToken(bot, clientToken);
+    }
+
+    if (changeError) throw changeError;
+
+    botInfo.botName = bot.user.username;
+  }
+
+  if (field === 'activityType') {
+    const key = cleanValue.toUpperCase();
+
+    if (ACTIVITY_TYPES[key] === undefined) {
+      throw new Error('INVALID_ACTIVITY_TYPE');
+    }
+
+    botInfo.activityType = key;
+  }
+
+  if (field === 'activityText') {
+    botInfo.activityText = cleanValue;
+  }
+
+  if (field === 'activityText2') {
+    botInfo.activityText2 = cleanValue;
+  }
+
+  if (field === 'avatar') {
+    const clientToken = bot.token || process.env.TOKEN;
+    let changeError = null;
+
+    try {
+      await bot.user.setAvatar(cleanValue);
+    } catch (error) {
+      changeError = error;
+    } finally {
+      restoreClientToken(bot, clientToken);
+    }
+
+    if (changeError) throw changeError;
+  }
+
+  if (field === 'status') {
+    const status = cleanValue.toLowerCase();
+
+    if (!VALID_STATUSES.includes(status)) {
+      throw new Error('INVALID_STATUS');
+    }
+
+    botInfo.status = status;
+    bot.user.setStatus(status);
+  }
+
+  await botInfo.save();
+
+  if (
+    field === 'activityType' ||
+    field === 'activityText' ||
+    field === 'activityText2'
+  ) {
+    buildRuntimeActivity(bot, botInfo);
+  }
+}
 
 module.exports = {
   name: 'editbot',
-  description: 'Modifier les informations du bot',
-  async execute(message, args) {
-    try {
-      // Vérifier la connexion à la base de données
-      if (!mongoose.connection.readyState) {
-        return message.reply('La connexion à la base de données n\'est pas établie.');
-      }
+  description: 'Modifier les informations du bot.',
 
-      let botInfo = await BotInfo.findOne({ guildId: message.guild.id });
+  async execute(message) {
+    if (!message.guild) return;
+
+    if (!(await isBotOwner(message.author.id))) {
+      return;
+    }
+
+    if (mongoose.connection.readyState !== 1) {
+      return message.reply(
+        '❌・La connexion à la base de données n’est pas établie.'
+      );
+    }
+
+    try {
+      let botInfo = await BotInfo.findOne({
+        guildId: message.guild.id
+      });
 
       if (!botInfo) {
-        botInfo = {
+        botInfo = await BotInfo.create({
+          guildId: message.guild.id,
           botName: message.client.user.username,
-          activityType: ActivityType[message.client.user.presence.activities[0]?.type] || 'LISTENING',
-          avatarURL: message.client.user.displayAvatarURL(),
-          status: message.client.user.presence.status,
-        };
-
-        await BotInfo.create({
-          guildId: message.guild.id,
-          ...botInfo,
+          activityType: 'LISTENING',
+          activityText: currentActivityText(message.client),
+          activityText2: `${process.env.PREFIX || '+'}help`,
+          status: message.client.user.presence?.status || 'online'
         });
       }
 
-      const [, field, value] = args;
-
-      if (!field && !value) {
-        // Afficher un select menu avec les options disponibles
-        const selectMenu = new StringSelectMenuBuilder()
-          .setCustomId('editInfo')
-          .setPlaceholder('Choisissez un champ à modifier')
-          .addOptions([
-            { label: 'Nom du bot', value: 'botName' },
-            { label: 'Activité', value: 'activity' },
-            { label: 'Avatar', value: 'avatar' },
-            { label: 'Statut', value: 'status' },
-          ]);
-
-        const row = new ActionRowBuilder().addComponents(selectMenu);
-
-        const currentInfoEmbed = createInfoEmbed(botInfo, message.client);
-
-        return message.reply({ embeds: [currentInfoEmbed], components: [row] });
+      if (botInfo.botName !== message.client.user.username) {
+        botInfo.botName = message.client.user.username;
+        await botInfo.save();
       }
 
-      // Modifier le champ sélectionné
-      switch (field.toLowerCase()) {
-        case 'botname':
-          botInfo.botName = value;
-          break;
-        case 'activity':
-          botInfo.activityType = value.toUpperCase();
-          break;
-        case 'avatar':
-          botInfo.avatarURL = value;
-          break;
-        case 'status':
-          botInfo.status = value.toLowerCase();
-          break;
-        default:
-          return message.reply('Champ invalide. Utilisez l\'un des suivants : botname, activity, avatar, status.');
-      }
+      const panel = await message.reply({
+        embeds: [createInfoEmbed(botInfo, message.client)],
+        components: [buildMenu()]
+      });
 
-      if (!botInfo._id) {
-        // Si le modèle n'existe pas dans la base de données, créez-le
-        await BotInfo.create({
-          guildId: message.guild.id,
-          ...botInfo,
+      const collector = panel.createMessageComponentCollector({
+        filter: interaction =>
+          interaction.customId === 'editInfo' &&
+          interaction.user.id === message.author.id,
+        time: 300000
+      });
+
+      collector.on('collect', async interaction => {
+        await interaction.deferUpdate();
+
+        const field = interaction.values[0];
+
+        const question = await message.channel.send(
+          promptFor(field)
+        );
+
+        const collected = await message.channel.awaitMessages({
+          filter: response =>
+            response.author.id === message.author.id,
+          max: 1,
+          time: 60000
         });
-      } else {
-        await BotInfo.updateOne({ guildId: message.guild.id }, botInfo);
-      }
 
-      // Appliquer les modifications
-      const bot = message.client;
-      bot.user.setUsername(botInfo.botName);
-      bot.user.setActivity(botInfo.botName, { type: ActivityType[botInfo.activityType] });
-      bot.user.setAvatar(botInfo.avatarURL);
-      bot.user.setStatus(botInfo.status);
+        const response = collected.first();
 
-      const updatedInfoEmbed = createInfoEmbed(botInfo, bot);
-      message.reply({ content: 'Informations mises à jour avec succès:', embeds: [updatedInfoEmbed] });
+        if (!response) {
+          return question.edit(
+            '❌・Temps écoulé. Relance la sélection dans le menu.'
+          );
+        }
+
+        const value = response.content;
+
+        await response.delete().catch(() => {});
+        await question.delete().catch(() => {});
+
+        try {
+          await applyChange(
+            message.client,
+            botInfo,
+            field,
+            value
+          );
+
+          botInfo = await BotInfo.findOne({
+            guildId: message.guild.id
+          });
+
+          await panel.edit({
+            embeds: [createInfoEmbed(botInfo, message.client)],
+            components: [buildMenu()]
+          });
+        } catch (error) {
+          let errorText = '❌・Impossible d’appliquer cette modification.';
+
+          if (error.message === 'INVALID_ACTIVITY_TYPE') {
+            errorText =
+              '❌・Type invalide. Utilise PLAYING, STREAMING, LISTENING, WATCHING ou COMPETING.';
+          } else if (error.message === 'INVALID_STATUS') {
+            errorText =
+              '❌・Statut invalide. Utilise online, idle, dnd ou invisible.';
+          } else if (error.message === 'EMPTY_VALUE') {
+            errorText = '❌・La valeur ne peut pas être vide.';
+          } else {
+            console.error('Erreur +editbot :', error);
+          }
+
+          const errorMessage = await message.channel.send(errorText);
+
+          setTimeout(() => {
+            errorMessage.delete().catch(() => {});
+          }, 5000);
+        }
+      });
+
+      collector.on('end', async () => {
+        await panel.edit({
+          components: []
+        }).catch(() => {});
+      });
     } catch (error) {
-      console.error(error);
-      return message.reply('Une erreur s\'est produite lors de la modification des informations du bot.');
-    }
-  },
-};
+      console.error('Erreur +editbot :', error);
 
-// Fonction pour créer un embed d'informations
-function createInfoEmbed(botInfo, bot) {
-  const diff = "``"; 
-  // Créer un embed avec les informations actuelles
-  return new EmbedBuilder()
-    .setTitle('Informations du bot')
-    .setThumbnail(bot.user.displayAvatarURL({ dynamic: true }))
-    .setDescription(`**Nom du bot:**\n${diff}${botInfo.botName}${diff}\n**Activité:**\n${diff}${botInfo.activityType}${diff}\n**Text:**\n${diff}${botInfo.activityText}${diff},${diff}${botInfo.activityText2}${diff}\n**Statut:**\n${diff}${botInfo.status}${diff}`);
-}
+      return message.reply(
+        '❌・Une erreur s’est produite lors de la modification des informations du bot.'
+      );
+    }
+  }
+};
