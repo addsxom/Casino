@@ -12,7 +12,7 @@ module.exports = {
     try {
       let userCoins = await UserCoins.findOne({ userId: message.author.id, guildId });
 
-      if (!userCoins || userCoins.coins < 0) {
+      if (!userCoins || userCoins.coins <= 0) {
         return message.reply('❌・Vous n\'avez pas de coins en poche.');
       }
 
