@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 
 module.exports = {
   name: 'dep',
@@ -8,7 +9,7 @@ module.exports = {
     const guildId = message.guild.id;
 
     try {
-      const amountToDeposit = parseInt(args[0]);
+      const amountToDeposit = parseAmount(args[0]);
 
       if (isNaN(amountToDeposit) || amountToDeposit <= 0) {
         return message.reply('Veuillez fournir un montant valide à déposer.');
