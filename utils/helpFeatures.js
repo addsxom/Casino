@@ -7,11 +7,13 @@ module.exports = [
   {
     emoji: '💳',
     title: 'Paiements',
+    isNew: true,
     description: 'Virements depuis la poche ou directement depuis la banque avec +pay.'
   },
   {
     emoji: '📊',
     title: 'Profil coins',
+    isNew: true,
     description: 'Résumé rapide avec +coins et bouton pour afficher les montants exacts et la fortune totale.'
   },
   {
@@ -22,11 +24,13 @@ module.exports = [
   {
     emoji: '🎫',
     title: 'Tickets support',
+    isNew: true,
     description: 'Panel +support avec création de tickets privés, catégories et fermeture par bouton.'
   },
   {
     emoji: '👥',
     title: 'Compteur de membres',
+    isNew: true,
     description: 'Le salon compteur se met automatiquement à jour quand un membre rejoint ou quitte le serveur.'
   },
   {
