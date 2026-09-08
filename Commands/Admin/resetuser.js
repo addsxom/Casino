@@ -1,6 +1,6 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const Owner = require("../../Models/Owner.js");
-const { formatAmount, formatFullAmount } = require('../../utils/formatAmount.js');
+const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildDiscordLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
@@ -33,25 +33,10 @@ module.exports = {
         'economy-logs',
         buildDiscordLog({
           title: '🧹 Reset économie global',
-          description: `${message.author} a réinitialisé l'économie de tous les membres.`,
-          color: 0xed4245,
-          fields: [
-            {
-              name: '👥 Comptes réinitialisés',
-              value: `${result.deletedCount}`,
-              inline: true
-            },
-            {
-              name: '💸 Coins supprimés',
-              value: `**${formatAmount(totalRemoved)}** • \`${formatFullAmount(totalRemoved)}\``,
-              inline: true
-            },
-            {
-              name: '📍 Salon',
-              value: `${message.channel}`,
-              inline: false
-            }
-          ]
+          description:
+            `${message.author} a réinitialisé **${result.deletedCount} comptes**.\n` +
+            `**-${formatAmount(totalRemoved)} coins** supprimés.`,
+          color: 0xed4245
         })
       );
 
