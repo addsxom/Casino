@@ -1,14 +1,21 @@
 const { ActivityType } = require("discord.js");
 const colors = require("colors");
 const mongoose = require("mongoose");
-const { joinVoiceChannel } = require('@discordjs/voice');
+const {
+  joinVoiceChannel,
+  entersState,
+  VoiceConnectionStatus
+} = require('@discordjs/voice');
 const GUILD_ID = '1546311652830351450';
-const CHANNEL_ID = '1546360551503044658';
 const WELCOME_CHANNEL_ID = '1546311653388189718';
 const prefix = process.env.PREFIX;
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
+const {
+  findBotStatusChannel,
+  updateBotStatusChannel
+} = require('../utils/updateBotStatus.js');
 const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
 
 module.exports = async (bot) => {
@@ -108,13 +115,44 @@ module.exports = async (bot) => {
     });
   }, MEMBER_COUNT_RESYNC_MS);
 
+  const botStatusChannel = await findBotStatusChannel(guild);
+
+  if (!botStatusChannel) {
+    console.error('Impossible de trouver le vocal BOT STATUS.');
+    return;
+  }
+
   const connection = joinVoiceChannel({
-    channelId: CHANNEL_ID,
-    guildId: GUILD_ID,
+    channelId: botStatusChannel.id,
+    guildId: guild.id,
     adapterCreator: guild.voiceAdapterCreator
   });
 
-  connection.on('stateChange', (_oldState, _newState) => {
+  connection.on('stateChange', (_oldState, newState) => {
+    if (newState.status === VoiceConnectionStatus.Ready) {
+      updateBotStatusChannel(guild, true).catch(() => {});
+    }
+
+    if (newState.status === VoiceConnectionStatus.Destroyed) {
+      updateBotStatusChannel(guild, false).catch(() => {});
+    }
   });
+
+  try {
+    await entersState(
+      connection,
+      VoiceConnectionStatus.Ready,
+      15000
+    );
+
+    await updateBotStatusChannel(guild, true);
+  } catch (error) {
+    await updateBotStatusChannel(guild, false);
+
+    console.error(
+      'Erreur connexion BOT STATUS :',
+      error?.code || error?.message || error
+    );
+  }
 };
 
