@@ -7,12 +7,6 @@ const TICKET_TYPES = {
     categoryName: '🎫・Support général',
     channelPrefix: 'support'
   },
-  payment: {
-    label: 'Achat / Paiement',
-    emoji: '💳',
-    categoryName: '💳・Achats & paiements',
-    channelPrefix: 'achat'
-  },
   report: {
     label: 'Signalement',
     emoji: '🚨',
