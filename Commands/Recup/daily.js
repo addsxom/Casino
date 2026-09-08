@@ -5,6 +5,7 @@ const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'daily',
+  aliases: ['dy'],
   description: 'Recevez une récompense quotidienne de coins.',
   async execute(message) {
     const guildId = message.guild.id;
