@@ -17,7 +17,7 @@ function logChannelMention(key) {
     return `**#${key}**`;
   }
 
-  return `<#${config.id}> • \`${config.name}\``;
+  return `<#${config.id}>`;
 }
 
 function buildHelpModEmbed(message) {
