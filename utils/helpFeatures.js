@@ -33,5 +33,10 @@ module.exports = [
     emoji: '🔢',
     title: 'Montants abrégés',
     description: 'Support de K, M, B et T.'
+  },
+  {
+    emoji: '📜',
+    title: 'Logs staff',
+    description: 'Dépôts, retraits et événements Discord.'
   }
 ];
