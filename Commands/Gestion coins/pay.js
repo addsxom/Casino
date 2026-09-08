@@ -5,19 +5,35 @@ const { formatAmount } = require('../../utils/formatAmount.js');
 module.exports = {
   name: 'pay',
   description: 'Transférez des coins à un autre utilisateur.',
-  usage: 'pay <montant> <@utilisateur>',
+  usage: 'pay [bank/coins] <montant> <@utilisateur>',
 
   async execute(message, args) {
     const guildId = message.guild.id;
     const senderId = message.author.id;
 
-    const amount = parseAmount(args[0]);
+    const requestedSource = args[0]?.toLowerCase();
+    const hasSource =
+      requestedSource === 'bank' ||
+      requestedSource === 'coins' ||
+      requestedSource === 'poche';
+
+    const source = requestedSource === 'bank'
+      ? 'bank'
+      : 'coins';
+
+    const amountArg = hasSource ? args[1] : args[0];
+    const recipientArg = hasSource ? args[2] : args[1];
+
+    const amount = parseAmount(amountArg);
     const recipient = message.mentions.users.first()
-      || message.client.users.cache.get(args[1]);
+      || message.client.users.cache.get(recipientArg);
 
     try {
       if (isNaN(amount) || amount <= 0) {
-        return message.reply('Veuillez fournir un montant valide à payer.');
+        return message.reply(
+          'Veuillez fournir un montant valide à payer.\n' +
+          'Exemples : **+pay 2m @utilisateur** ou **+pay bank 2m @utilisateur**'
+        );
       }
 
       if (!recipient) {
@@ -37,8 +53,12 @@ module.exports = {
         guildId
       });
 
-      if (!senderCoins || senderCoins.coins < amount) {
-        return message.reply('‼️・Tu n\'as pas assez de coins en poche.');
+      if (!senderCoins || senderCoins[source] < amount) {
+        return message.reply(
+          source === 'bank'
+            ? '‼️・Tu n\'as pas assez de coins en banque.'
+            : '‼️・Tu n\'as pas assez de coins en poche.'
+        );
       }
 
       let recipientCoins = await UserCoins.findOne({
@@ -55,14 +75,14 @@ module.exports = {
         });
       }
 
-      senderCoins.coins -= amount;
+      senderCoins[source] -= amount;
       recipientCoins.coins += amount;
 
       await senderCoins.save();
       await recipientCoins.save();
 
       return message.reply(
-        `Tu as payé **${formatAmount(amount)}** coins💰 à ${recipient.tag}.`
+        `Tu as payé **${formatAmount(amount)}** coins💰 à ${recipient.tag} depuis ${source === 'bank' ? 'ta banque' : 'ta poche'}.`
       );
     } catch (error) {
       console.error(error);
