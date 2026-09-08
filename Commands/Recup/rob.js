@@ -32,11 +32,24 @@ function randomInt(min, max) {
 }
 
 function formatDynamicTimer(timestampMs) {
-  if (!timestampMs || Date.now() >= timestampMs) {
+  const remaining = Number(timestampMs) - Date.now();
+
+  if (!timestampMs || remaining <= 0) {
     return '**0s**';
   }
 
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
+  const totalMinutes = Math.ceil(
+    remaining / (60 * 1000)
+  );
+
+  if (totalMinutes >= 60) {
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+
+    return `**${hours}h${String(minutes).padStart(2, '0')}**`;
+  }
+
+  return `**${totalMinutes}m**`;
 }
 
 function buildInfoEmbed(
@@ -87,6 +100,28 @@ async function replyEmbed(
     )
   ].sort((a, b) => a - b);
 
+  if (!expirations.length) {
+    return sent;
+  }
+
+  const lastExpiration =
+    expirations[expirations.length - 1];
+
+  const refresh = () => {
+    sent.edit({
+      embeds: [buildEmbed()]
+    }).catch(() => {});
+  };
+
+  const minuteInterval = setInterval(() => {
+    if (Date.now() >= lastExpiration) {
+      clearInterval(minuteInterval);
+      return;
+    }
+
+    refresh();
+  }, 60 * 1000);
+
   for (const expiration of expirations) {
     const delay = Math.max(
       0,
@@ -94,9 +129,11 @@ async function replyEmbed(
     );
 
     setTimeout(() => {
-      sent.edit({
-        embeds: [buildEmbed()]
-      }).catch(() => {});
+      refresh();
+
+      if (expiration === lastExpiration) {
+        clearInterval(minuteInterval);
+      }
     }, delay);
   }
 
