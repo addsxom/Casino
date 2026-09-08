@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildEconomyLog } = require('../../utils/staffLogs.js');
 const UserCoins = require('../../Models/UserCoins.js');
 
 module.exports = {
@@ -20,6 +21,20 @@ module.exports = {
       userCoins.coins += amountToWithdraw;
       userCoins.bank = 0;
       await userCoins.save();
+
+      await sendStaffLog(
+        message.guild,
+        'withdraw-logs',
+        buildEconomyLog({
+          title: '📤 Retrait total de la banque',
+          user: message.author,
+          amount: amountToWithdraw,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          sourceChannel: message.channel,
+          color: 0xfee75c
+        })
+      );
 
       return message.reply(`🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** de votre banque.`)
 
