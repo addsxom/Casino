@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'rob',
@@ -36,6 +37,36 @@ module.exports = {
 
         userCoins.coins += stolenCoins;
         await userCoins.save();
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🦹 Vol réussi',
+            user: message.author,
+            delta: stolenCoins,
+            pocket: userCoins.coins,
+            bank: userCoins.bank,
+            reason: '+rob',
+            sourceChannel: message.channel,
+            otherUser: targetUser
+          })
+        );
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '💸 Coins volés',
+            user: targetUser,
+            delta: -stolenCoins,
+            pocket: targetCoins.coins,
+            bank: targetCoins.bank,
+            reason: '+rob',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
       }
 
       const embed = new EmbedBuilder()
