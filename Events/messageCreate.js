@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const ServerPrefix = require("../Models/ServerPrefix");
 const UserCoins = require("../Models/UserCoins");
+const { formatAmount } = require("../utils/formatAmount.js");
 
 // Créez un ensemble pour stocker les utilisateurs ayant déjà reçu des pièces pour la session actuelle
 const usersReceivedCoins = new Set();
@@ -72,7 +73,7 @@ module.exports = async (bot, message) => {
           if (thresholdResult) {
             const channel = message.guild.channels.cache.get('1132784655817519225');
             if (channel) {
-              channel.send(`${message.author}, vous avez gagné ${thresholdResult.coins} coins dans votre banque pour avoir atteint ${thresholdResult.threshold} messages !`);
+              channel.send(`${message.author}, vous avez gagné ${formatAmount(thresholdResult.coins)} coins dans votre banque pour avoir atteint ${thresholdResult.threshold} messages !`);
             }
           }
         }
