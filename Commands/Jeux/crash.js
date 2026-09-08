@@ -6,15 +6,12 @@ const {
 } = require('discord.js');
 
 const UserCoins = require('../../Models/UserCoins.js');
+const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const parseAmount = require('../../utils/parseAmount.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
 const LIVE_UPDATE_MS = 900;
-
-function formatCoins(amount) {
-  return Math.floor(amount).toLocaleString('fr-FR');
-}
 
 function generateCrashPoint() {
   const random = Math.random();
