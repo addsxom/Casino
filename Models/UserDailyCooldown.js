@@ -15,4 +15,9 @@ const userDailyCooldownSchema = new mongoose.Schema({
   },
 });
 
+userDailyCooldownSchema.index(
+  { userId: 1, guildId: 1 },
+  { unique: true, name: 'daily_cooldown_user_guild_unique' }
+);
+
 module.exports = mongoose.model('UserDailyCooldown', userDailyCooldownSchema);
