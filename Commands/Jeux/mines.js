@@ -13,6 +13,7 @@ const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
 const { sleep } = require('../../utils');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
@@ -538,6 +539,23 @@ module.exports = {
           if (userCoins) {
             userCoins.coins += game.payout;
             await userCoins.save();
+
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: '💣 Mines — Cash Out',
+                user: message.author,
+                delta: game.payout - game.amount,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: '+mines',
+                sourceChannel: message.channel,
+                details:
+                  `Mode : ${game.mode.label} • Mise : ${formatCoins(game.amount)} • ` +
+                  `Payout : ${formatCoins(game.payout)}`
+              })
+            );
           }
 
           await render();
@@ -659,6 +677,29 @@ module.exports = {
         if (game.minePositions.has(index)) {
           game.gameOver = true;
           game.status = 'lost';
+
+          userCoins = await UserCoins.findOne({
+            userId: message.author.id,
+            guildId
+          });
+
+          if (userCoins) {
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: '💣 Mines — Perte',
+                user: message.author,
+                delta: -game.amount,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: '+mines',
+                sourceChannel: message.channel,
+                details: `Mode : ${game.mode.label} • Mise : ${formatCoins(game.amount)}`
+              })
+            );
+          }
+
           await render();
           stopCooldownTimer();
           gameCollector.stop('finished');
@@ -706,6 +747,23 @@ module.exports = {
           if (userCoins) {
             userCoins.coins += game.payout;
             await userCoins.save();
+
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: '💣 Mines — Grille terminée',
+                user: message.author,
+                delta: game.payout - game.amount,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: '+mines',
+                sourceChannel: message.channel,
+                details:
+                  `Mode : ${game.mode.label} • Mise : ${formatCoins(game.amount)} • ` +
+                  `Payout : ${formatCoins(game.payout)}`
+              })
+            );
           }
 
           await render();
@@ -739,6 +797,27 @@ module.exports = {
         if (userCoins) {
           userCoins.coins += payout;
           await userCoins.save();
+
+          const net = payout - game.amount;
+
+          if (net !== 0) {
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: net > 0 ? '💣 Mines — Cash Out auto' : '💣 Mines — Perte auto',
+                user: message.author,
+                delta: net,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: '+mines • partie expirée',
+                sourceChannel: message.channel,
+                details:
+                  `Mode : ${game.mode.label} • Mise : ${formatCoins(game.amount)} • ` +
+                  `Payout : ${formatCoins(payout)}`
+              })
+            );
+          }
         }
 
         await gameMessage.edit({
