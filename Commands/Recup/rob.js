@@ -54,6 +54,27 @@ function formatRemaining(ms) {
   return parts.join(' ') || 'quelques secondes';
 }
 
+async function clearLegacyTestCooldown(
+  Model,
+  userId,
+  guildId,
+  maxDurationMs
+) {
+  const existing = await Model.findOne({
+    userId,
+    guildId
+  });
+
+  const availableAt = Number(existing?.cooldown) || 0;
+  const remaining = availableAt - Date.now();
+
+  if (remaining > maxDurationMs) {
+    await Model.updateOne(
+      { userId, guildId },
+      { $set: { cooldown: 0 } }
+    );
+  }
+}
 async function getProtection(userId, guildId) {
   const protection = await UserRobProtection.findOne({
     userId,
@@ -245,6 +266,13 @@ module.exports = {
         );
       }
 
+      await clearLegacyTestCooldown(
+        UserRobProtection,
+        targetUser.id,
+        guildId,
+        VICTIM_PROTECTION_MS
+      );
+
       const existingProtection = await getProtection(
         targetUser.id,
         guildId
@@ -256,6 +284,13 @@ module.exports = {
           `Protection restante : **${formatRemaining(existingProtection.availableAt - Date.now())}**.`
         );
       }
+
+      await clearLegacyTestCooldown(
+        UserRobCooldown,
+        robberId,
+        guildId,
+        ROBBER_COOLDOWN_MS
+      );
 
       const robberCooldown = await tryAcquireCooldown(
         UserRobCooldown,
