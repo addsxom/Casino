@@ -31,31 +31,76 @@ function randomInt(min, max) {
   ) + min;
 }
 
-function formatDiscordRelative(timestampMs) {
+function formatDynamicTimer(timestampMs) {
+  if (!timestampMs || Date.now() >= timestampMs) {
+    return '**0s**';
+  }
+
   return `<t:${Math.floor(timestampMs / 1000)}:R>`;
 }
 
-function formatRemaining(ms) {
-  const totalSeconds = Math.max(
-    0,
-    Math.ceil(ms / 1000)
-  );
+function buildInfoEmbed(
+  message,
+  {
+    title,
+    description,
+    color = 0x6b6de6,
+    thumbnail = null
+  }
+) {
+  const embed = new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(description)
+    .setColor(color)
+    .setFooter({
+      text: 'Kuromi Coins',
+      iconURL:
+        message.client.user.displayAvatarURL({
+          dynamic: true
+        })
+    });
 
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor(
-    (totalSeconds % 3600) / 60
-  );
-  const seconds = totalSeconds % 60;
-
-  const parts = [];
-
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0) parts.push(`${minutes}m`);
-  if (hours === 0 && seconds > 0) {
-    parts.push(`${seconds}s`);
+  if (thumbnail) {
+    embed.setThumbnail(thumbnail);
   }
 
-  return parts.join(' ') || 'quelques secondes';
+  return embed;
+}
+
+async function replyEmbed(
+  message,
+  buildEmbed,
+  freezeAt = []
+) {
+  const sent = await message.reply({
+    embeds: [buildEmbed()]
+  });
+
+  const expirations = [
+    ...new Set(
+      freezeAt
+        .map(Number)
+        .filter(timestamp =>
+          Number.isFinite(timestamp) &&
+          timestamp > Date.now()
+        )
+    )
+  ].sort((a, b) => a - b);
+
+  for (const expiration of expirations) {
+    const delay = Math.max(
+      0,
+      expiration - Date.now() + 250
+    );
+
+    setTimeout(() => {
+      sent.edit({
+        embeds: [buildEmbed()]
+      }).catch(() => {});
+    }, delay);
+  }
+
+  return sent;
 }
 
 async function clearLegacyTestCooldown(
@@ -79,6 +124,7 @@ async function clearLegacyTestCooldown(
     );
   }
 }
+
 async function getProtection(userId, guildId) {
   const protection = await UserRobProtection.findOne({
     userId,
@@ -106,36 +152,27 @@ function buildSuccessEmbed({
     ? '\n💎 **JACKPOT !**'
     : '';
 
-  return new EmbedBuilder()
-    .setTitle(
-      jackpot
+  return buildInfoEmbed(
+    message,
+    {
+      title: jackpot
         ? '💎 Jackpot !'
-        : '🦹 Braquage réussi'
-    )
-    .setDescription(
-      `${message.author} ➜ ${targetUser}\n\n` +
-      `💰 **${formatAmount(stolenCoins)} coins**\n` +
-      `-# ${stolenPercent}% de la poche${jackpotLine}\n\n` +
-      `🛡️ Protection : ${formatDiscordRelative(victimAvailableAt)}\n` +
-      `⏳ Prochain rob : ${formatDiscordRelative(robberAvailableAt)}`
-    )
-    .setThumbnail(
-      targetUser.displayAvatarURL({
-        dynamic: true
-      })
-    )
-    .setColor(
-      jackpot
+        : '🦹 Braquage réussi',
+      description:
+        `${message.author} ➜ ${targetUser}\n\n` +
+        `💰 **${formatAmount(stolenCoins)} coins**\n` +
+        `-# ${stolenPercent}% de la poche${jackpotLine}\n\n` +
+        `🛡️ Protection : ${formatDynamicTimer(victimAvailableAt)}\n` +
+        `⏳ Prochain rob : ${formatDynamicTimer(robberAvailableAt)}`,
+      color: jackpot
         ? 0xf1c40f
-        : 0x57f287
-    )
-    .setFooter({
-      text: 'Kuromi Coins',
-      iconURL:
-        message.client.user.displayAvatarURL({
+        : 0x57f287,
+      thumbnail:
+        targetUser.displayAvatarURL({
           dynamic: true
         })
-    });
+    }
+  );
 }
 
 function buildFailureEmbed({
@@ -154,26 +191,21 @@ function buildFailureEmbed({
       : `🚨 **Amende de ${finePercent}%**\n-# Aucun coin en poche à payer`;
   }
 
-  return new EmbedBuilder()
-    .setTitle('🚔 Braquage raté')
-    .setDescription(
-      `${message.author} ➜ ${targetUser}\n\n` +
-      resultText +
-      `\n\n⏳ Prochain rob : ${formatDiscordRelative(robberAvailableAt)}`
-    )
-    .setThumbnail(
-      targetUser.displayAvatarURL({
-        dynamic: true
-      })
-    )
-    .setColor(0xed4245)
-    .setFooter({
-      text: 'Kuromi Coins',
-      iconURL:
-        message.client.user.displayAvatarURL({
+  return buildInfoEmbed(
+    message,
+    {
+      title: '🚔 Braquage raté',
+      description:
+        `${message.author} ➜ ${targetUser}\n\n` +
+        resultText +
+        `\n\n⏳ Prochain rob : ${formatDynamicTimer(robberAvailableAt)}`,
+      color: 0xed4245,
+      thumbnail:
+        targetUser.displayAvatarURL({
           dynamic: true
         })
-    });
+    }
+  );
 }
 
 module.exports = {
@@ -190,20 +222,47 @@ module.exports = {
         message.client.users.cache.get(args[0]);
 
       if (!targetUser) {
-        return message.reply(
-          '❌・Veuillez mentionner un utilisateur à rob.'
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '❌ Cible invalide',
+              description:
+                'Mentionne un utilisateur valide à braquer.',
+              color: 0xed4245
+            }
+          )
         );
       }
 
       if (targetUser.bot) {
-        return message.reply(
-          '❌・Tu ne peux pas voler un bot.'
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '❌ Braquage impossible',
+              description:
+                'Tu ne peux pas braquer un bot.',
+              color: 0xed4245
+            }
+          )
         );
       }
 
       if (targetUser.id === robberId) {
-        return message.reply(
-          '❌・Tu ne peux pas te voler toi-même.'
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '❌ Braquage impossible',
+              description:
+                'Tu ne peux pas te braquer toi-même.',
+              color: 0xed4245
+            }
+          )
         );
       }
 
@@ -216,9 +275,22 @@ module.exports = {
         !targetCoins ||
         targetCoins.coins < MIN_TARGET_POCKET
       ) {
-        return message.reply(
-          `🛡️・${targetUser.tag} n’a pas assez de coins en poche pour être braqué.\n` +
-          `Il faut au minimum **${formatAmount(MIN_TARGET_POCKET)} coins** en poche.`
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '🛡️ Joueur protégé',
+              description:
+                `${targetUser} possède moins de **${formatAmount(MIN_TARGET_POCKET)} coins** en poche.\n` +
+                'Il ne peut pas être braqué.',
+              color: 0x6b6de6,
+              thumbnail:
+                targetUser.displayAvatarURL({
+                  dynamic: true
+                })
+            }
+          )
         );
       }
 
@@ -235,9 +307,23 @@ module.exports = {
       );
 
       if (existingProtection.active) {
-        return message.reply(
-          `🛡️・${targetUser.tag} a déjà été braqué récemment.\n` +
-          `Protection restante : **${formatRemaining(existingProtection.availableAt - Date.now())}**.`
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '🛡️ Victime protégée',
+              description:
+                `${targetUser} a déjà été braqué récemment.\n\n` +
+                `Protection restante : ${formatDynamicTimer(existingProtection.availableAt)}`,
+              color: 0x6b6de6,
+              thumbnail:
+                targetUser.displayAvatarURL({
+                  dynamic: true
+                })
+            }
+          ),
+          [existingProtection.availableAt]
         );
       }
 
@@ -258,9 +344,19 @@ module.exports = {
       );
 
       if (!robberCooldown.acquired) {
-        return message.reply(
-          '⏳・Tu as déjà tenté un braquage récemment.\n' +
-          `Tu pourras recommencer dans **${formatRemaining(robberCooldown.availableAt - Date.now())}**.`
+        return replyEmbed(
+          message,
+          () => buildInfoEmbed(
+            message,
+            {
+              title: '⏳ Braquage en cooldown',
+              description:
+                'Tu as déjà tenté un braquage récemment.\n\n' +
+                `Prochain rob : ${formatDynamicTimer(robberCooldown.availableAt)}`,
+              color: 0x6b6de6
+            }
+          ),
+          [robberCooldown.availableAt]
         );
       }
 
@@ -286,9 +382,24 @@ module.exports = {
             }
           );
 
-          return message.reply(
-            `🛡️・${targetUser.tag} vient d’être protégé par un autre braquage.\n` +
-            'Ton cooldown n’a pas été consommé.'
+          return replyEmbed(
+            message,
+            () => buildInfoEmbed(
+              message,
+              {
+                title: '🛡️ Victime protégée',
+                description:
+                  `${targetUser} vient d’être braqué par quelqu’un d’autre.\n\n` +
+                  `Protection restante : ${formatDynamicTimer(victimProtection.availableAt)}\n` +
+                  '-# Ton cooldown n’a pas été consommé.',
+                color: 0x6b6de6,
+                thumbnail:
+                  targetUser.displayAvatarURL({
+                    dynamic: true
+                  })
+              }
+            ),
+            [victimProtection.availableAt]
           );
         }
 
@@ -319,9 +430,22 @@ module.exports = {
             }
           );
 
-          return message.reply(
-            `🛡️・${targetUser.tag} n’a plus assez de coins en poche pour être braqué.\n` +
-            'Ton cooldown n’a pas été consommé.'
+          return replyEmbed(
+            message,
+            () => buildInfoEmbed(
+              message,
+              {
+                title: '🛡️ Braquage annulé',
+                description:
+                  `${targetUser} n’a plus assez de coins en poche.\n` +
+                  '-# Ton cooldown n’a pas été consommé.',
+                color: 0x6b6de6,
+                thumbnail:
+                  targetUser.displayAvatarURL({
+                    dynamic: true
+                  })
+              }
+            )
           );
         }
 
@@ -362,8 +486,19 @@ module.exports = {
             error instanceof InsufficientFundsError ||
             error?.code === 'INSUFFICIENT_FUNDS'
           ) {
-            return message.reply(
-              '❌・Le braquage a échoué car le solde de la victime a changé pendant la tentative.'
+            return replyEmbed(
+              message,
+              () => buildInfoEmbed(
+                message,
+                {
+                  title: '❌ Braquage interrompu',
+                  description:
+                    'Le solde de la victime a changé pendant la tentative.\n\n' +
+                    `Prochain rob : ${formatDynamicTimer(robberCooldown.availableAt)}`,
+                  color: 0xed4245
+                }
+              ),
+              [robberCooldown.availableAt]
             );
           }
 
@@ -405,19 +540,24 @@ module.exports = {
           })
         );
 
-        const embed = buildSuccessEmbed({
+        return replyEmbed(
           message,
-          targetUser,
-          stolenCoins,
-          stolenPercent,
-          jackpot,
-          robberAvailableAt: robberCooldown.availableAt,
-          victimAvailableAt: victimProtection.availableAt
-        });
-
-        return message.reply({
-          embeds: [embed]
-        });
+          () => buildSuccessEmbed({
+            message,
+            targetUser,
+            stolenCoins,
+            stolenPercent,
+            jackpot,
+            robberAvailableAt:
+              robberCooldown.availableAt,
+            victimAvailableAt:
+              victimProtection.availableAt
+          }),
+          [
+            robberCooldown.availableAt,
+            victimProtection.availableAt
+          ]
+        );
       }
 
       const fineApplied = Math.random() < FINE_CHANCE;
@@ -485,23 +625,33 @@ module.exports = {
         })
       );
 
-      const embed = buildFailureEmbed({
+      return replyEmbed(
         message,
-        targetUser,
-        fineApplied,
-        finePercent,
-        fineAmount,
-        robberAvailableAt: robberCooldown.availableAt
-      });
-
-      return message.reply({
-        embeds: [embed]
-      });
+        () => buildFailureEmbed({
+          message,
+          targetUser,
+          fineApplied,
+          finePercent,
+          fineAmount,
+          robberAvailableAt:
+            robberCooldown.availableAt
+        }),
+        [robberCooldown.availableAt]
+      );
     } catch (error) {
       console.error('Rob command error:', error);
 
-      return message.reply(
-        '❌・Une erreur s’est produite lors de la tentative de vol.'
+      return replyEmbed(
+        message,
+        () => buildInfoEmbed(
+          message,
+          {
+            title: '❌ Erreur',
+            description:
+              'Une erreur s’est produite lors de la tentative de vol.',
+            color: 0xed4245
+          }
+        )
       );
     }
   },
