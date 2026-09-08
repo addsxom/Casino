@@ -1,163 +1,218 @@
-const { ButtonBuilder, ActionRowBuilder } = require("discord.js");
-const Discord = require("discord.js");
-const fs = require("fs");
-const ServerPrefix = require("../../Models/ServerPrefix");
+const {
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags
+} = require('discord.js');
 
-const categories = {
-  General:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  Rewards:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  "Gestion Coins":
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  Minijeux:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  Crew:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  Admin:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
-  Owner:
-    "Les paramètres peuvent être des noms, des mentions, ou des IDs\nSi ce ne sont pas des mentions ils doivent être séparés par ``,,``",
+const ServerPrefix = require('../../Models/ServerPrefix');
+const helpFeatures = require('../../utils/helpFeatures.js');
+
+const CATEGORY_META = {
+  General: { name: 'Général', emoji: '📌' },
+  Recup: { name: 'Récompenses', emoji: '🎁' },
+  'Gestion coins': { name: 'Gestion Coins', emoji: '💰' },
+  Jeux: { name: 'Jeux', emoji: '🎰' },
+  Admin: { name: 'Administration', emoji: '🛡️' },
+  Owner: { name: 'Owner', emoji: '👑' },
+  Team: { name: 'Équipe', emoji: '👥' }
 };
 
+function getCategoryMeta(category) {
+  return CATEGORY_META[category] || {
+    name: category,
+    emoji: '📁'
+  };
+}
+
+function cleanUsage(command) {
+  if (!command.usage) return '';
+
+  let usage = String(command.usage).trim();
+  const lowerName = command.name.toLowerCase();
+
+  if (usage.toLowerCase().startsWith(lowerName)) {
+    usage = usage.slice(command.name.length).trim();
+  }
+
+  return usage ? ` ${usage}` : '';
+}
+
+function buildNavigationRow(page, totalPages) {
+  return new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId('help_previous')
+      .setEmoji('◀️')
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId('help_page')
+      .setLabel(`${page + 1} / ${totalPages}`)
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(true),
+    new ButtonBuilder()
+      .setCustomId('help_next')
+      .setEmoji('▶️')
+      .setStyle(ButtonStyle.Secondary)
+  );
+}
+
 module.exports = {
-  name: "help",
-  description: "Affiche la liste des commandes par catégorie",
+  name: 'help',
+  description: 'Affiche toutes les commandes et fonctionnalités du bot.',
 
   async execute(message) {
-    const commandFiles = fs
-      .readdirSync("./commands")
-      .filter((file) => file.endsWith(".js"));
+    let prefix = process.env.PREFIX || '+';
 
-    const commandsByCategory = {};
-    for (const file of commandFiles) {
-      const command = require(`./${file}`);
-      if (command.category && categories[command.category]) {
-        if (!commandsByCategory[command.category]) {
-          commandsByCategory[command.category] = [];
-        }
-        commandsByCategory[command.category].push(command);
-      }
-    }
-
-    let prefix = process.env.PREFIX;
     if (message.guild) {
       const serverData = await ServerPrefix.findOne({
-        guildId: message.guild.id,
+        guildId: message.guild.id
       });
-      if (serverData && serverData.prefix) {
+
+      if (serverData?.prefix) {
         prefix = serverData.prefix;
       }
     }
 
-    const embeds = [];
-    for (const categoryName in categories) {
-      const categoryDescription = categories[categoryName];
-      const categoryCommands = commandsByCategory[categoryName] || [];
+    const commands = [...message.client.commands.values()]
+      .filter(command => command?.name)
+      .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
-      const embed = new Discord.EmbedBuilder()
-        .setTitle(`${categoryName}`)
-        .setDescription(categoryDescription)
+    const commandsByCategory = new Map();
+
+    for (const command of commands) {
+      const category = command.category || 'Autres';
+
+      if (!commandsByCategory.has(category)) {
+        commandsByCategory.set(category, []);
+      }
+
+      commandsByCategory.get(category).push(command);
+    }
+
+    const embeds = [];
+
+    const featureText = helpFeatures
+      .map(feature =>
+        `${feature.emoji} **${feature.title}**\n` +
+        `-# ${feature.description}`
+      )
+      .join('\n\n');
+
+    embeds.push(
+      new EmbedBuilder()
+        .setTitle('✨ Kuromi Coins — Aide')
+        .setDescription(
+          `**${commands.length} commandes chargées** • Préfixe : \`${prefix}\`\n\n` +
+          'Toutes les commandes ajoutées au bot apparaissent automatiquement dans ce menu.\n\n' +
+          featureText
+        )
         .setColor(0x6b6de6)
         .setFooter({
-          text: `${message.client.user.username} • Préfixe actuel : ${prefix}`,
-        });
-
-      if (categoryCommands.length > 0) {
-        let commandList = categoryCommands
-          .map((command) => `${command.name} - ${command.description}`)
-          .join("\n\n");
-        if (commandList.trim() !== "") {
-          embed.addFields({ name: "Commandes", value: commandList });
-        }
-      }
-      const diff = "``";
-
-      if (categoryName === "General") {
-        embed.setDescription(`
-        ${diff}${prefix}ping${diff}\nVoir la latence du bot\n\n${diff}${prefix}uptime${diff}\nVoir depuis combien de temps le bot est en ligne\n\n${diff}${prefix}kuromibots${diff}\nAvoir le serveur support des bots kuromi\n
-
-        `);
-      } else if (categoryName === "Rewards") {
-        embed.setDescription(`
-        ${diff}${prefix}daily/dy${diff}\nnéclamez votre récompense quotidienne\n\n${diff}${prefix}work/wk${diff}\nRéclamez votre récompense par heures\n
-        `);
-      } else if (categoryName === "Gestion Coins") {
-        embed.setDescription(`
-        ${diff}${prefix}coins${diff}\nObternir votre profil\n\n${diff}${prefix}rob <@user/Id>${diff}\nVoler des coins a un utilisateur\n\n${diff}${prefix}dep <nombre de coins>${diff}\nDéposez votre coins de poche dans la banque\n\n${diff}${prefix}depall${diff}\nDéposez tous vos coins dans la banque\n\n${diff}${prefix}pay${diff}\nEnvoyer des coins a un utilisateur\n\n${diff}${prefix}ret <nombre de coins>${diff}\nRetirez vos coins de la banque\n\n${diff}${prefix}retall${diff}\nRetirez tous vos coins de la banque\n
-        `);
-      } else if (categoryName === "Minijeux") {
-        embed.setDescription(`
-        ${diff}${prefix}slot <nombre de coins>${diff}\nJouer au slots en mettant un nombre de coins\n\n${diff}${prefix}slotall${diff}\nJouer au slots en mettant tous vos coins\n
-        `);
-      } else if (categoryName === "Crew") {
-        embed.setDescription(`
-        ${diff}${prefix}cacc${diff}\nPermet d'accepter l'invitation a un crew\n\n${diff}${prefix}ccreate${diff}\nPermet de creer un crew avec un nom et une photo de profil personaliser\n\n${diff}${prefix}cdelete${diff}\nPermet de suprimer son crew\n\n${diff}${prefix}cedit${diff}\nPermet de modifier le nom ou la photo de profil de son crew\n\n${diff}${prefix}cinfo/cinfo <@user/userid>${diff}\nPermet de voir tout les information sur son crew ou sur le crew d'une autre personne\n\n${diff}${prefix}cinvite${diff}\nPermet d'inviter un membre qui nais dans aucun crew dans votre crew\n\n${diff}${prefix}cleave${diff}\nPermet de quitter un crew\n
-        `);
-      } else if (categoryName === "Admin") {
-        embed.setDescription(`
-        ${diff}${prefix}add <type(rep/bank/coins)> <nombre> <@utilisateur>${diff}\nAjouter des rep/bank/coins a un membre\n\n${diff}${prefix}remove <type(rep/coins)> <nombre> <@utilisateur>${diff}\nRetirer des rep/coins a un membre\n\n${diff}${prefix}reset <@utilisateur>${diff}\nRetirer tout les coins a un membre\n\n${diff}${prefix}resetuser${diff}\nRetirer tout les rep/coins au membre du serveur\n
-        `);
-      } else if (categoryName === "Owner") {
-        embed.setDescription(`
-        ${diff}${prefix}owner/unowner${diff}\nAjouter/retirer un membre en owner bot\n\n${diff}${prefix}stream/play/listen/watch <message>${diff}\nChanger l'activité du bot, le [text] peut contenir plusieurs phrases séparées par , , qui alterneront dans le profil du bot\n\n${diff}${prefix}online/idle/dnd${diff}\nChanger le statut du bot\n\n${diff}${prefix}set <name/pic>${diff}\nChanger le nom ou la photo profil du bot\n\n${diff}${prefix}joinvc <ID de la voc>${diff}\nFaire rejoindre le bot dans un canal vocal\n\n${diff}${prefix}theme <couleur>${diff}\nChanger la couleur de l'embed du bot\n
-        `);
-      }
-
-      embeds.push(embed);
-    }
-    const buttonRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId("previous")
-        .setLabel("◀")
-        .setStyle("Primary"),
-      new ButtonBuilder().setCustomId("next").setLabel("▶").setStyle("Primary")
+          text: 'Fonctionnalités • Utilise les flèches pour voir les commandes',
+          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
+        })
     );
 
-    let currentPage = 0;
-    const maxPage = embeds.length - 1;
+    const preferredOrder = [
+      'General',
+      'Recup',
+      'Gestion coins',
+      'Jeux',
+      'Team',
+      'Admin',
+      'Owner'
+    ];
 
-    const messageData = {
-      embeds: [embeds[currentPage]],
-      components: [buttonRow],
-    };
+    const categories = [...commandsByCategory.keys()].sort((a, b) => {
+      const aIndex = preferredOrder.indexOf(a);
+      const bIndex = preferredOrder.indexOf(b);
 
-    const messageSent = await message.channel.send(messageData);
-
-    const filter = (i) => i.customId === "previous" || i.customId === "next";
-
-    const collector = messageSent.createMessageComponentCollector({
-      filter,
-      time: 300000,
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b, 'fr');
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
     });
 
-    collector.on("collect", async (i) => {
-      if (i.user.id !== message.author.id) {
-        i.reply({
-          content: "Vous n'êtes pas autorisé à utiliser cette message",
-          ephemeral: true,
-        });
+    for (const category of categories) {
+      const categoryCommands = commandsByCategory.get(category);
+      const meta = getCategoryMeta(category);
+
+      const commandText = categoryCommands
+        .map(command => {
+          const usage = cleanUsage(command);
+          const aliases = Array.isArray(command.aliases) && command.aliases.length
+            ? `\n-# Alias : ${command.aliases.map(alias => \`${prefix}${alias}\`).join(', ')}`
+            : '';
+
+          return (
+            `**\`${prefix}${command.name}${usage}\`**\n` +
+            `${command.description || 'Aucune description.'}` +
+            aliases
+          );
+        })
+        .join('\n\n');
+
+      embeds.push(
+        new EmbedBuilder()
+          .setTitle(`${meta.emoji} ${meta.name}`)
+          .setDescription(commandText || 'Aucune commande dans cette catégorie.')
+          .setColor(0x6b6de6)
+          .setFooter({
+            text: `${categoryCommands.length} commande${categoryCommands.length > 1 ? 's' : ''} • Préfixe : ${prefix}`,
+            iconURL: message.client.user.displayAvatarURL({ dynamic: true })
+          })
+      );
+    }
+
+    let currentPage = 0;
+    const totalPages = embeds.length;
+
+    const helpMessage = await message.channel.send({
+      embeds: [embeds[currentPage]],
+      components: [buildNavigationRow(currentPage, totalPages)]
+    });
+
+    const collector = helpMessage.createMessageComponentCollector({
+      time: 300000
+    });
+
+    collector.on('collect', async interaction => {
+      if (!['help_previous', 'help_next'].includes(interaction.customId)) {
         return;
       }
 
-      if (i.customId === "previous") {
-        if (currentPage === 0) {
-          currentPage = maxPage;
-        } else {
-          currentPage--;
-        }
-      } else if (i.customId === "next" && currentPage < maxPage) {
-        currentPage++;
-      } else {
-        currentPage = 0;
+      if (interaction.user.id !== message.author.id) {
+        return interaction.reply({
+          content: '❌・Seule la personne qui a lancé +help peut utiliser ces boutons.',
+          flags: MessageFlags.Ephemeral
+        }).catch(() => {});
       }
 
-      messageData.embeds = [embeds[currentPage]];
-      await i.update(messageData);
+      if (interaction.customId === 'help_previous') {
+        currentPage =
+          currentPage === 0
+            ? totalPages - 1
+            : currentPage - 1;
+      }
+
+      if (interaction.customId === 'help_next') {
+        currentPage =
+          currentPage === totalPages - 1
+            ? 0
+            : currentPage + 1;
+      }
+
+      return interaction.update({
+        embeds: [embeds[currentPage]],
+        components: [buildNavigationRow(currentPage, totalPages)]
+      });
     });
 
-    collector.on("end", () => {
-      messageSent.edit({ components: [] }).catch(console.error);
+    collector.on('end', async () => {
+      await helpMessage.edit({
+        components: []
+      }).catch(() => {});
     });
-  },
+  }
 };
