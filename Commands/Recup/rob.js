@@ -17,8 +17,8 @@ const {
   releaseCooldown
 } = require('../../utils/cooldownService.js');
 
-const ROBBER_COOLDOWN_MS = 1000;
-const VICTIM_PROTECTION_MS = 1000;
+const ROBBER_COOLDOWN_MS = 15 * 1000;
+const VICTIM_PROTECTION_MS = 15 * 1000;
 const MIN_TARGET_POCKET = 1000;
 
 const SUCCESS_CHANCE = 0.55;
@@ -29,6 +29,10 @@ function randomInt(min, max) {
   return Math.floor(
     Math.random() * (max - min + 1)
   ) + min;
+}
+
+function formatDiscordRelative(timestampMs) {
+  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
 }
 
 function formatRemaining(ms) {
@@ -94,7 +98,9 @@ function buildSuccessEmbed({
   targetUser,
   stolenCoins,
   stolenPercent,
-  jackpot
+  jackpot,
+  robberAvailableAt,
+  victimAvailableAt
 }) {
   const jackpotLine = jackpot
     ? '\n💎 **JACKPOT !**'
@@ -110,7 +116,8 @@ function buildSuccessEmbed({
       `${message.author} ➜ ${targetUser}\n\n` +
       `💰 **${formatAmount(stolenCoins)} coins**\n` +
       `-# ${stolenPercent}% de la poche${jackpotLine}\n\n` +
-      '🛡️ Victime protégée **1s**'
+      `🛡️ Protection : ${formatDiscordRelative(victimAvailableAt)}\n` +
+      `⏳ Prochain rob : ${formatDiscordRelative(robberAvailableAt)}`
     )
     .setThumbnail(
       targetUser.displayAvatarURL({
@@ -123,7 +130,7 @@ function buildSuccessEmbed({
         : 0x57f287
     )
     .setFooter({
-      text: 'Prochain rob dans 1s • Kuromi Coins',
+      text: 'Kuromi Coins',
       iconURL:
         message.client.user.displayAvatarURL({
           dynamic: true
@@ -136,7 +143,8 @@ function buildFailureEmbed({
   targetUser,
   fineApplied,
   finePercent,
-  fineAmount
+  fineAmount,
+  robberAvailableAt
 }) {
   let resultText = '🍀 **Aucune amende**';
 
@@ -150,7 +158,8 @@ function buildFailureEmbed({
     .setTitle('🚔 Braquage raté')
     .setDescription(
       `${message.author} ➜ ${targetUser}\n\n` +
-      resultText
+      resultText +
+      `\n\n⏳ Prochain rob : ${formatDiscordRelative(robberAvailableAt)}`
     )
     .setThumbnail(
       targetUser.displayAvatarURL({
@@ -159,7 +168,7 @@ function buildFailureEmbed({
     )
     .setColor(0xed4245)
     .setFooter({
-      text: 'Prochain rob dans 1s • Kuromi Coins',
+      text: 'Kuromi Coins',
       iconURL:
         message.client.user.displayAvatarURL({
           dynamic: true
@@ -392,7 +401,7 @@ module.exports = {
             reason: '+rob',
             details:
               `Voleur : ${message.author.tag} • ` +
-              `Vol : ${stolenPercent}% • Protection : 1s`
+              `Vol : ${stolenPercent}% • Protection : 15s`
           })
         );
 
@@ -401,7 +410,9 @@ module.exports = {
           targetUser,
           stolenCoins,
           stolenPercent,
-          jackpot
+          jackpot,
+          robberAvailableAt: robberCooldown.availableAt,
+          victimAvailableAt: victimProtection.availableAt
         });
 
         return message.reply({
@@ -479,7 +490,8 @@ module.exports = {
         targetUser,
         fineApplied,
         finePercent,
-        fineAmount
+        fineAmount,
+        robberAvailableAt: robberCooldown.availableAt
       });
 
       return message.reply({
