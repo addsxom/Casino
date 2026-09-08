@@ -1,5 +1,6 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'pay',
@@ -61,7 +62,7 @@ module.exports = {
       await recipientCoins.save();
 
       return message.reply(
-        `Tu as payé **${amount.toLocaleString('fr-FR')}** coins💰 à ${recipient.tag}.`
+        `Tu as payé **${formatAmount(amount)}** coins💰 à ${recipient.tag}.`
       );
     } catch (error) {
       console.error(error);
