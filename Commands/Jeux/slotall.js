@@ -1,8 +1,8 @@
 const { EmbedBuilder } = require("discord.js");
-const UserCoins = require('../../Models/UserCoins.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -36,19 +36,17 @@ module.exports = {
     }
 
     try {
-      let userCoins = await UserCoins.findOne({
-        userId: message.author.id,
+      const drained = await drainPocket(
+        message.author.id,
         guildId
-      });
+      );
 
-      if (!userCoins || userCoins.coins <= 0) {
+      if (!drained || drained.amount <= 0) {
         return message.reply('❌・Vous n\'avez pas assez de coins pour jouer.');
       }
 
-      const amount = userCoins.coins;
-
-      userCoins.coins = 0;
-      await userCoins.save();
+      const amount = drained.amount;
+      let userCoins = drained.before;
 
       const slotEmbed = new EmbedBuilder()
         .setTitle('Slots')
@@ -69,8 +67,14 @@ module.exports = {
       const result = Math.random() < 0.5;
 
       if (result) {
-        userCoins.coins += amount * 3;
-        await userCoins.save();
+        userCoins = await creditBalance({
+          userId: message.author.id,
+          guildId,
+          target: 'coins',
+          amount: amount * 3
+        });
+      } else {
+        userCoins = await getAccount(message.author.id, guildId) || userCoins;
       }
 
       await sendStaffLog(
