@@ -19,11 +19,11 @@ module.exports = {
 
       let userCoins = await UserCoins.findOne({ userId: message.author.id, guildId });
 
-      if (!userCoins || userCoins.coins < amountToDeposit) {
+      if (!userCoins || userCoins.coins <= 0) {
         return message.reply('❌・Vous n\'avez pas de coins en poche.');
       }
 
-      if (!userCoins || userCoins.bank || userCoins.coins < amountToDeposit) {
+      if (userCoins.coins < amountToDeposit) {
         return message.reply('❌・Vous n\'avez pas assez de coins pour déposer cette somme.');
       }
 
