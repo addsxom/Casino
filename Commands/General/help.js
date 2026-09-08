@@ -15,8 +15,7 @@ const CATEGORY_META = {
   'Gestion coins': { name: 'Gestion Coins', emoji: '💰' },
   Jeux: { name: 'Jeux', emoji: '🎰' },
   Admin: { name: 'Administration', emoji: '🛡️' },
-  Owner: { name: 'Owner', emoji: '👑' },
-  Team: { name: 'Équipe', emoji: '👥' }
+  Owner: { name: 'Owner', emoji: '👑' }
 };
 
 
@@ -98,7 +97,6 @@ module.exports = {
       'Recup',
       'Gestion coins',
       'Jeux',
-      'Team',
       'Admin',
       'Owner'
     ];
