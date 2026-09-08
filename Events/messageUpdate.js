@@ -13,18 +13,9 @@ module.exports = async (_bot, oldMessage, newMessage) => {
     'discord-logs',
     buildDiscordLog({
       title: '✏️ Message modifié',
+      description: `${newMessage.author} dans ${newMessage.channel}`,
       color: 0xfee75c,
       fields: [
-        {
-          name: 'Auteur',
-          value: `${newMessage.author} • \`${newMessage.author.id}\``,
-          inline: false
-        },
-        {
-          name: 'Salon',
-          value: `${newMessage.channel}`,
-          inline: false
-        },
         {
           name: 'Avant',
           value: before.slice(0, 1000) || '*Vide*',
