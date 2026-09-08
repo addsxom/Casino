@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 const { sleep } = require('../../utils');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
@@ -33,7 +34,7 @@ module.exports = {
     }
 
     try {
-      const amount = parseInt(args[0]);
+      const amount = parseAmount(args[0]);
 
       if (isNaN(amount) || amount <= 0) {
         return message.reply('❌・Veuillez miser un montant valide de coins.');
