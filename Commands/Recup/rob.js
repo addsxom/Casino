@@ -17,8 +17,8 @@ const {
   releaseCooldown
 } = require('../../utils/cooldownService.js');
 
-const ROBBER_COOLDOWN_MS = 15 * 1000;
-const VICTIM_PROTECTION_MS = 15 * 1000;
+const ROBBER_COOLDOWN_MS = 2 * 60 * 60 * 1000;
+const VICTIM_PROTECTION_MS = 60 * 60 * 1000;
 const MIN_TARGET_POCKET = 1000;
 
 const SUCCESS_CHANCE = 0.55;
@@ -101,28 +101,6 @@ async function replyEmbed(
   }
 
   return sent;
-}
-
-async function clearLegacyTestCooldown(
-  Model,
-  userId,
-  guildId,
-  maxDurationMs
-) {
-  const existing = await Model.findOne({
-    userId,
-    guildId
-  });
-
-  const availableAt = Number(existing?.cooldown) || 0;
-  const remaining = availableAt - Date.now();
-
-  if (remaining > maxDurationMs) {
-    await Model.updateOne(
-      { userId, guildId },
-      { $set: { cooldown: 0 } }
-    );
-  }
 }
 
 async function getProtection(userId, guildId) {
@@ -294,13 +272,6 @@ module.exports = {
         );
       }
 
-      await clearLegacyTestCooldown(
-        UserRobProtection,
-        targetUser.id,
-        guildId,
-        VICTIM_PROTECTION_MS
-      );
-
       const existingProtection = await getProtection(
         targetUser.id,
         guildId
@@ -326,13 +297,6 @@ module.exports = {
           [existingProtection.availableAt]
         );
       }
-
-      await clearLegacyTestCooldown(
-        UserRobCooldown,
-        robberId,
-        guildId,
-        ROBBER_COOLDOWN_MS
-      );
 
       const robberCooldown = await tryAcquireCooldown(
         UserRobCooldown,
@@ -536,7 +500,7 @@ module.exports = {
             reason: '+rob',
             details:
               `Voleur : ${message.author.tag} • ` +
-              `Vol : ${stolenPercent}% • Protection : 15s`
+              `Vol : ${stolenPercent}% • Protection : 1h`
           })
         );
 
