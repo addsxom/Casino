@@ -29,10 +29,9 @@ module.exports = async (_bot, oldState, newState) => {
       member.guild,
       AuditLogEvent.MemberMove,
       {
-        targetId: member.id,
         channelId: newState.channelId,
-        withinMs: 6000,
-        delayMs: 900
+        withinMs: 8000,
+        delayMs: 1000
       }
     );
 
