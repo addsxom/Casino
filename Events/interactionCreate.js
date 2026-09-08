@@ -4,7 +4,8 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require('discord.js');
 
 const {
@@ -64,7 +65,7 @@ async function getOrCreateCategory(guild, bot, type) {
 }
 
 async function openTicket(bot, interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const typeKey = interaction.customId.replace('ticket_open_', '');
   const type = TICKET_TYPES[typeKey];
@@ -157,7 +158,7 @@ async function openTicket(bot, interaction) {
 }
 
 async function closeTicket(interaction) {
-  await interaction.deferReply({ ephemeral: true });
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const channel = interaction.channel;
   const ownerId = channel?.topic?.match(/ticketOwner:(\d+)/)?.[1];
@@ -210,7 +211,7 @@ module.exports = async (bot, interaction) => {
     return interaction
       .reply({
         content: '❌・Une erreur est survenue avec le système de tickets.',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       })
       .catch(() => {});
   }
