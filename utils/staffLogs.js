@@ -38,21 +38,11 @@ function buildEconomyLog({
   return new EmbedBuilder()
     .setTitle(title)
     .setDescription(
-      `${user} • **${formatAmount(amount)} coins**`
+      `${user}\n` +
+      `**${formatAmount(amount)} coins**\n` +
+      `-# 🪙 ${formatAmount(pocket)} • 🏦 ${formatAmount(bank)}`
     )
     .setColor(color)
-    .addFields(
-      {
-        name: '🪙 Poche',
-        value: `**${formatAmount(pocket)}**`,
-        inline: true
-      },
-      {
-        name: '🏦 Banque',
-        value: `**${formatAmount(bank)}**`,
-        inline: true
-      }
-    )
     .setTimestamp();
 }
 
@@ -82,22 +72,13 @@ function buildCoinMovementLog({
     description += `\n-# ${details}`;
   }
 
+  description +=
+    `\n-# 🪙 ${formatAmount(pocket)} • 🏦 ${formatAmount(bank)}`;
+
   return new EmbedBuilder()
     .setTitle(title)
     .setDescription(description)
     .setColor(isGain ? 0x57f287 : isLoss ? 0xed4245 : 0x6b6de6)
-    .addFields(
-      {
-        name: '🪙 Poche',
-        value: `**${formatAmount(pocket)}**`,
-        inline: true
-      },
-      {
-        name: '🏦 Banque',
-        value: `**${formatAmount(bank)}**`,
-        inline: true
-      }
-    )
     .setTimestamp();
 }
 
@@ -115,23 +96,11 @@ function buildTransferLog({
     .setDescription(
       `${sender} ➜ ${recipient}\n` +
       `**${formatAmount(amount)} coins**\n` +
-      `-# Depuis ${source === 'bank' ? 'la banque' : 'la poche'}`
+      `-# ${source === 'bank' ? 'Banque' : 'Poche'} → Poche\n` +
+      `-# Expéditeur : 🪙 ${formatAmount(senderPocket)} • 🏦 ${formatAmount(senderBank)}\n` +
+      `-# Destinataire : 🪙 ${formatAmount(recipientPocket)}`
     )
     .setColor(0x5865f2)
-    .addFields(
-      {
-        name: 'Expéditeur',
-        value:
-          `🪙 ${formatAmount(senderPocket)} • ` +
-          `🏦 ${formatAmount(senderBank)}`,
-        inline: true
-      },
-      {
-        name: 'Destinataire',
-        value: `🪙 ${formatAmount(recipientPocket)}`,
-        inline: true
-      }
-    )
     .setTimestamp();
 }
 
