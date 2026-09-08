@@ -51,7 +51,7 @@ module.exports = async (_bot, message) => {
 
   await sendStaffLog(
     message.guild,
-    'discord-logs',
+    'message-logs',
     buildDiscordLog({
       title: '🗑️ Message supprimé',
       description:

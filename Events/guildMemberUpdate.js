@@ -32,7 +32,7 @@ module.exports = async (_bot, oldMember, newMember) => {
 
   await sendStaffLog(
     newMember.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '👤 Membre modifié',
       description: `${newMember.user}\n${changes.join('\n')}`,

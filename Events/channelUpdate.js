@@ -27,7 +27,7 @@ module.exports = async (_bot, oldChannel, newChannel) => {
 
   await sendStaffLog(
     newChannel.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '⚙️ Salon modifié',
       description:

@@ -15,7 +15,7 @@ module.exports = async (_bot, oldRole, newRole) => {
 
   await sendStaffLog(
     newRole.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '⚙️ Rôle modifié',
       description: `${newRole}\n${changes.join('\n')}`,

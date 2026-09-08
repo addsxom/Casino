@@ -3,7 +3,7 @@ const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
 module.exports = async (_bot, role) => {
   await sendStaffLog(
     role.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '➕ Rôle créé',
       description: `${role} **${role.name}**`,

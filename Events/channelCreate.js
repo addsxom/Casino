@@ -12,7 +12,7 @@ module.exports = async (_bot, channel) => {
 
   await sendStaffLog(
     channel.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '➕ Salon créé',
       description:

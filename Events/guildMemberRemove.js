@@ -6,7 +6,7 @@ module.exports = async (_bot, member) => {
 
   await sendStaffLog(
     member.guild,
-    'discord-logs',
+    'server-logs',
     buildDiscordLog({
       title: '📤 Départ',
       description:

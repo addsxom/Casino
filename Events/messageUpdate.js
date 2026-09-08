@@ -10,7 +10,7 @@ module.exports = async (_bot, oldMessage, newMessage) => {
 
   await sendStaffLog(
     newMessage.guild,
-    'discord-logs',
+    'message-logs',
     buildDiscordLog({
       title: '✏️ Message modifié',
       description: `${newMessage.author} dans ${newMessage.channel}`,

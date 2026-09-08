@@ -22,7 +22,7 @@ module.exports = async (_bot, oldState, newState) => {
 
   await sendStaffLog(
     member.guild,
-    'discord-logs',
+    'voice-logs',
     buildDiscordLog({
       title,
       description,
