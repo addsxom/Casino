@@ -2,40 +2,36 @@ module.exports = [
   {
     emoji: '💰',
     title: 'Économie',
-    description: 'Coins en poche, banque, dépôts, retraits, virements et réputation.'
+    description: 'Poche, banque, dépôts, retraits et réputation.'
   },
   {
     emoji: '💳',
     title: 'Paiements',
-    isNew: true,
-    description: 'Virements depuis la poche ou directement depuis la banque avec +pay.'
+    description: 'Virements depuis la poche ou la banque.'
   },
   {
     emoji: '📊',
     title: 'Profil coins',
-    isNew: true,
-    description: 'Résumé rapide avec +coins et bouton pour afficher les montants exacts et la fortune totale.'
+    description: 'Solde, montants exacts et fortune totale.'
   },
   {
     emoji: '🎰',
     title: 'Jeux',
-    description: 'Slots, Mines et Crash avec mises abrégées comme 10k, 2k5, 1m, etc.'
+    description: 'Slots, Mines et Crash.'
   },
   {
     emoji: '🎫',
-    title: 'Tickets support',
-    isNew: true,
-    description: 'Panel +support avec création de tickets privés, catégories et fermeture par bouton.'
+    title: 'Tickets',
+    description: 'Support privé avec ouverture et fermeture par bouton.'
   },
   {
     emoji: '👥',
     title: 'Compteur de membres',
-    isNew: true,
-    description: 'Le salon compteur se met automatiquement à jour quand un membre rejoint ou quitte le serveur.'
+    description: 'Mise à jour automatique des membres du serveur.'
   },
   {
     emoji: '🔢',
     title: 'Montants abrégés',
-    description: 'Le bot comprend et affiche les gros montants en K, M, B et T pour rester lisible.'
+    description: 'Support de K, M, B et T.'
   }
 ];
