@@ -12,6 +12,7 @@ const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
 const { sleep } = require('../../utils');
+const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
@@ -23,10 +24,6 @@ const MODES = {
   classique: { label: '💣 Classique', rows: 4, cols: 4, mines: 3, color: 0x6b6de6 },
   complexe: { label: '🔥 Complexe', rows: 4, cols: 5, mines: 6, color: 0xe67e22 }
 };
-
-function formatCoins(amount) {
-  return Math.floor(amount).toLocaleString('fr-FR');
-}
 
 function formatCooldown(ms) {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
