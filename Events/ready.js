@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const { joinVoiceChannel } = require('@discordjs/voice');
 const GUILD_ID = '1546311652830351450';
 const CHANNEL_ID = '1546360551503044658';
+const WELCOME_CHANNEL_ID = '1546311653388189718';
 const prefix = process.env.PREFIX;
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
@@ -80,6 +81,24 @@ module.exports = async (bot) => {
   }
 
   await updateMemberCount(guild);
+
+  try {
+    const welcomeChannel =
+      guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
+      await guild.channels.fetch(WELCOME_CHANNEL_ID);
+
+    if (welcomeChannel && guild.systemChannelId !== WELCOME_CHANNEL_ID) {
+      await guild.setSystemChannel(
+        welcomeChannel,
+        'Salon système d’arrivée'
+      );
+    }
+  } catch (error) {
+    console.error(
+      'Erreur configuration salon système :',
+      error?.code || error?.message || error
+    );
+  }
 
   // Sécurité : resynchronise aussi le compteur périodiquement
   // au cas où un événement Discord aurait été manqué.
