@@ -76,6 +76,9 @@ module.exports = {
         });
       }
 
+      const senderBefore = senderCoins[source];
+      const recipientBefore = recipientCoins.coins;
+
       senderCoins[source] -= amount;
       recipientCoins.coins += amount;
 
@@ -90,9 +93,10 @@ module.exports = {
           recipient,
           amount,
           source,
-          senderPocket: senderCoins.coins,
-          senderBank: senderCoins.bank,
-          recipientPocket: recipientCoins.coins
+          senderBefore,
+          senderAfter: senderCoins[source],
+          recipientBefore,
+          recipientAfter: recipientCoins.coins
         })
       );
 
