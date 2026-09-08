@@ -6,18 +6,18 @@ module.exports = async (_bot, oldState, newState) => {
   const member = newState.member || oldState.member;
   if (!member || member.user?.bot) return;
 
-  let title = '🎙️ Vocal';
-  let description = '';
+  let title;
+  let description;
 
   if (!oldState.channelId && newState.channelId) {
     title = '🎙️ Vocal rejoint';
-    description = `${member} a rejoint ${newState.channel}.`;
+    description = `${member} → ${newState.channel}`;
   } else if (oldState.channelId && !newState.channelId) {
     title = '🎙️ Vocal quitté';
-    description = `${member} a quitté ${oldState.channel}.`;
+    description = `${member} ← ${oldState.channel}`;
   } else {
     title = '🎙️ Vocal déplacé';
-    description = `${member} : ${oldState.channel} → ${newState.channel}`;
+    description = `${member}\n${oldState.channel} → ${newState.channel}`;
   }
 
   await sendStaffLog(
@@ -26,10 +26,7 @@ module.exports = async (_bot, oldState, newState) => {
     buildDiscordLog({
       title,
       description,
-      color: 0x5865f2,
-      fields: [
-        { name: 'ID', value: `\`${member.id}\``, inline: true }
-      ]
+      color: 0x5865f2
     })
   );
 };
