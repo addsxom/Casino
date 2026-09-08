@@ -1,7 +1,7 @@
-const UserCoins = require('../../Models/UserCoins.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+const { resetAccount } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'reset',
@@ -21,27 +21,25 @@ if (args.length !== 1) {
     }
 
     try {
-      let userCoins = await UserCoins.findOne({ userId: targetUser.id, guildId: message.guild.id });
+      const reset = await resetAccount(
+        targetUser.id,
+        message.guild.id
+      );
 
-      if (!userCoins) {
-        return message.reply(`${targetUser.tag} n'a pas de coins à réinitialiser.`);
+      if (!reset) {
+        return message.reply(
+          targetUser.tag + " n'a pas de coins à réinitialiser."
+        );
       }
 
-      const removedCoins = (Number(userCoins.coins) || 0) + (Number(userCoins.bank) || 0);
-
-      userCoins.coins = 0;
-      userCoins.bank = 0;
-      userCoins.rep = 0;
-      await userCoins.save();
-
-      if (removedCoins > 0) {
+      if (reset.removedCoins > 0) {
         await sendStaffLog(
           message.guild,
           'economy-logs',
           buildCoinMovementLog({
             title: '🧹 Reset économie',
             user: targetUser,
-            delta: -removedCoins,
+            delta: -reset.removedCoins,
             pocket: 0,
             bank: 0,
             reason: '+reset',
@@ -51,7 +49,10 @@ if (args.length !== 1) {
         );
       }
 
-      return message.reply(`Vous avez réinitialisé tous les coins/rep de ${targetUser.tag}.`);
+      return message.reply(
+        'Vous avez réinitialisé tous les coins/rep de ' +
+        targetUser.tag + '.'
+      );
     } catch (error) {
       console.error(error);
       return message.reply('Une erreur s\'est produite lors de la réinitialisation des coins.');
