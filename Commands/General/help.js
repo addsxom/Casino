@@ -19,12 +19,6 @@ const CATEGORY_META = {
   Team: { name: 'Équipe', emoji: '👥' }
 };
 
-const RECENT_COMMANDS = [
-  { name: 'support', access: 'Administration' },
-  { name: 'clear', access: 'Owner' },
-  { name: 'helpmod', access: 'Owner' },
-  { name: 'rules', access: 'Administration' }
-];
 
 function getCategoryMeta(category) {
   return CATEGORY_META[category] || {
@@ -98,44 +92,6 @@ module.exports = {
     }
 
     const embeds = [];
-
-    const recentCommandText = RECENT_COMMANDS
-      .map(item => {
-        const command = commands.find(
-          current => current.name === item.name
-        );
-
-        if (!command) return null;
-
-        const usage = cleanUsage(command);
-        const names = [
-          `\`${prefix}${command.name}${usage}\``,
-          ...(Array.isArray(command.aliases)
-            ? command.aliases.map(alias => `\`${prefix}${alias}\``)
-            : [])
-        ].join('/');
-
-        return (
-          `**${names}**\n` +
-          `${command.description || 'Aucune description.'}\n` +
-          `-# Accès : ${item.access}`
-        );
-      })
-      .filter(Boolean)
-      .join('\n\n');
-
-    if (recentCommandText) {
-      embeds.push(
-        new EmbedBuilder()
-          .setTitle('🆕 Nouveautés')
-          .setDescription(recentCommandText)
-          .setColor(0x6b6de6)
-          .setFooter({
-            text: `Commandes récemment ajoutées • Préfixe : ${prefix}`,
-            iconURL: message.client.user.displayAvatarURL({ dynamic: true })
-          })
-      );
-    }
 
     const preferredOrder = [
       'General',
