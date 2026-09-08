@@ -17,6 +17,9 @@ module.exports = bot => {
         let command = require(`../Commands/${dir}/${file}`);
         
         if (command && command.name) {
+          command.category = command.category || dir;
+          command.file = file;
+
           bot.commands.set(command.name, command);
           
           if (command.aliases && Array.isArray(command.aliases)) {
