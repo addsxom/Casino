@@ -142,7 +142,9 @@ module.exports = {
         .map(command => {
           const usage = cleanUsage(command);
           const aliases = Array.isArray(command.aliases) && command.aliases.length
-            ? `\n-# Alias : ${command.aliases.map(alias => \`${prefix}${alias}\`).join(', ')}`
+            ? '\n-# Alias : ' + command.aliases
+                .map(alias => '`' + prefix + alias + '`')
+                .join(', ')
             : '';
 
           return (
