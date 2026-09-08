@@ -15,6 +15,51 @@ const {
   makeTicketChannelName
 } = require('../utils/ticketSystem.js');
 
+const MEMBER_ROLE_NAME = 'Member';
+
+async function acceptRules(interaction) {
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
+
+  const member = await interaction.guild.members
+    .fetch(interaction.user.id)
+    .catch(() => interaction.member);
+
+  await interaction.guild.roles.fetch().catch(() => null);
+
+  const memberRole = interaction.guild.roles.cache.find(
+    role => role.name.toLowerCase() === MEMBER_ROLE_NAME.toLowerCase()
+  );
+
+  if (!memberRole) {
+    return interaction.editReply(
+      '❌・Le rôle **Member** est introuvable. Contacte un administrateur.'
+    );
+  }
+
+  if (member.roles.cache.has(memberRole.id)) {
+    return interaction.editReply(
+      '✅・Tu as déjà accepté le règlement et tu possèdes déjà le rôle Member.'
+    );
+  }
+
+  if (!memberRole.editable) {
+    return interaction.editReply(
+      '❌・Je ne peux pas attribuer le rôle **Member**. Mon rôle doit être placé au-dessus dans la hiérarchie.'
+    );
+  }
+
+  await member.roles.add(
+    memberRole,
+    'Règlement accepté'
+  );
+
+  return interaction.editReply(
+    '✅・Règlement accepté ! Le rôle **Member** t’a été attribué. Bienvenue sur le serveur.'
+  );
+}
+
 function staffPermissionOverwrites(guild) {
   return getStaffRoles(guild).map(role => ({
     id: role.id,
@@ -198,6 +243,10 @@ module.exports = async (bot, interaction) => {
   if (!interaction.isButton() || !interaction.guild) return;
 
   try {
+    if (interaction.customId === 'rules_accept') {
+      return await acceptRules(interaction);
+    }
+
     if (interaction.customId.startsWith('ticket_open_')) {
       return await openTicket(bot, interaction);
     }
