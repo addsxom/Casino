@@ -2,6 +2,7 @@ const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const Owner = require("../../Models/Owner.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'add',
@@ -42,10 +43,42 @@ module.exports = {
       } else if (type === 'bank') {
         userCoins.bank += amount;
         await userCoins.save();
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🛡️ Ajout admin',
+            user: targetUser,
+            delta: amount,
+            pocket: userCoins.coins,
+            bank: userCoins.bank,
+            reason: 'Ajout admin dans la banque',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
+
         return message.reply(`Vous avez ajouté ${formatAmount(amount)} coins en bank à ${targetUser.tag}.`);
       } else if (type === 'coins') {
         userCoins.coins += amount;
         await userCoins.save();
+
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🛡️ Ajout admin',
+            user: targetUser,
+            delta: amount,
+            pocket: userCoins.coins,
+            bank: userCoins.bank,
+            reason: 'Ajout admin dans la poche',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
+
         return message.reply(`Vous avez ajouté ${formatAmount(amount)} coins à ${targetUser.tag}.`);
       } else {
         return message.reply('Type invalide. Veuillez spécifier "rep", "bank" ou "coins".');
