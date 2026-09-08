@@ -59,6 +59,8 @@ module.exports = {
       );
     }
 
+    await message.delete().catch(() => {});
+
     return message.channel.send({
       embeds: [embed],
       components: [row]
