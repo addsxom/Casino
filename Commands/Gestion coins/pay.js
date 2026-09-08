@@ -1,6 +1,7 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'pay',
@@ -80,6 +81,36 @@ module.exports = {
 
       await senderCoins.save();
       await recipientCoins.save();
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: '💸 Paiement envoyé',
+          user: message.author,
+          delta: -amount,
+          pocket: senderCoins.coins,
+          bank: senderCoins.bank,
+          reason: source === 'bank' ? 'Paiement depuis la banque' : 'Paiement depuis la poche',
+          sourceChannel: message.channel,
+          otherUser: recipient
+        })
+      );
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: '💰 Paiement reçu',
+          user: recipient,
+          delta: amount,
+          pocket: recipientCoins.coins,
+          bank: recipientCoins.bank,
+          reason: 'Paiement reçu',
+          sourceChannel: message.channel,
+          otherUser: message.author
+        })
+      );
 
       return message.reply(
         `Tu as payé **${formatAmount(amount)}** coins💰 à ${recipient.tag} depuis ${source === 'bank' ? 'ta banque' : 'ta poche'}.`
