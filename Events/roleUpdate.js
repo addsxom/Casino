@@ -4,19 +4,11 @@ module.exports = async (_bot, oldRole, newRole) => {
   const changes = [];
 
   if (oldRole.name !== newRole.name) {
-    changes.push({
-      name: 'Nom',
-      value: `${oldRole.name} → ${newRole.name}`,
-      inline: false
-    });
+    changes.push(`**Nom :** ${oldRole.name} → ${newRole.name}`);
   }
 
   if (oldRole.color !== newRole.color) {
-    changes.push({
-      name: 'Couleur',
-      value: `${oldRole.hexColor} → ${newRole.hexColor}`,
-      inline: false
-    });
+    changes.push(`**Couleur :** ${oldRole.hexColor} → ${newRole.hexColor}`);
   }
 
   if (!changes.length) return;
@@ -26,9 +18,8 @@ module.exports = async (_bot, oldRole, newRole) => {
     'discord-logs',
     buildDiscordLog({
       title: '⚙️ Rôle modifié',
-      description: `${newRole} • \`${newRole.id}\``,
-      color: 0x5865f2,
-      fields: changes
+      description: `${newRole}\n${changes.join('\n')}`,
+      color: 0x5865f2
     })
   );
 };
