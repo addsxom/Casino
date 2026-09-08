@@ -1,5 +1,6 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const Owner = require("../../Models/Owner.js");
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'reset',
@@ -27,10 +28,30 @@ module.exports = {
         return message.reply(`${targetUser.tag} n'a pas de coins à réinitialiser.`);
       }
 
+      const removedCoins = (Number(userCoins.coins) || 0) + (Number(userCoins.bank) || 0);
+
       userCoins.coins = 0;
       userCoins.bank = 0;
       userCoins.rep = 0;
       await userCoins.save();
+
+      if (removedCoins > 0) {
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🧹 Reset économie',
+            user: targetUser,
+            delta: -removedCoins,
+            pocket: 0,
+            bank: 0,
+            reason: '+reset',
+            sourceChannel: message.channel,
+            otherUser: message.author
+          })
+        );
+      }
+
       return message.reply(`Vous avez réinitialisé tous les coins/rep de ${targetUser.tag}.`);
     } catch (error) {
       console.error(error);
