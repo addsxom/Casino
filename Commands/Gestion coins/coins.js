@@ -39,51 +39,21 @@ module.exports = {
         targetUser.username;
 
       const avatar = targetUser.displayAvatarURL({
-        dynamic: true,
-        size: 256
+        dynamic: true
       });
 
       const embed = new EmbedBuilder()
         .setAuthor({
-          name: `Portefeuille de ${displayName}`,
+          name: displayName,
           iconURL: avatar
         })
-        .setThumbnail(avatar)
         .setColor(0x6b6de6)
-        .addFields(
-          {
-            name: '🪙 Poche',
-            value:
-              `**${formatAmount(pocket)}**\n` +
-              `\`${formatFullAmount(pocket)}\``,
-            inline: true
-          },
-          {
-            name: '🏦 Banque',
-            value:
-              `**${formatAmount(bank)}**\n` +
-              `\`${formatFullAmount(bank)}\``,
-            inline: true
-          },
-          {
-            name: '🔺 Réputation',
-            value:
-              `**${formatAmount(rep)}**\n` +
-              `\`${formatFullAmount(rep)}\``,
-            inline: true
-          },
-          {
-            name: '💰 Fortune totale',
-            value:
-              `**${formatAmountPrecise(total)} coins**  •  ` +
-              `\`${formatFullAmount(total)}\``,
-            inline: false
-          }
-        )
-        .setFooter({
-          text: 'Kuromi Coins',
-          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
-        });
+        .setDescription(
+          `🪙 **${formatAmount(pocket)}**  \`${formatFullAmount(pocket)}\`\n` +
+          `🏦 **${formatAmount(bank)}**  \`${formatFullAmount(bank)}\`\n` +
+          `🔺 **${formatAmount(rep)}**  \`${formatFullAmount(rep)}\`\n\n` +
+          `💰 **${formatAmountPrecise(total)}**  \`${formatFullAmount(total)}\``
+        );
 
       return message.reply({ embeds: [embed] });
     } catch (error) {
