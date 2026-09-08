@@ -1,28 +1,25 @@
-const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildBankTransferLog } = require('../../utils/staffLogs.js');
-const UserCoins = require('../../Models/UserCoins.js');
+const { moveAllBalance } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'retall',
   description: 'Retirez tous les coins de votre banque vers votre poche.',
+
   async execute(message) {
     const guildId = message.guild.id;
 
     try {
-      let userCoins = await UserCoins.findOne({ userId: message.author.id, guildId });
+      const movement = await moveAllBalance({
+        userId: message.author.id,
+        guildId,
+        from: 'bank',
+        to: 'coins'
+      });
 
-      if (!userCoins || userCoins.bank <= 0) {
-        return message.reply('❌・Vous n\'avez pas de coins a retiré.');
+      if (!movement) {
+        return message.reply('❌・Vous n\'avez pas de coins à retirer.');
       }
-
-      const amountToWithdraw = userCoins.bank;
-      const bankBefore = userCoins.bank;
-      const pocketBefore = userCoins.coins;
-
-      userCoins.coins += amountToWithdraw;
-      userCoins.bank = 0;
-      await userCoins.save();
 
       await sendStaffLog(
         message.guild,
@@ -30,19 +27,22 @@ module.exports = {
         buildBankTransferLog({
           title: '📤 Retrait total de la banque',
           user: message.author,
-          amount: amountToWithdraw,
-          bankBefore,
-          bankAfter: userCoins.bank,
-          pocketBefore,
-          pocketAfter: userCoins.coins
+          amount: movement.amount,
+          bankBefore: movement.before.bank,
+          bankAfter: movement.after.bank,
+          pocketBefore: movement.before.coins,
+          pocketAfter: movement.after.coins
         })
       );
 
-      return message.reply(`🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** de votre banque.`)
-
+      return message.reply(
+        `🏦・Vous avez retiré **${formatAmount(movement.amount)}** de votre banque.`
+      );
     } catch (error) {
-      console.error(error);
-      message.reply('Une erreur s\'est produite lors du retrait des coins.');
+      console.error('Withdraw all error:', error);
+      return message.reply(
+        'Une erreur s\'est produite lors du retrait des coins.'
+      );
     }
   },
 };
