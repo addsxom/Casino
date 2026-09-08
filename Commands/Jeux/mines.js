@@ -8,12 +8,12 @@ const {
   MessageFlags
 } = require('discord.js');
 
-const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
 const { sleep } = require('../../utils');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { debitBalance, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
@@ -371,10 +371,10 @@ module.exports = {
       );
     }
 
-    let userCoins = await UserCoins.findOne({
-      userId: message.author.id,
+    let userCoins = await getAccount(
+      message.author.id,
       guildId
-    });
+    );
 
     if (!userCoins || userCoins.coins < amount) {
       return message.reply(
@@ -414,12 +414,14 @@ module.exports = {
       const mode = MODES[modeKey];
       if (!mode) return;
 
-      userCoins = await UserCoins.findOne({
+      userCoins = await debitBalance({
         userId: message.author.id,
-        guildId
+        guildId,
+        source: 'coins',
+        amount
       });
 
-      if (!userCoins || userCoins.coins < amount) {
+      if (!userCoins) {
         return gameMessage.edit({
           components: [
             buildStatusContainer(
@@ -430,9 +432,6 @@ module.exports = {
           ]
         });
       }
-
-      userCoins.coins -= amount;
-      await userCoins.save();
 
       const totalCells = mode.rows * mode.cols;
       const minePositions = generateMines(totalCells, mode.mines);
@@ -531,15 +530,14 @@ module.exports = {
             Math.floor(game.amount * game.currentMultiplier) - game.revealFees
           );
 
-          userCoins = await UserCoins.findOne({
+          userCoins = await creditBalance({
             userId: message.author.id,
-            guildId
+            guildId,
+            target: 'coins',
+            amount: game.payout
           });
 
           if (userCoins) {
-            userCoins.coins += game.payout;
-            await userCoins.save();
-
             await sendStaffLog(
               message.guild,
               'economy-logs',
@@ -678,10 +676,10 @@ module.exports = {
           game.gameOver = true;
           game.status = 'lost';
 
-          userCoins = await UserCoins.findOne({
-            userId: message.author.id,
+          userCoins = await getAccount(
+            message.author.id,
             guildId
-          });
+          );
 
           if (userCoins) {
             await sendStaffLog(
@@ -739,15 +737,14 @@ module.exports = {
             Math.floor(game.amount * game.currentMultiplier) - game.revealFees
           );
 
-          userCoins = await UserCoins.findOne({
+          userCoins = await creditBalance({
             userId: message.author.id,
-            guildId
+            guildId,
+            target: 'coins',
+            amount: game.payout
           });
 
           if (userCoins) {
-            userCoins.coins += game.payout;
-            await userCoins.save();
-
             await sendStaffLog(
               message.guild,
               'economy-logs',
@@ -789,15 +786,14 @@ module.exports = {
             )
           : game.amount;
 
-        userCoins = await UserCoins.findOne({
+        userCoins = await creditBalance({
           userId: message.author.id,
-          guildId
+          guildId,
+          target: 'coins',
+          amount: payout
         });
 
         if (userCoins) {
-          userCoins.coins += payout;
-          await userCoins.save();
-
           const net = payout - game.amount;
 
           if (net !== 0) {
