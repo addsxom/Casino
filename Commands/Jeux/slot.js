@@ -98,7 +98,7 @@ module.exports = {
 
       await sleep(5000);
 
-      const result = Math.random() < 0.5;
+      const result = Math.random() < 0.485;
 
       if (result) {
         userCoins = await creditBalance({
