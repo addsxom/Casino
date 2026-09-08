@@ -37,11 +37,11 @@ module.exports = [
   {
     emoji: '📜',
     title: 'Logs staff',
-    description: 'Dépôts, retraits et événements Discord.'
+    description: 'Logs séparés par économie, banque, transactions, messages, serveur, vocal et modération.'
   },
   {
-    emoji: '📈',
-    title: 'Logs économie',
-    description: 'Gains, pertes, paiements et jeux.'
+    emoji: '📘',
+    title: 'Guide staff',
+    description: 'La commande +helpmod publie le guide des salons staff dans information.'
   }
 ];
