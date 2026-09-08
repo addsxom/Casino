@@ -8,10 +8,15 @@ const BOT_VOICE_CHANNEL = {
   name: '╰・BOT STATUT'
 };
 const WELCOME_CHANNEL_ID = '1546311653388189718';
-const prefix = process.env.PREFIX;
+const prefix = process.env.PREFIX || '+';
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
+const {
+  DEFAULT_DYNAMIC_ACTIVITY,
+  normalizeActivityTemplate,
+  renderActivityText
+} = require('../utils/activityText.js');
 const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
 
 const ACTIVITY_TYPES = {
@@ -39,11 +44,26 @@ module.exports = async (bot) => {
 
   const botInfo = await BotInfo.findOne();
 
+  if (botInfo?.activityText2) {
+    const normalizedText2 =
+      normalizeActivityTemplate(botInfo.activityText2);
+
+    if (normalizedText2 !== botInfo.activityText2) {
+      botInfo.activityText2 = normalizedText2;
+      await botInfo.save().catch(error => {
+        console.error(
+          'Erreur migration activityText2 :',
+          error?.message || error
+        );
+      });
+    }
+  }
+
   const botName = bot.user.username;
   const activitytext = botInfo?.activityText || "Kuromi-Coins 🎀";
   const activitytext2 =
     botInfo?.activityText2 ||
-    `${prefix}help for ${bot.guilds.cache.reduce((acc, guild) => acc + guild.memberCount, 0)} users!`;
+    DEFAULT_DYNAMIC_ACTIVITY;
   const activityType = resolveActivityType(
     botInfo?.activityType
   );
@@ -59,9 +79,12 @@ module.exports = async (bot) => {
   const firstActivity = bot.activityRotation.texts[0];
 
   if (firstActivity) {
-    bot.user.setActivity(firstActivity, {
-      type: bot.activityRotation.type
-    });
+    bot.user.setActivity(
+      renderActivityText(firstActivity, bot, prefix),
+      {
+        type: bot.activityRotation.type
+      }
+    );
   }
 
   setInterval(() => {
@@ -73,7 +96,11 @@ module.exports = async (bot) => {
       (rotation.index + 1) % rotation.texts.length;
 
     bot.user.setActivity(
-      rotation.texts[rotation.index],
+      renderActivityText(
+        rotation.texts[rotation.index],
+        bot,
+        prefix
+      ),
       { type: rotation.type }
     );
   }, 5000);
