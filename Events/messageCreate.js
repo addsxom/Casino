@@ -51,26 +51,19 @@ module.exports = async (bot, message) => {
     } else {
       if (!message.author.bot) {
         if (message.guild && message.guild.id) {
-          let userCoins = await UserCoins.findOne({
-            userId: message.author.id,
-            guildId: message.guild.id,
-          });
-      
-          if (!userCoins) {
-            const newUserCoins = new UserCoins({
+          const userCoins = await UserCoins.findOneAndUpdate(
+            {
               userId: message.author.id,
-              guildId: message.guild.id,
-              coins: 0,
-              bank: 0,
-              messages: 0,
-            });
-            await newUserCoins.save();
-          }
-      
-          userCoins = await UserCoins.findOneAndUpdate(
-            { userId: message.author.id, guildId: message.guild.id },
-            { $inc: { messages: 1 } },
-            { new: true }
+              guildId: message.guild.id
+            },
+            {
+              $inc: { messages: 1 }
+            },
+            {
+              new: true,
+              upsert: true,
+              setDefaultsOnInsert: true
+            }
           );
       
           const thresholdResult = await userCoins.checkMessageThreshold();
