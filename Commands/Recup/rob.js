@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
-const UserCoins = require('../../Models/UserCoins.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { InsufficientFundsError, getAccount, transferCoins } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'rob',
@@ -16,28 +16,52 @@ module.exports = {
         return message.reply('Veuillez mentionner un utilisateur à rob.');
       }
 
-      let userCoins = await UserCoins.findOne({ userId: message.author.id, guildId });
-      let targetCoins = await UserCoins.findOne({ userId: targetUser.id, guildId });
-
-      if (!userCoins) {
-        userCoins = await UserCoins.create({ userId: message.author.id, guildId });
+      if (targetUser.bot) {
+        return message.reply('Tu ne peux pas voler un bot.');
       }
 
-      if (!targetCoins) {
-        targetCoins = await UserCoins.create({ userId: targetUser.id, guildId });
+      if (targetUser.id === message.author.id) {
+        return message.reply('Tu ne peux pas te voler toi-même.');
       }
+
+      const targetCoins = await getAccount(targetUser.id, guildId);
 
       const robberyChance = Math.random();
       let stolenCoins = 0;
+      let transfer = null;
 
-      if (robberyChance <= 0.5) {
-        stolenCoins = Math.floor(targetCoins.coins * (Math.random() * 0.5));
-        targetCoins.coins -= stolenCoins;
-        await targetCoins.save();
+      if (
+        robberyChance <= 0.5 &&
+        targetCoins &&
+        targetCoins.coins > 0
+      ) {
+        stolenCoins = Math.floor(
+          targetCoins.coins * (Math.random() * 0.5)
+        );
 
-        userCoins.coins += stolenCoins;
-        await userCoins.save();
+        if (stolenCoins > 0) {
+          try {
+            transfer = await transferCoins({
+              guildId,
+              senderId: targetUser.id,
+              recipientId: message.author.id,
+              source: 'coins',
+              amount: stolenCoins
+            });
+          } catch (error) {
+            if (
+              error instanceof InsufficientFundsError ||
+              error?.code === 'INSUFFICIENT_FUNDS'
+            ) {
+              stolenCoins = 0;
+            } else {
+              throw error;
+            }
+          }
+        }
+      }
 
+      if (transfer && stolenCoins > 0) {
         await sendStaffLog(
           message.guild,
           'economy-logs',
@@ -45,8 +69,8 @@ module.exports = {
             title: '🦹 Vol réussi',
             user: message.author,
             delta: stolenCoins,
-            pocket: userCoins.coins,
-            bank: userCoins.bank,
+            pocket: transfer.recipientDocument.coins,
+            bank: transfer.recipientDocument.bank,
             reason: '+rob',
             sourceChannel: message.channel,
             otherUser: targetUser
@@ -60,8 +84,8 @@ module.exports = {
             title: '💸 Coins volés',
             user: targetUser,
             delta: -stolenCoins,
-            pocket: targetCoins.coins,
-            bank: targetCoins.bank,
+            pocket: transfer.senderDocument.coins,
+            bank: transfer.senderDocument.bank,
             reason: '+rob',
             sourceChannel: message.channel,
             otherUser: message.author
