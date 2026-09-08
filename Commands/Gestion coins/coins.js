@@ -34,26 +34,22 @@ module.exports = {
       const rep = Number(userCoins.rep) || 0;
       const total = pocket + bank;
 
-      const displayName =
-        targetUser.globalName ||
-        targetUser.username;
-
-      const avatar = targetUser.displayAvatarURL({
-        dynamic: true
-      });
-
       const embed = new EmbedBuilder()
         .setAuthor({
-          name: displayName,
-          iconURL: avatar
+          name: targetUser.tag,
+          iconURL: targetUser.displayAvatarURL({ dynamic: true })
         })
-        .setColor(0x6b6de6)
         .setDescription(
-          `🪙 **${formatAmount(pocket)}**  \`${formatFullAmount(pocket)}\`\n` +
-          `🏦 **${formatAmount(bank)}**  \`${formatFullAmount(bank)}\`\n` +
-          `🔺 **${formatAmount(rep)}**  \`${formatFullAmount(rep)}\`\n\n` +
-          `💰 **${formatAmountPrecise(total)}**  \`${formatFullAmount(total)}\``
-        );
+          `🪙 **${formatAmount(pocket)}** \`${formatFullAmount(pocket)}\` coins en poche\n` +
+          `🏦 **${formatAmount(bank)}** \`${formatFullAmount(bank)}\` coins en banque\n` +
+          `🔺 **${formatAmount(rep)}** \`${formatFullAmount(rep)}\` Réputation\n` +
+          `💰 **${formatAmountPrecise(total)}** \`${formatFullAmount(total)}\` Fortune totale`
+        )
+        .setFooter({
+          text: 'Kuromi Coins',
+          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
+        })
+        .setColor(0x6b6de6);
 
       return message.reply({ embeds: [embed] });
     } catch (error) {
