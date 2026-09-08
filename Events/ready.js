@@ -12,6 +12,7 @@ const prefix = process.env.PREFIX || '+';
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
+const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
 const {
   DEFAULT_DYNAMIC_ACTIVITY,
   normalizeActivityTemplate,
@@ -37,10 +38,14 @@ function resolveActivityType(value) {
 
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
+  mongoose.set("autoIndex", false);
+
   await mongoose.connect(process.env.MONGODB).then(() => {
     console.log(colors.bold.magenta("Database • connection established"));
     console.log(colors.bold.magenta("0===========================0"));
   });
+
+  await ensureDatabaseIntegrity();
 
   const botInfo = await BotInfo.findOne();
 
