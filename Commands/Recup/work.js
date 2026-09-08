@@ -5,6 +5,7 @@ const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'work',
+  aliases: ['wk'],
   description: 'Gagnez des coins en travaillant.',
   async execute(message) {
     const guildId = message.guild.id;
