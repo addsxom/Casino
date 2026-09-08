@@ -1,17 +1,16 @@
 const UserCoins = require('../../Models/UserCoins.js');
-const Owner = require("../../Models/Owner.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildDiscordLog } = require('../../utils/staffLogs.js');
+
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 
 module.exports = {
   name: 'resetallusers',
   description: 'Réinitialiser tous les rep/coins des membres du serveur',
   async execute(message, args) {
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
+    if (!(await requireBotOwner(message))) return;
 
-    if (!isOwner) return;
-
-    try {
+try {
       const users = await UserCoins.find({ guildId: message.guild.id });
 
       const totalRemoved = users.reduce(
