@@ -15,6 +15,11 @@ const userRepCooldownSchema = new mongoose.Schema({
   },
 });
 
+userRepCooldownSchema.index(
+  { userId: 1, guildId: 1 },
+  { unique: true, name: 'rep_cooldown_user_guild_unique' }
+);
+
 const UserRepCooldown = mongoose.model('UserRepCooldown', userRepCooldownSchema);
 
 module.exports = UserRepCooldown;
