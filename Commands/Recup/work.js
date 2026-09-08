@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const UserWorkCooldown = require('../../Models/UserWorkCooldown.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'work',
@@ -38,6 +39,20 @@ module.exports = {
 
       userCoins.coins += coinsEarned;
       await userCoins.save();
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: '💼 Récompense de travail',
+          user: message.author,
+          delta: coinsEarned,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          reason: '+work / +wk',
+          sourceChannel: message.channel
+        })
+      );
 
       if (userWorkCooldown) {
         userWorkCooldown.cooldown = Date.now() + 60 * 60 * 1000;
