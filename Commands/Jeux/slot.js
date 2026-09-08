@@ -3,6 +3,7 @@ const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -70,6 +71,21 @@ module.exports = {
         userCoins.coins += amount * 2;
         await userCoins.save();
       }
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: result ? '🎰 Slots — Gain' : '🎰 Slots — Perte',
+          user: message.author,
+          delta: result ? amount : -amount,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          reason: '+slot',
+          sourceChannel: message.channel,
+          details: `Mise : ${formatAmount(amount)} • Résultat : ${result ? 'x2' : 'perdu'}`
+        })
+      );
 
       const resultEmbed = new EmbedBuilder()
         .setTitle(result ? '🎉 YOU WIN' : '💀 YOU LOSE')
