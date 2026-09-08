@@ -94,7 +94,7 @@ module.exports = {
 
     const featureText = helpFeatures
       .map(feature =>
-        `${feature.emoji} **${feature.title}**\n` +
+        `${feature.isNew ? '🆕 ' : ''}${feature.emoji} **${feature.title}**\n` +
         `-# ${feature.description}`
       )
       .join('\n\n');
