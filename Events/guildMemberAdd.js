@@ -13,6 +13,16 @@ module.exports = async (_bot, member) => {
       await member.guild.channels.fetch(WELCOME_CHANNEL_ID);
 
     if (welcomeChannel?.isTextBased?.()) {
+      const rulesChannel = member.guild.channels.cache.find(
+        channel =>
+          channel?.isTextBased?.() &&
+          String(channel.name || '').toLowerCase().endsWith('rules')
+      );
+
+      const rulesMention = rulesChannel
+        ? `${rulesChannel}`
+        : '**#rules**';
+
       const welcomeEmbed = new EmbedBuilder()
         .setColor(0x6b6de6)
         .setAuthor({
@@ -21,8 +31,9 @@ module.exports = async (_bot, member) => {
         })
         .setTitle(`👋 Bienvenue ${member.user.username} !`)
         .setDescription(
-          `${member.user}, bienvenue sur **${member.guild.name}** !\n` +
-          `On est heureux de t'accueillir parmi nous. 🎀`
+          `${member.user}, bienvenue sur **${member.guild.name}** ! 🎀\n\n` +
+          `Pour accéder au reste du serveur, rends-toi dans ${rulesMention}, ` +
+          `lis le règlement puis clique sur **✅ Accepter** pour recevoir le rôle **Member**.`
         )
         .setThumbnail(
           member.user.displayAvatarURL({
