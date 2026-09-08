@@ -9,13 +9,20 @@ const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 
 module.exports = async (bot) => {
+  console.log("[DEBUG READY] clientReady déclenché");
+
   mongoose.set("strictQuery", false);
+
+  console.log("[DEBUG READY] Connexion MongoDB...");
   await mongoose.connect(process.env.MONGODB).then(() => {
     console.log(colors.bold.magenta("Database • connection established"));
     console.log(colors.bold.magenta("0===========================0"));
   });
+  console.log("[DEBUG READY] MongoDB connecté");
 
+  console.log("[DEBUG READY] Recherche BotInfo...");
   const botInfo = await BotInfo.findOne();
+  console.log("[DEBUG READY] BotInfo chargé");
 
   const botName = botInfo ? botInfo.botName : "Kuromi-Coins 🎀";
   const activitytext = botInfo ? botInfo.activityText : "Kuromi-Coins 🎀";
@@ -43,7 +50,9 @@ module.exports = async (bot) => {
   let isBuyerInOwner = false;
   
   try {
+    console.log("[DEBUG READY] Vérification Owner...");
     isBuyerInOwner = await Owner.exists({ userId: BuyerID });
+    console.log("[DEBUG READY] Vérification Owner terminée");
   } catch (error) {
     console.error(`Erreur lors de la vérification de l\'ID ${BuyerID} dans la collection Owner:`, error);
     console.error(colors.bold.blue("0==================================================================================0"));
@@ -70,6 +79,7 @@ module.exports = async (bot) => {
   console.log(colors.bold.red(`${botName} • Online`));
   console.log(colors.bold.red("0===========================0"));
 
+  console.log("[DEBUG READY] Recherche du serveur...");
   const guild = bot.guilds.cache.get(guildId);
 
   if (!guild) {
@@ -77,13 +87,18 @@ module.exports = async (bot) => {
     return;
   }
 
+  console.log("[DEBUG READY] Connexion au salon vocal...");
+
   const connection = joinVoiceChannel({
     channelId: CHANNEL_ID,
     guildId: GUILD_ID,
     adapterCreator: guild.voiceAdapterCreator
   });
 
-  connection.on('stateChange', (_oldState, _newState) => {
+  console.log("[DEBUG READY] joinVoiceChannel appelé");
+
+  connection.on('stateChange', (oldState, newState) => {
+    console.log(`[DEBUG VOICE] ${oldState.status} -> ${newState.status}`);
   });
 };
 
