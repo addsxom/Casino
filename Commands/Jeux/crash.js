@@ -174,7 +174,7 @@ function buildCashoutRow() {
 module.exports = {
   name: 'crash',
   description:
-    'Misez des coins et cash out avant le crash.',
+    'Misez des coins et cash out avant le crash. Ajoutez `all` au nom pour miser toute votre poche.',
 
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
