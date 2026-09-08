@@ -2,7 +2,7 @@ const Discord = require("discord.js");
 
 module.exports = {
   name: "ping",
-  description: 'Répond avec "Pong!"',
+  description: 'Affiche le ping et la latence du bot.',
 
   async execute(message, args) {
     const botPing = Date.now() - message.createdTimestamp;
