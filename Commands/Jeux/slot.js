@@ -13,7 +13,7 @@ const LOSE_GIF = 'https://media.giphy.com/media/eJ4j2VnYOZU8qJU3Py/giphy.gif';
 
 module.exports = {
   name: 'slot',
-  description: 'Jouez aux machines à sous en misant des coins.',
+  description: 'Jouez aux machines à sous. Ajoutez `all` au nom pour miser toute votre poche.',
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
 
