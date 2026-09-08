@@ -8,7 +8,7 @@ const {
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
-const { debitBalance, creditBalance, getAccount } = require('../../utils/economyService.js');
+const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -176,31 +176,54 @@ module.exports = {
   description:
     'Misez des coins et cash out avant le crash.',
 
-  async execute(message, args) {
+  async execute(message, args, options = {}) {
     const guildId = message.guild.id;
-    const amount = parseAmount(args[0]);
+    const allIn = options.all === true;
+    let amount;
+    let userCoins;
 
-    if (
-      !Number.isInteger(amount) ||
-      amount <= 0
-    ) {
-      return message.reply(
-        '❌・Utilisation : **+crash <mise>**\n' +
-        'Exemple : **+crash 1000**'
+    if (allIn) {
+      const drained = await drainPocket(
+        message.author.id,
+        guildId
       );
-    }
 
-    let userCoins = await debitBalance({
-      userId: message.author.id,
-      guildId,
-      source: 'coins',
-      amount
-    });
+      if (!drained || drained.amount <= 0) {
+        return message.reply(
+          '❌・Vous n\'avez pas assez de coins pour cette mise.'
+        );
+      }
 
-    if (!userCoins) {
-      return message.reply(
-        '❌・Vous n\'avez pas assez de coins pour cette mise.'
+      amount = drained.amount;
+      userCoins = await getAccount(
+        message.author.id,
+        guildId
       );
+    } else {
+      amount = parseAmount(args[0]);
+
+      if (
+        !Number.isInteger(amount) ||
+        amount <= 0
+      ) {
+        return message.reply(
+          '❌・Utilisation : **+crash <mise>**\n' +
+          'Exemple : **+crash 1000**'
+        );
+      }
+
+      userCoins = await debitBalance({
+        userId: message.author.id,
+        guildId,
+        source: 'coins',
+        amount
+      });
+
+      if (!userCoins) {
+        return message.reply(
+          '❌・Vous n\'avez pas assez de coins pour cette mise.'
+        );
+      }
     }
 
     const game = {
@@ -291,7 +314,7 @@ module.exports = {
             delta: -game.amount,
             pocket: latestCoins.coins,
             bank: latestCoins.bank,
-            reason: '+crash',
+            reason: allIn ? '+crashall' : '+crash',
             sourceChannel: message.channel,
             details: `Mise : ${formatCoins(game.amount)} • Crash : x${game.crashPoint.toFixed(2)}`
           })
@@ -442,7 +465,7 @@ module.exports = {
               delta: game.payout - game.amount,
               pocket: userCoins.coins,
               bank: userCoins.bank,
-              reason: '+crash',
+              reason: allIn ? '+crashall' : '+crash',
               sourceChannel: message.channel,
               details:
                 `Mise : ${formatCoins(game.amount)} • ` +
