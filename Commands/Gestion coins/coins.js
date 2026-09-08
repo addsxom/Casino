@@ -15,6 +15,7 @@ function formatCompact(amount) {
     if (abs >= unit.value) {
       const compact = value / unit.value;
       const decimals = compact >= 100 ? 0 : compact >= 10 ? 1 : 2;
+
       return `${Number(compact.toFixed(decimals))}${unit.suffix}`;
     }
   }
@@ -22,9 +23,14 @@ function formatCompact(amount) {
   return String(value);
 }
 
+function formatFull(amount) {
+  return Number(amount || 0).toLocaleString('fr-FR');
+}
+
 module.exports = {
   name: 'coins',
   description: 'Affiche le solde de coins de l\'utilisateur.',
+
   async execute(message, args) {
     const guildId = message.guild.id;
 
@@ -36,41 +42,81 @@ module.exports = {
         targetUser = await message.client.users.fetch(userId, false);
       }
 
-      let userCoins = await UserCoins.findOne({ userId: targetUser.id, guildId });
+      let userCoins = await UserCoins.findOne({
+        userId: targetUser.id,
+        guildId
+      });
 
       if (!userCoins) {
-        userCoins = await UserCoins.create({ userId: targetUser.id, guildId });
+        userCoins = await UserCoins.create({
+          userId: targetUser.id,
+          guildId
+        });
       }
+
+      const pocket = Number(userCoins.coins) || 0;
+      const bank = Number(userCoins.bank) || 0;
+      const rep = Number(userCoins.rep) || 0;
+      const total = pocket + bank;
+
+      const displayName =
+        targetUser.globalName ||
+        targetUser.username;
+
+      const avatar = targetUser.displayAvatarURL({
+        dynamic: true,
+        size: 256
+      });
 
       const embed = new EmbedBuilder()
         .setAuthor({
-          name: targetUser.tag,
-          iconURL: targetUser.displayAvatarURL({ dynamic: true })
+          name: `Portefeuille de ${displayName}`,
+          iconURL: avatar
         })
-        .setTitle('📊 Profil financier')
-        .setDescription(
-          `🪙 **Poche**\n` +
-          `**${formatCompact(userCoins.coins)}**\n` +
-          `\`${Number(userCoins.coins).toLocaleString('fr-FR')}\`\n\n` +
-          `────────────\n\n` +
-          `🏦 **Banque**\n` +
-          `**${formatCompact(userCoins.bank)}**\n` +
-          `\`${Number(userCoins.bank).toLocaleString('fr-FR')}\`\n\n` +
-          `────────────\n\n` +
-          `🔺 **Réputation**\n` +
-          `**${formatCompact(userCoins.rep)}**\n` +
-          `\`${Number(userCoins.rep).toLocaleString('fr-FR')}\``
+        .setThumbnail(avatar)
+        .setColor(0x6b6de6)
+        .addFields(
+          {
+            name: '🪙 Poche',
+            value:
+              `## ${formatCompact(pocket)}\n` +
+              `\`${formatFull(pocket)}\``,
+            inline: true
+          },
+          {
+            name: '🏦 Banque',
+            value:
+              `## ${formatCompact(bank)}\n` +
+              `\`${formatFull(bank)}\``,
+            inline: true
+          },
+          {
+            name: '🔺 Réputation',
+            value:
+              `## ${formatCompact(rep)}\n` +
+              `\`${formatFull(rep)}\``,
+            inline: true
+          },
+          {
+            name: '💰 Fortune totale',
+            value:
+              `**${formatCompact(total)} coins**  •  ` +
+              `\`${formatFull(total)}\``,
+            inline: false
+          }
         )
         .setFooter({
           text: 'Kuromi Coins',
           iconURL: message.client.user.displayAvatarURL({ dynamic: true })
-        })
-        .setColor(0x6b6de6);
+        });
 
-      message.reply({ embeds: [embed] });
+      return message.reply({ embeds: [embed] });
     } catch (error) {
       console.error(error);
-      message.reply('Une erreur s\'est produite lors de la récupération des coins.');
+
+      return message.reply(
+        'Une erreur s\'est produite lors de la récupération des coins.'
+      );
     }
   },
 };
