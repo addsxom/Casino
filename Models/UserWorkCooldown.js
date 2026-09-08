@@ -15,6 +15,11 @@ const userWorkCooldownSchema = new mongoose.Schema({
   },
 });
 
+userWorkCooldownSchema.index(
+  { userId: 1, guildId: 1 },
+  { unique: true, name: 'work_cooldown_user_guild_unique' }
+);
+
 const userWorkCooldown = mongoose.model('userWorkCooldown', userWorkCooldownSchema);
 
 module.exports = userWorkCooldown;
