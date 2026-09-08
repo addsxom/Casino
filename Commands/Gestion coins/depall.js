@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildEconomyLog } = require('../../utils/staffLogs.js');
 const UserCoins = require('../../Models/UserCoins.js');
 
 module.exports = {
@@ -20,6 +21,20 @@ module.exports = {
       userCoins.coins = 0;
       userCoins.bank += amountToDeposit;
       await userCoins.save();
+
+      await sendStaffLog(
+        message.guild,
+        'deposit-logs',
+        buildEconomyLog({
+          title: '📥 Dépôt total en banque',
+          user: message.author,
+          amount: amountToDeposit,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          sourceChannel: message.channel,
+          color: 0x57f287
+        })
+      );
 
       return message.reply(`🏦・Vous avez déposé **${formatAmount(amountToDeposit)}** dans votre banque.`)
 
