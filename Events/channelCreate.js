@@ -9,11 +9,7 @@ module.exports = async (_bot, channel) => {
     buildDiscordLog({
       title: '➕ Salon créé',
       description: `${channel} **${channel.name}**`,
-      color: 0x57f287,
-      fields: [
-        { name: 'ID', value: `\`${channel.id}\``, inline: true },
-        { name: 'Type', value: `${channel.type}`, inline: true }
-      ]
+      color: 0x57f287
     })
   );
 };
