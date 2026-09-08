@@ -8,6 +8,7 @@ const prefix = process.env.PREFIX;
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
+const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
 
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
@@ -79,6 +80,14 @@ module.exports = async (bot) => {
   }
 
   await updateMemberCount(guild);
+
+  // Sécurité : resynchronise aussi le compteur périodiquement
+  // au cas où un événement Discord aurait été manqué.
+  setInterval(() => {
+    updateMemberCount(guild).catch(error => {
+      console.error('Erreur resynchronisation compteur membres :', error);
+    });
+  }, MEMBER_COUNT_RESYNC_MS);
 
   const connection = joinVoiceChannel({
     channelId: CHANNEL_ID,
