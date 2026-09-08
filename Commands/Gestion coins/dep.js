@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildEconomyLog } = require('../../utils/staffLogs.js');
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 
@@ -30,7 +31,21 @@ module.exports = {
       userCoins.bank += amountToDeposit;
       await userCoins.save();
 
-        return message.reply(`🏦・Vous avez déposé **${formatAmount(amountToDeposit)}** coins dans votre banque.`)
+      await sendStaffLog(
+        message.guild,
+        'deposit-logs',
+        buildEconomyLog({
+          title: '📥 Dépôt en banque',
+          user: message.author,
+          amount: amountToDeposit,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          sourceChannel: message.channel,
+          color: 0x57f287
+        })
+      );
+
+      return message.reply(`🏦・Vous avez déposé **${formatAmount(amountToDeposit)}** coins dans votre banque.`)
 
     } catch (error) {
       console.error(error);
