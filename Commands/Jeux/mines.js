@@ -17,6 +17,7 @@ const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../
 
 const MINES_CHANNEL_ID = '1546311653564620899';
 const BONUS_CHANCE = 0.10;
+const BONUS_BALANCE_FACTOR = 1 + BONUS_CHANCE;
 const REVEAL_COST_PERCENT = 0.20;
 const REVEAL_COOLDOWN_MS = 2 * 60 * 1000;
 
@@ -969,14 +970,16 @@ module.exports = {
         );
 
         const normalIncrease = nextBase - previousBase;
+        const balancedIncrease =
+          normalIncrease / BONUS_BALANCE_FACTOR;
 
         game.safeOpened++;
 
         if (game.bonusPositions.has(index)) {
-          game.currentMultiplier += normalIncrease * 2;
+          game.currentMultiplier += balancedIncrease * 2;
           game.bonusOpened++;
         } else {
-          game.currentMultiplier += normalIncrease;
+          game.currentMultiplier += balancedIncrease;
         }
 
         const safeCells = game.totalCells - game.mode.mines;
