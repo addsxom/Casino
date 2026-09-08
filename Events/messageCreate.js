@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 const ServerPrefix = require("../Models/ServerPrefix");
 const UserCoins = require("../Models/UserCoins");
 const { formatAmount } = require("../utils/formatAmount.js");
+const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
 
 // Créez un ensemble pour stocker les utilisateurs ayant déjà reçu des pièces pour la session actuelle
 const usersReceivedCoins = new Set();
@@ -72,6 +73,20 @@ module.exports = async (bot, message) => {
           const thresholdResult = await userCoins.checkMessageThreshold();
       
           if (thresholdResult) {
+            await sendStaffLog(
+              message.guild,
+              'economy-logs',
+              buildCoinMovementLog({
+                title: '💬 Récompense de messages',
+                user: message.author,
+                delta: thresholdResult.coins,
+                pocket: userCoins.coins,
+                bank: userCoins.bank,
+                reason: `${thresholdResult.threshold} messages atteints`,
+                sourceChannel: message.channel
+              })
+            );
+
             const channel = message.guild.channels.cache.get('1132784655817519225');
             if (channel) {
               channel.send(`${message.author}, vous avez gagné ${formatAmount(thresholdResult.coins)} coins dans votre banque pour avoir atteint ${thresholdResult.threshold} messages !`);
