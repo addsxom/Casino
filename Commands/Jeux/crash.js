@@ -8,6 +8,7 @@ const {
 const UserCoins = require('../../Models/UserCoins.js');
 const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
 const parseAmount = require('../../utils/parseAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 const HOUSE_EDGE = 0.03;
 const MAX_CRASH = 100;
@@ -275,6 +276,28 @@ module.exports = {
         ],
         components: []
       }).catch(() => {});
+
+      const latestCoins = await UserCoins.findOne({
+        userId: message.author.id,
+        guildId
+      });
+
+      if (latestCoins) {
+        await sendStaffLog(
+          message.guild,
+          'economy-logs',
+          buildCoinMovementLog({
+            title: '🚀 Crash — Perte',
+            user: message.author,
+            delta: -game.amount,
+            pocket: latestCoins.coins,
+            bank: latestCoins.bank,
+            reason: '+crash',
+            sourceChannel: message.channel,
+            details: `Mise : ${formatCoins(game.amount)} • Crash : x${game.crashPoint.toFixed(2)}`
+          })
+        );
+      }
     };
 
     const liveTimer = setInterval(() => {
@@ -414,6 +437,24 @@ module.exports = {
             game.payout;
 
           await userCoins.save();
+
+          await sendStaffLog(
+            message.guild,
+            'economy-logs',
+            buildCoinMovementLog({
+              title: '🚀 Crash — Cash Out',
+              user: message.author,
+              delta: game.payout - game.amount,
+              pocket: userCoins.coins,
+              bank: userCoins.bank,
+              reason: '+crash',
+              sourceChannel: message.channel,
+              details:
+                `Mise : ${formatCoins(game.amount)} • ` +
+                `Payout : ${formatCoins(game.payout)} • ` +
+                `x${game.cashoutMultiplier.toFixed(2)}`
+            })
+          );
         }
       }
     );
