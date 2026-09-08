@@ -27,6 +27,11 @@ const userCoinsSchema = new mongoose.Schema({
   },
 });
 
+userCoinsSchema.index(
+  { userId: 1, guildId: 1 },
+  { unique: true, name: 'user_coins_user_guild_unique' }
+);
+
 userCoinsSchema.methods.checkMessageThreshold = async function () {
   const messageThresholds = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000];
   const coinsPerThresholds = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000];
