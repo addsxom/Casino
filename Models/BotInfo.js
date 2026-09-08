@@ -15,7 +15,7 @@ const botInfoSchema = new mongoose.Schema({
   },
   activityText2: {
     type: String,
-    default: "${prefix}help for ${bot.guilds.cache.reduce((acc, guild) => acc + guild.memberCount,0)} users!"
+    default: "{prefix}help for {users} users!"
   },
   status: {
     type: String,
