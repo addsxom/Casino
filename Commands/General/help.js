@@ -92,28 +92,6 @@ module.exports = {
 
     const embeds = [];
 
-    const featureText = helpFeatures
-      .map(feature =>
-        `${feature.isNew ? '🆕 ' : ''}${feature.emoji} **${feature.title}**\n` +
-        `-# ${feature.description}`
-      )
-      .join('\n\n');
-
-    embeds.push(
-      new EmbedBuilder()
-        .setTitle('✨ Kuromi Coins — Aide')
-        .setDescription(
-          `**${commands.length} commandes chargées** • Préfixe : \`${prefix}\`\n\n` +
-          'Toutes les commandes ajoutées au bot apparaissent automatiquement dans ce menu.\n\n' +
-          featureText
-        )
-        .setColor(0x6b6de6)
-        .setFooter({
-          text: 'Fonctionnalités • Utilise les flèches pour voir les commandes',
-          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
-        })
-    );
-
     const preferredOrder = [
       'General',
       'Recup',
@@ -166,6 +144,23 @@ module.exports = {
           })
       );
     }
+
+    const featureText = helpFeatures
+      .map(feature =>
+        `${feature.emoji} **${feature.title}** — ${feature.description}`
+      )
+      .join('\n\n');
+
+    embeds.push(
+      new EmbedBuilder()
+        .setTitle('⚙️ Fonctionnalités')
+        .setDescription(featureText)
+        .setColor(0x6b6de6)
+        .setFooter({
+          text: `Fonctionnalités disponibles • Préfixe : ${prefix}`,
+          iconURL: message.client.user.displayAvatarURL({ dynamic: true })
+        })
+    );
 
     let currentPage = 0;
     const totalPages = embeds.length;
