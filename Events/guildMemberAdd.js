@@ -32,12 +32,9 @@ module.exports = async (_bot, member) => {
         .setTitle(`👋 Bienvenue ${member.user.username} !`)
         .setDescription(
           `${member.user}, bienvenue sur **${member.guild.name}** ! 🎀\n\n` +
-          `Avant de commencer, prends quelques secondes pour lire le règlement du serveur.\n\n` +
-          `📜 Rendez-vous dans ${rulesMention}\n` +
-          `✅ Lis le règlement puis clique sur **Accepter**\n` +
-          `🎟️ Tu recevras automatiquement le rôle **Member**\n` +
-          `🔓 Tu auras ensuite accès au reste du serveur\n\n` +
-          `**Bonne découverte et amuse-toi bien parmi nous !**`
+          `Avant de commencer, rends-toi dans ${rulesMention} pour lire le règlement.\n` +
+          `Clique ensuite sur **✅ Accepter** pour recevoir le rôle **Member** et accéder au reste du serveur.\n\n` +
+          `**Bonne découverte parmi nous !**`
         )
         .setThumbnail(
           member.user.displayAvatarURL({
