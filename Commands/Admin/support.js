@@ -8,6 +8,12 @@ const {
 
 const { TICKET_TYPES } = require('../../utils/ticketSystem.js');
 
+function getButtonStyle(key) {
+  if (key === 'general') return ButtonStyle.Primary;
+  if (key === 'report') return ButtonStyle.Danger;
+  return ButtonStyle.Secondary;
+}
+
 module.exports = {
   name: 'support',
   description: 'Envoie le panneau de support dans le salon actuel.',
@@ -22,11 +28,19 @@ module.exports = {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle('🎫 Support')
+      .setTitle('🎫 BESOIN D’AIDE ?')
       .setDescription(
-        'Besoin d\'aide ? Choisis la raison de ton ticket avec un bouton ci-dessous.\n\n' +
-        'Un salon privé sera créé automatiquement et sera visible uniquement par toi et le staff.'
+        '**Notre équipe est là pour vous aider.**\n\n' +
+        'Choisis simplement la raison de ta demande avec l’un des boutons ci-dessous. ' +
+        'Un ticket privé sera créé pour que tu puisses échanger directement avec le staff.'
       )
+      .addFields({
+        name: 'Avant d’ouvrir un ticket',
+        value:
+          '• Choisis la catégorie qui correspond le mieux à ta demande.\n' +
+          '• Explique clairement ton problème une fois le ticket ouvert.\n' +
+          '• Évite d’ouvrir plusieurs tickets pour la même demande.'
+      })
       .setColor(0x6b6de6)
       .setFooter({
         text: 'Kuromi Support',
@@ -41,7 +55,7 @@ module.exports = {
           .setCustomId(`ticket_open_${key}`)
           .setLabel(type.label)
           .setEmoji(type.emoji)
-          .setStyle(ButtonStyle.Secondary)
+          .setStyle(getButtonStyle(key))
       );
     }
 
