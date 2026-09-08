@@ -399,6 +399,39 @@ async function incrementAccountField({
   }
 }
 
+async function claimMessageMilestone({
+  userId,
+  guildId,
+  threshold,
+  amount
+}) {
+  threshold = validateAmount(threshold);
+  amount = validateAmount(amount);
+
+  return UserCoins.findOneAndUpdate(
+    {
+      userId,
+      guildId,
+      messages: { $gte: threshold },
+      $or: [
+        { messageRewardThreshold: { $lt: threshold } },
+        { messageRewardThreshold: { $exists: false } }
+      ]
+    },
+    {
+      $set: {
+        messageRewardThreshold: threshold
+      },
+      $inc: {
+        bank: amount
+      }
+    },
+    {
+      new: true
+    }
+  );
+}
+
 async function removeUpTo({
   userId,
   guildId,
@@ -493,6 +526,7 @@ module.exports = {
   drainPocket,
   transferCoins,
   incrementAccountField,
+  claimMessageMilestone,
   removeUpTo,
   resetAccount
 };
