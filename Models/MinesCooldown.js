@@ -17,7 +17,7 @@ const minesCooldownSchema = new mongoose.Schema({
 
 minesCooldownSchema.index(
   { userId: 1, guildId: 1 },
-  { unique: true, name: 'mines_cooldown_user_guild_unique' }
+  { unique: true }
 );
 
 module.exports = mongoose.model('MinesCooldown', minesCooldownSchema);
