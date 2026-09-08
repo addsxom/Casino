@@ -1,5 +1,6 @@
 const ServerPrefix = require("../../Models/ServerPrefix");
-const Owner = require("../../Models/Owner.js");
+
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 
 module.exports = {
   name: "setprefix",
@@ -7,12 +8,9 @@ module.exports = {
   async execute(message, args) {
     const server = message.guild;
     if (!server) return;
+    if (!(await requireBotOwner(message))) return;
 
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
-
-    if (!isOwner) return;
-
-    const newPrefix = args[0];
+const newPrefix = args[0];
 
     if (!newPrefix) {
       return message.channel.send("Veuillez fournir un nouveau préfixe.");
