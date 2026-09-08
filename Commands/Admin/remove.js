@@ -57,7 +57,7 @@ module.exports = {
             bank: userCoins.bank,
             reason: 'Retrait admin depuis la banque',
             sourceChannel: message.channel,
-            otherUser: message.author
+            actor: message.author
           })
         );
 
@@ -78,7 +78,7 @@ module.exports = {
             bank: userCoins.bank,
             reason: 'Retrait admin depuis la poche',
             sourceChannel: message.channel,
-            otherUser: message.author
+            actor: message.author
           })
         );
 

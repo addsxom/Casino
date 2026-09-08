@@ -47,7 +47,7 @@ module.exports = {
             bank: 0,
             reason: '+reset',
             sourceChannel: message.channel,
-            otherUser: message.author
+            actor: message.author
           })
         );
       }

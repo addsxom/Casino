@@ -55,7 +55,7 @@ module.exports = {
             bank: userCoins.bank,
             reason: 'Ajout admin dans la banque',
             sourceChannel: message.channel,
-            otherUser: message.author
+            actor: message.author
           })
         );
 
@@ -75,7 +75,7 @@ module.exports = {
             bank: userCoins.bank,
             reason: 'Ajout admin dans la poche',
             sourceChannel: message.channel,
-            otherUser: message.author
+            actor: message.author
           })
         );
 

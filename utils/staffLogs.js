@@ -53,7 +53,8 @@ function buildCoinMovementLog({
   pocket,
   bank,
   reason,
-  details = null
+  details = null,
+  actor = null
 }) {
   const amount = Math.abs(Number(delta) || 0);
   const isGain = delta > 0;
@@ -70,6 +71,10 @@ function buildCoinMovementLog({
 
   if (details) {
     description += `\n-# ${details}`;
+  }
+
+  if (actor) {
+    description += `\n-# Effectué par ${actor}`;
   }
 
   description +=
