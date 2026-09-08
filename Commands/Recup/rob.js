@@ -68,6 +68,137 @@ async function getProtection(userId, guildId) {
   };
 }
 
+function buildSuccessEmbed({
+  message,
+  targetUser,
+  stolenCoins,
+  stolenPercent,
+  jackpot
+}) {
+  return new EmbedBuilder()
+    .setTitle(
+      jackpot
+        ? '💎 JACKPOT ROB'
+        : '🦹 BRAQUAGE RÉUSSI'
+    )
+    .setDescription(
+      `${message.author} a réussi son braquage contre ${targetUser}.`
+    )
+    .setThumbnail(
+      targetUser.displayAvatarURL({
+        dynamic: true
+      })
+    )
+    .addFields(
+      {
+        name: '💰 Butin',
+        value: `**${formatAmount(stolenCoins)} coins**`,
+        inline: true
+      },
+      {
+        name: '📊 Part volée',
+        value: `**${stolenPercent}%** de sa poche`,
+        inline: true
+      },
+      {
+        name: '🎲 Type de braquage',
+        value: jackpot
+          ? '💎 **JACKPOT**\n-# Chance spéciale : 5%'
+          : '🎯 **Classique**\n-# Plage normale : 1% à 40%',
+        inline: true
+      },
+      {
+        name: '🛡️ Protection de la victime',
+        value:
+          'La victime est maintenant **invulnérable pendant 1 heure**.',
+        inline: false
+      },
+      {
+        name: '⏳ Prochaine tentative',
+        value:
+          'Ton prochain +rob sera disponible dans **2 heures**.',
+        inline: false
+      }
+    )
+    .setColor(
+      jackpot
+        ? 0xf1c40f
+        : 0x57f287
+    )
+    .setFooter({
+      text: 'Kuromi Coins • Système de braquage',
+      iconURL:
+        message.client.user.displayAvatarURL({
+          dynamic: true
+        })
+    })
+    .setTimestamp();
+}
+
+function buildFailureEmbed({
+  message,
+  targetUser,
+  fineApplied,
+  finePercent,
+  fineAmount,
+  robberCoins
+}) {
+  const fineText = fineApplied
+    ? fineAmount > 0
+      ? `**-${formatAmount(fineAmount)} coins**\n-# Amende : ${finePercent}% de ta poche`
+      : `**0 coin payé**\n-# Amende tirée : ${finePercent}%, mais ta poche était vide`
+    : '**Aucune amende**\n-# Tu as eu de la chance cette fois-ci';
+
+  return new EmbedBuilder()
+    .setTitle('🚔 BRAQUAGE RATÉ')
+    .setDescription(
+      `${message.author} n’a pas réussi à braquer ${targetUser}.`
+    )
+    .setThumbnail(
+      targetUser.displayAvatarURL({
+        dynamic: true
+      })
+    )
+    .addFields(
+      {
+        name: '🎯 Résultat',
+        value: '**Échec du braquage**',
+        inline: true
+      },
+      {
+        name: '🚨 Sanction',
+        value: fineText,
+        inline: true
+      },
+      {
+        name: '🪙 Ta poche après le braquage',
+        value: `**${formatAmount(robberCoins.coins)} coins**`,
+        inline: true
+      },
+      {
+        name: '🛡️ Victime',
+        value:
+          'La victime **ne reçoit pas de protection** après une tentative ratée.',
+        inline: false
+      },
+      {
+        name: '⏳ Prochaine tentative',
+        value:
+          'Ton prochain +rob sera disponible dans **2 heures**.',
+        inline: false
+      }
+    )
+    .setColor(0xed4245)
+    .setFooter({
+      text: 'Kuromi Coins • Système de braquage',
+      iconURL:
+        message.client.user.displayAvatarURL({
+          dynamic: true
+        })
+    })
+    .setTimestamp();
+}
+
 module.exports = {
   name: 'rob',
   description: 'Tentez de voler les coins en poche d’un utilisateur.',
@@ -283,40 +414,13 @@ module.exports = {
           })
         );
 
-        const embed = new EmbedBuilder()
-          .setTitle(
-            jackpot
-              ? '💎 JACKPOT ROB !'
-              : '🦹 BRAQUAGE RÉUSSI'
-          )
-          .setAuthor({
-            name: targetUser.tag,
-            iconURL: targetUser.displayAvatarURL({
-              dynamic: true
-            })
-          })
-          .setDescription(
-            `🎯 **Réussite !**\n` +
-            `💰 Tu as volé **${formatAmount(stolenCoins)} coins** à ${targetUser}.\n` +
-            `📊 Pourcentage volé : **${stolenPercent}%**\n` +
-            (jackpot
-              ? '💎 **JACKPOT !** Tu es tombé sur le vol rare à 5%.\n'
-              : '') +
-            '🛡️ La victime est maintenant protégée pendant **1h**.\n' +
-            '⏳ Ton prochain rob sera disponible dans **2h**.'
-          )
-          .setColor(
-            jackpot
-              ? 0xf1c40f
-              : 0x57f287
-          )
-          .setFooter({
-            text: 'Kuromi Coins',
-            iconURL:
-              message.client.user.displayAvatarURL({
-                dynamic: true
-              })
-          });
+        const embed = buildSuccessEmbed({
+          message,
+          targetUser,
+          stolenCoins,
+          stolenPercent,
+          jackpot
+        });
 
         return message.reply({
           embeds: [embed]
@@ -388,31 +492,14 @@ module.exports = {
         })
       );
 
-      const embed = new EmbedBuilder()
-        .setTitle('🚔 BRAQUAGE RATÉ')
-        .setAuthor({
-          name: targetUser.tag,
-          iconURL: targetUser.displayAvatarURL({
-            dynamic: true
-          })
-        })
-        .setDescription(
-          `❌ Tu n’as pas réussi à voler ${targetUser}.\n` +
-          (fineApplied
-            ? fineAmount > 0
-              ? `🚨 Tu as reçu une amende de **${finePercent}%**, soit **${formatAmount(fineAmount)} coins**.\n`
-              : `🚨 Tu as tiré une amende de **${finePercent}%**, mais tu n’avais aucun coin en poche à payer.\n`
-            : '🍀 Tu as évité l’amende cette fois-ci.\n') +
-          '⏳ Ton prochain rob sera disponible dans **2h**.'
-        )
-        .setColor(0xed4245)
-        .setFooter({
-          text: 'Kuromi Coins',
-          iconURL:
-            message.client.user.displayAvatarURL({
-              dynamic: true
-            })
-        });
+      const embed = buildFailureEmbed({
+        message,
+        targetUser,
+        fineApplied,
+        finePercent,
+        fineAmount,
+        robberCoins
+      });
 
       return message.reply({
         embeds: [embed]
