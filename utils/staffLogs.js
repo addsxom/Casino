@@ -24,8 +24,14 @@ function findStaffLogChannel(guild, key) {
 
 async function sendStaffLog(guild, key, embed) {
   try {
-    const channel = findStaffLogChannel(guild, key);
-    if (!channel) return false;
+    const channelId = STAFF_LOG_CHANNELS[key];
+    if (!guild || !channelId) return false;
+
+    const channel =
+      findStaffLogChannel(guild, key) ||
+      await guild.channels.fetch(channelId).catch(() => null);
+
+    if (!channel?.isTextBased?.()) return false;
 
     await channel.send({ embeds: [embed] });
     return true;
