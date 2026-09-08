@@ -2,7 +2,8 @@ const {
   EmbedBuilder,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  MessageFlags
 } = require("discord.js");
 
 const UserCoins = require('../../Models/UserCoins.js');
@@ -123,7 +124,7 @@ module.exports = {
           if (interaction.user.id !== message.author.id) {
             return interaction.reply({
               content: '❌・Ce bouton ne vous appartient pas.',
-              ephemeral: true
+              flags: MessageFlags.Ephemeral
             }).catch(() => {});
           }
 
