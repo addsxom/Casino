@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
+const parseAmount = require('../../utils/parseAmount.js');
 
 module.exports = {
   name: 'ret',
@@ -8,7 +9,7 @@ module.exports = {
     const guildId = message.guild.id;
 
     try {
-      const amountToWithdraw = parseInt(args[0]);
+      const amountToWithdraw = parseAmount(args[0]);
 
       if (isNaN(amountToWithdraw) || amountToWithdraw <= 0) {
         return message.reply('❓・Veuillez fournir un montant valide à retirer.');
