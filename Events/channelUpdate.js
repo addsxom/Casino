@@ -7,19 +7,13 @@ module.exports = async (_bot, oldChannel, newChannel) => {
   const changes = [];
 
   if (oldChannel.name !== newChannel.name) {
-    changes.push({
-      name: 'Nom',
-      value: `${oldChannel.name} → ${newChannel.name}`,
-      inline: false
-    });
+    changes.push(`**Nom :** ${oldChannel.name} → ${newChannel.name}`);
   }
 
   if (oldChannel.parentId !== newChannel.parentId) {
-    changes.push({
-      name: 'Catégorie',
-      value: `${oldChannel.parent?.name || 'Aucune'} → ${newChannel.parent?.name || 'Aucune'}`,
-      inline: false
-    });
+    changes.push(
+      `**Catégorie :** ${oldChannel.parent?.name || 'Aucune'} → ${newChannel.parent?.name || 'Aucune'}`
+    );
   }
 
   if (!changes.length) return;
@@ -29,9 +23,8 @@ module.exports = async (_bot, oldChannel, newChannel) => {
     'discord-logs',
     buildDiscordLog({
       title: '⚙️ Salon modifié',
-      description: `${newChannel} • \`${newChannel.id}\``,
-      color: 0x5865f2,
-      fields: changes
+      description: `${newChannel}\n${changes.join('\n')}`,
+      color: 0x5865f2
     })
   );
 };
