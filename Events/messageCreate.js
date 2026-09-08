@@ -1,12 +1,15 @@
 const Discord = require("discord.js");
 const ServerPrefix = require("../Models/ServerPrefix");
-const { incrementAccountField } = require("../utils/economyService.js");
-const { formatAmount } = require("../utils/formatAmount.js");
+const {
+  incrementAccountField,
+  claimMessageMilestone
+} = require("../utils/economyService.js");
+const {
+  getReachedMessageReward,
+  sendMessageRewardNotification
+} = require("../utils/rewardService.js");
 const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
 const { cacheMessage } = require("../utils/messageCache.js");
-
-// Créez un ensemble pour stocker les utilisateurs ayant déjà reçu des pièces pour la session actuelle
-const usersReceivedCoins = new Set();
 
 module.exports = async (bot, message) => {
   cacheMessage(message);
@@ -85,27 +88,50 @@ module.exports = async (bot, message) => {
             field: 'messages',
             amount: 1
           });
-      
-          const thresholdResult = await userCoins.checkMessageThreshold();
-      
-          if (thresholdResult) {
-            await sendStaffLog(
-              message.guild,
-              'economy-logs',
-              buildCoinMovementLog({
-                title: '💬 Récompense de messages',
-                user: message.author,
-                delta: thresholdResult.coins,
-                pocket: userCoins.coins,
-                bank: userCoins.bank,
-                reason: `${thresholdResult.threshold} messages atteints`,
-                sourceChannel: message.channel
-              })
-            );
 
-            const channel = message.guild.channels.cache.get('1132784655817519225');
-            if (channel) {
-              channel.send(`${message.author}, vous avez gagné ${formatAmount(thresholdResult.coins)} coins dans votre banque pour avoir atteint ${thresholdResult.threshold} messages !`);
+          const reward =
+            getReachedMessageReward(userCoins.messages);
+
+          if (
+            reward &&
+            (Number(userCoins.messageRewardThreshold) || 0) <
+              reward.threshold
+          ) {
+            const rewardedAccount =
+              await claimMessageMilestone({
+                userId: message.author.id,
+                guildId: message.guild.id,
+                threshold: reward.threshold,
+                amount: reward.coins
+              });
+
+            if (rewardedAccount) {
+              await sendStaffLog(
+                message.guild,
+                'economy-logs',
+                buildCoinMovementLog({
+                  title: '💬 Récompense de messages',
+                  user: message.author,
+                  delta: reward.coins,
+                  pocket: rewardedAccount.coins,
+                  bank: rewardedAccount.bank,
+                  reason:
+                    `${reward.threshold} messages atteints`,
+                  sourceChannel: message.channel
+                })
+              );
+
+              await sendMessageRewardNotification({
+                guild: message.guild,
+                user: message.author,
+                reward,
+                account: rewardedAccount
+              }).catch(error => {
+                console.error(
+                  'Erreur notification récompense message :',
+                  error
+                );
+              });
             }
           }
         }
