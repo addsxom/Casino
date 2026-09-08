@@ -4,6 +4,12 @@ const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
+const {
+  tryAcquireActiveGame,
+  updateActiveGame,
+  releaseActiveGame,
+  buildActiveGameEmbed
+} = require('../../utils/activeGameLock.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -16,6 +22,8 @@ module.exports = {
   description: 'Jouez aux machines à sous. Ajoutez `all` au nom pour miser toute votre poche.',
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
+    const userId = message.author.id;
+    let activeGameToken = null;
 
     if (message.channel.id !== SLOT_CHANNEL_ID) {
       const warningMessage = await message.reply(
@@ -40,24 +48,7 @@ module.exports = {
       let amount;
       let userCoins;
 
-      if (allIn) {
-        const drained = await drainPocket(
-          message.author.id,
-          guildId
-        );
-
-        if (!drained || drained.amount <= 0) {
-          return message.reply(
-            '❌・Vous n\'avez pas assez de coins pour jouer.'
-          );
-        }
-
-        amount = drained.amount;
-        userCoins = await getAccount(
-          message.author.id,
-          guildId
-        );
-      } else {
+      if (!allIn) {
         amount = parseAmount(args[0]);
 
         if (isNaN(amount) || amount <= 0) {
@@ -65,15 +56,68 @@ module.exports = {
             '❌・Veuillez miser un montant valide de coins.'
           );
         }
+      }
 
+      const activeGame = tryAcquireActiveGame({
+        userId,
+        guildId,
+        game: allIn ? 'Slots ALL' : 'Slots',
+        channelId: message.channel.id
+      });
+
+      if (!activeGame.acquired) {
+        return message.reply({
+          embeds: [
+            buildActiveGameEmbed(
+              message,
+              activeGame.activeGame
+            )
+          ]
+        });
+      }
+
+      activeGameToken = activeGame.token;
+
+      if (allIn) {
+        const drained = await drainPocket(
+          userId,
+          guildId
+        );
+
+        if (!drained || drained.amount <= 0) {
+          releaseActiveGame({
+            userId,
+            guildId,
+            token: activeGameToken
+          });
+          activeGameToken = null;
+
+          return message.reply(
+            '❌・Vous n\'avez pas assez de coins pour jouer.'
+          );
+        }
+
+        amount = drained.amount;
+        userCoins = await getAccount(
+          userId,
+          guildId
+        );
+      } else {
         userCoins = await debitBalance({
-          userId: message.author.id,
+          userId,
           guildId,
           source: 'coins',
           amount
         });
 
         if (!userCoins) {
+          releaseActiveGame({
+            userId,
+            guildId,
+            token: activeGameToken
+          });
+          activeGameToken = null;
+
           return message.reply(
             '❌・Vous n\'avez pas assez de coins pour jouer.'
           );
@@ -95,6 +139,14 @@ module.exports = {
         .setColor(0x6b6de6);
 
       const sentEmbed = await message.reply({ embeds: [slotEmbed] });
+
+      updateActiveGame({
+        userId,
+        guildId,
+        token: activeGameToken,
+        channelId: message.channel.id,
+        messageId: sentEmbed.id
+      });
 
       await sleep(5000);
 
@@ -141,7 +193,23 @@ module.exports = {
         .setColor(result ? 0x4caf50 : 0xe91e63);
 
       await sentEmbed.edit({ embeds: [resultEmbed] });
+
+      releaseActiveGame({
+        userId,
+        guildId,
+        token: activeGameToken
+      });
+      activeGameToken = null;
     } catch (error) {
+      if (activeGameToken) {
+        releaseActiveGame({
+          userId,
+          guildId,
+          token: activeGameToken
+        });
+        activeGameToken = null;
+      }
+
       console.error(error);
       message.reply('Une erreur s\'est produite lors du jeu aux machines à sous.');
     }
