@@ -44,7 +44,8 @@ async function mergeUserCoinDuplicates() {
         coins: { $sum: { $ifNull: ['$coins', 0] } },
         bank: { $sum: { $ifNull: ['$bank', 0] } },
         rep: { $sum: { $ifNull: ['$rep', 0] } },
-        messages: { $sum: { $ifNull: ['$messages', 0] } }
+        messages: { $sum: { $ifNull: ['$messages', 0] } },
+        messageRewardThreshold: { $max: { $ifNull: ['$messageRewardThreshold', 0] } }
       }
     },
     {
@@ -64,7 +65,8 @@ async function mergeUserCoinDuplicates() {
           coins: duplicate.coins,
           bank: duplicate.bank,
           rep: duplicate.rep,
-          messages: duplicate.messages
+          messages: duplicate.messages,
+          messageRewardThreshold: duplicate.messageRewardThreshold
         }
       }
     );
