@@ -3,7 +3,7 @@ const parseAmount = require('../../utils/parseAmount.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
-const { debitBalance, creditBalance, getAccount } = require('../../utils/economyService.js');
+const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -14,7 +14,7 @@ const LOSE_GIF = 'https://media.giphy.com/media/eJ4j2VnYOZU8qJU3Py/giphy.gif';
 module.exports = {
   name: 'slot',
   description: 'Jouez aux machines à sous en misant des coins.',
-  async execute(message, args) {
+  async execute(message, args, options = {}) {
     const guildId = message.guild.id;
 
     if (message.channel.id !== SLOT_CHANNEL_ID) {
@@ -36,26 +36,57 @@ module.exports = {
     }
 
     try {
-      const amount = parseAmount(args[0]);
+      const allIn = options.all === true;
+      let amount;
+      let userCoins;
 
-      if (isNaN(amount) || amount <= 0) {
-        return message.reply('❌・Veuillez miser un montant valide de coins.');
-      }
+      if (allIn) {
+        const drained = await drainPocket(
+          message.author.id,
+          guildId
+        );
 
-      let userCoins = await debitBalance({
-        userId: message.author.id,
-        guildId,
-        source: 'coins',
-        amount
-      });
+        if (!drained || drained.amount <= 0) {
+          return message.reply(
+            '❌・Vous n\'avez pas assez de coins pour jouer.'
+          );
+        }
 
-      if (!userCoins) {
-        return message.reply('❌・Vous n\'avez pas assez de coins pour jouer.');
+        amount = drained.amount;
+        userCoins = await getAccount(
+          message.author.id,
+          guildId
+        );
+      } else {
+        amount = parseAmount(args[0]);
+
+        if (isNaN(amount) || amount <= 0) {
+          return message.reply(
+            '❌・Veuillez miser un montant valide de coins.'
+          );
+        }
+
+        userCoins = await debitBalance({
+          userId: message.author.id,
+          guildId,
+          source: 'coins',
+          amount
+        });
+
+        if (!userCoins) {
+          return message.reply(
+            '❌・Vous n\'avez pas assez de coins pour jouer.'
+          );
+        }
       }
 
       const slotEmbed = new EmbedBuilder()
         .setTitle('Slots')
-        .setDescription(`${message.author} vient de lancer les slots en misant **${formatAmount(amount)}** coins🪙.`)
+        .setDescription(
+          allIn
+            ? `${message.author} vient de lancer les slots en misant **toute sa poche : ${formatAmount(amount)} coins🪙**.`
+            : `${message.author} vient de lancer les slots en misant **${formatAmount(amount)}** coins🪙.`
+        )
         .setImage(SLOT_GIF)
         .setFooter({
           text: `${message.author.tag} | 5 secondes avant le résultat`,
@@ -89,7 +120,7 @@ module.exports = {
           delta: result ? amount : -amount,
           pocket: userCoins.coins,
           bank: userCoins.bank,
-          reason: '+slot',
+          reason: allIn ? '+slotall' : '+slot',
           sourceChannel: message.channel,
           details: `Mise : ${formatAmount(amount)} • Résultat : ${result ? 'x2' : 'perdu'}`
         })
