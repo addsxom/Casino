@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const UserDailyCooldown = require('../../Models/UserDailyCooldown.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 module.exports = {
   name: 'daily',
@@ -37,6 +38,20 @@ module.exports = {
 
       userCoins.coins += coinsEarned;
       await userCoins.save();
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: '🎁 Récompense quotidienne',
+          user: message.author,
+          delta: coinsEarned,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          reason: '+daily / +dy',
+          sourceChannel: message.channel
+        })
+      );
 
       if (userDailyCooldown) {
         userDailyCooldown.cooldown = Date.now() + 24 * 60 * 60 * 1000;
