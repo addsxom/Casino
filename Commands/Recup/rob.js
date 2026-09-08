@@ -17,8 +17,8 @@ const {
   releaseCooldown
 } = require('../../utils/cooldownService.js');
 
-const ROBBER_COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const VICTIM_PROTECTION_MS = 60 * 60 * 1000;
+const ROBBER_COOLDOWN_MS = 1000;
+const VICTIM_PROTECTION_MS = 1000;
 const MIN_TARGET_POCKET = 1000;
 
 const SUCCESS_CHANCE = 0.55;
@@ -110,13 +110,13 @@ function buildSuccessEmbed({
       {
         name: '🛡️ Protection de la victime',
         value:
-          'La victime est maintenant **invulnérable pendant 1 heure**.',
+          'La victime est maintenant **invulnérable pendant 1 seconde**.',
         inline: false
       },
       {
         name: '⏳ Prochaine tentative',
         value:
-          'Ton prochain +rob sera disponible dans **2 heures**.',
+          'Ton prochain +rob sera disponible dans **1 seconde**.',
         inline: false
       }
     )
@@ -184,7 +184,7 @@ function buildFailureEmbed({
       {
         name: '⏳ Prochaine tentative',
         value:
-          'Ton prochain +rob sera disponible dans **2 heures**.',
+          'Ton prochain +rob sera disponible dans **1 seconde**.',
         inline: false
       }
     )
@@ -410,7 +410,7 @@ module.exports = {
             reason: '+rob',
             details:
               `Voleur : ${message.author.tag} • ` +
-              `Vol : ${stolenPercent}% • Protection : 1h`
+              `Vol : ${stolenPercent}% • Protection : 1s`
           })
         );
 
