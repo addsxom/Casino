@@ -8,6 +8,11 @@ const {
 const mongoose = require('mongoose');
 const BotInfo = require('../../Models/BotInfo');
 const Owner = require('../../Models/Owner.js');
+const {
+  DEFAULT_DYNAMIC_ACTIVITY,
+  normalizeActivityTemplate,
+  renderActivityText
+} = require('../../utils/activityText.js');
 
 const ACTIVITY_TYPES = {
   PLAYING: ActivityType.Playing,
@@ -54,8 +59,12 @@ function currentActivityText(bot) {
 }
 
 function buildRuntimeActivity(bot, botInfo) {
-  const text1 = String(botInfo.activityText || '').trim();
-  const text2 = String(botInfo.activityText2 || '').trim();
+  const text1 = normalizeActivityTemplate(
+    botInfo.activityText
+  );
+  const text2 = normalizeActivityTemplate(
+    botInfo.activityText2
+  );
 
   bot.activityRotation = {
     texts: [text1, text2].filter(Boolean),
@@ -66,15 +75,27 @@ function buildRuntimeActivity(bot, botInfo) {
   const firstText = bot.activityRotation.texts[0];
 
   if (firstText) {
-    bot.user.setActivity(firstText, {
-      type: bot.activityRotation.type
-    });
+    bot.user.setActivity(
+      renderActivityText(
+        firstText,
+        bot,
+        process.env.PREFIX || '+'
+      ),
+      {
+        type: bot.activityRotation.type
+      }
+    );
   }
 }
 
 function createInfoEmbed(botInfo, bot) {
-  const text1 = botInfo.activityText || 'Non défini';
-  const text2 = botInfo.activityText2 || 'Non défini';
+  const prefix = process.env.PREFIX || '+';
+  const text1 = botInfo.activityText
+    ? renderActivityText(botInfo.activityText, bot, prefix)
+    : 'Non défini';
+  const text2 = botInfo.activityText2
+    ? renderActivityText(botInfo.activityText2, bot, prefix)
+    : 'Non défini';
   const activityType = getActivityTypeName(botInfo.activityType);
   const status = botInfo.status || bot.user.presence?.status || 'online';
 
@@ -162,9 +183,15 @@ function promptFor(field) {
     case 'activityType':
       return 'Envoie le nouveau **type d’activité** : `PLAYING`, `STREAMING`, `LISTENING`, `WATCHING` ou `COMPETING`.';
     case 'activityText':
-      return 'Envoie le nouveau **Texte 1**.';
+      return (
+        'Envoie le nouveau **Texte 1**.\n' +
+        '-# Variables disponibles : `{prefix}` et `{users}`'
+      );
     case 'activityText2':
-      return 'Envoie le nouveau **Texte 2**.';
+      return (
+        'Envoie le nouveau **Texte 2**.\n' +
+        '-# Variables disponibles : `{prefix}` et `{users}`'
+      );
     case 'avatar':
       return 'Envoie la nouvelle **URL de l’avatar**.';
     case 'status':
@@ -209,11 +236,13 @@ async function applyChange(bot, botInfo, field, value) {
   }
 
   if (field === 'activityText') {
-    botInfo.activityText = cleanValue;
+    botInfo.activityText =
+      normalizeActivityTemplate(cleanValue);
   }
 
   if (field === 'activityText2') {
-    botInfo.activityText2 = cleanValue;
+    botInfo.activityText2 =
+      normalizeActivityTemplate(cleanValue);
   }
 
   if (field === 'avatar') {
@@ -281,13 +310,34 @@ module.exports = {
           botName: message.client.user.username,
           activityType: 'LISTENING',
           activityText: currentActivityText(message.client),
-          activityText2: `${process.env.PREFIX || '+'}help`,
+          activityText2: DEFAULT_DYNAMIC_ACTIVITY,
           status: message.client.user.presence?.status || 'online'
         });
       }
 
+      let shouldSave = false;
+
       if (botInfo.botName !== message.client.user.username) {
         botInfo.botName = message.client.user.username;
+        shouldSave = true;
+      }
+
+      const normalizedText1 =
+        normalizeActivityTemplate(botInfo.activityText);
+      const normalizedText2 =
+        normalizeActivityTemplate(botInfo.activityText2);
+
+      if (normalizedText1 !== botInfo.activityText) {
+        botInfo.activityText = normalizedText1;
+        shouldSave = true;
+      }
+
+      if (normalizedText2 !== botInfo.activityText2) {
+        botInfo.activityText2 = normalizedText2;
+        shouldSave = true;
+      }
+
+      if (shouldSave) {
         await botInfo.save();
       }
 
