@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'rob',
@@ -40,7 +41,7 @@ module.exports = {
       const embed = new EmbedBuilder()
         .setAuthor({ name: targetUser.tag, iconURL: targetUser.displayAvatarURL({ dynamic: true })})
         .setDescription(stolenCoins > 0
-          ? `💰・Vous avez volé **${stolenCoins}** coins à ${targetUser.tag}.`
+          ? `💰・Vous avez volé **${formatAmount(stolenCoins)}** coins à ${targetUser.tag}.`
           : `❌・Vous n'avez pas réussi à voler ${targetUser.tag}`)
         .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
         .setColor(0x6b6de6);
