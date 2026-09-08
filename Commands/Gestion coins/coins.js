@@ -54,21 +54,21 @@ module.exports = {
           {
             name: '🪙 Poche',
             value:
-              `## ${formatAmount(pocket)}\n` +
+              `**${formatAmount(pocket)}**\n` +
               `\`${formatFullAmount(pocket)}\``,
             inline: true
           },
           {
             name: '🏦 Banque',
             value:
-              `## ${formatAmount(bank)}\n` +
+              `**${formatAmount(bank)}**\n` +
               `\`${formatFullAmount(bank)}\``,
             inline: true
           },
           {
             name: '🔺 Réputation',
             value:
-              `## ${formatAmount(rep)}\n` +
+              `**${formatAmount(rep)}**\n` +
               `\`${formatFullAmount(rep)}\``,
             inline: true
           },
