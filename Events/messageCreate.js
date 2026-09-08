@@ -1,6 +1,6 @@
 const Discord = require("discord.js");
 const ServerPrefix = require("../Models/ServerPrefix");
-const UserCoins = require("../Models/UserCoins");
+const { incrementAccountField } = require("../utils/economyService.js");
 const { formatAmount } = require("../utils/formatAmount.js");
 const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
 const { cacheMessage } = require("../utils/messageCache.js");
@@ -51,20 +51,12 @@ module.exports = async (bot, message) => {
     } else {
       if (!message.author.bot) {
         if (message.guild && message.guild.id) {
-          const userCoins = await UserCoins.findOneAndUpdate(
-            {
-              userId: message.author.id,
-              guildId: message.guild.id
-            },
-            {
-              $inc: { messages: 1 }
-            },
-            {
-              new: true,
-              upsert: true,
-              setDefaultsOnInsert: true
-            }
-          );
+          const userCoins = await incrementAccountField({
+            userId: message.author.id,
+            guildId: message.guild.id,
+            field: 'messages',
+            amount: 1
+          });
       
           const thresholdResult = await userCoins.checkMessageThreshold();
       
