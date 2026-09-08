@@ -119,16 +119,16 @@ module.exports = {
       const commandText = categoryCommands
         .map(command => {
           const usage = cleanUsage(command);
-          const aliases = Array.isArray(command.aliases) && command.aliases.length
-            ? '\n-# Alias : ' + command.aliases
-                .map(alias => '`' + prefix + alias + '`')
-                .join(', ')
-            : '';
+          const names = [
+            `\`${prefix}${command.name}${usage}\``,
+            ...(Array.isArray(command.aliases)
+              ? command.aliases.map(alias => `\`${prefix}${alias}\``)
+              : [])
+          ].join('/');
 
           return (
-            `**\`${prefix}${command.name}${usage}\`**\n` +
-            `${command.description || 'Aucune description.'}` +
-            aliases
+            `**${names}**\n` +
+            `${command.description || 'Aucune description.'}`
           );
         })
         .join('\n\n');
