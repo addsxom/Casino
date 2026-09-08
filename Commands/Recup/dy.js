@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const UserDailyCooldown = require('../../Models/UserDailyCooldown.js');
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'dy',
@@ -45,7 +46,7 @@ module.exports = {
 
       const embed = new EmbedBuilder()
         .setAuthor({ name: message.author.tag, iconURL: message.author.displayAvatarURL({ dynamic: true })})
-        .setDescription(`💰・Vous venez de gagner ${coinsEarned} coins.`)
+        .setDescription(`💰・Vous venez de gagner ${formatAmount(coinsEarned)} coins.`)
         .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
         .setColor(0x6b6de6);
 
