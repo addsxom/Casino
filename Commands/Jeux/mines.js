@@ -386,9 +386,8 @@ function buildAllWarningContainer(message, pocketAmount) {
       .setStyle(ButtonStyle.Success),
     new ButtonBuilder()
       .setCustomId('mines_all_refuse')
-      .setLabel('Refuser')
-      .setEmoji('❌')
-      .setStyle(ButtonStyle.Secondary)
+      .setLabel('✕ Refuser')
+      .setStyle(ButtonStyle.Danger)
   );
 
   let tip =
