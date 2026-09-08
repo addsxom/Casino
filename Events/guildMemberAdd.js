@@ -29,9 +29,9 @@ module.exports = async (_bot, member) => {
           name: 'Nouveau membre',
           iconURL: member.guild.iconURL({ dynamic: true }) || undefined
         })
-        .setTitle(`Bienvenue ${member.user.username} !`)
+        .setTitle(`👋 Bienvenue ${member.user.username} !`)
         .setDescription(
-          `${member.user}, bienvenue sur **${member.guild.name}** !\n\n` +
+          `${member.user}, bienvenue sur **${member.guild.name}** ! 🎀\n\n` +
           `Avant de commencer, prends quelques secondes pour lire le règlement du serveur.\n\n` +
           `Rendez-vous dans ${rulesMention}\n` +
           `Lis le règlement puis clique sur **Accepter**\n` +
@@ -47,12 +47,12 @@ module.exports = async (_bot, member) => {
         )
         .addFields(
           {
-            name: 'Membre',
+            name: '👥 Membre',
             value: `Tu es le **#${member.guild.memberCount}** membre du serveur.`,
             inline: true
           },
           {
-            name: 'Compte créé',
+            name: '📅 Compte créé',
             value: `<t:${Math.floor(member.user.createdTimestamp / 1000)}:R>`,
             inline: true
           }
