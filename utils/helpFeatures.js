@@ -38,5 +38,10 @@ module.exports = [
     emoji: '📜',
     title: 'Logs staff',
     description: 'Dépôts, retraits et événements Discord.'
+  },
+  {
+    emoji: '📈',
+    title: 'Logs économie',
+    description: 'Gains, pertes, paiements et jeux.'
   }
 ];
