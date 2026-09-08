@@ -1,31 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
-
-function formatCompact(amount) {
-  const value = Number(amount) || 0;
-  const abs = Math.abs(value);
-
-  const units = [
-    { value: 1_000_000_000, suffix: 'B' },
-    { value: 1_000_000, suffix: 'M' },
-    { value: 1_000, suffix: 'K' }
-  ];
-
-  for (const unit of units) {
-    if (abs >= unit.value) {
-      const compact = value / unit.value;
-      const decimals = compact >= 100 ? 0 : compact >= 10 ? 1 : 2;
-
-      return `${Number(compact.toFixed(decimals))}${unit.suffix}`;
-    }
-  }
-
-  return String(value);
-}
-
-function formatFull(amount) {
-  return Number(amount || 0).toLocaleString('fr-FR');
-}
+const { formatAmount, formatFullAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'coins',
@@ -79,29 +54,29 @@ module.exports = {
           {
             name: '🪙 Poche',
             value:
-              `## ${formatCompact(pocket)}\n` +
-              `\`${formatFull(pocket)}\``,
+              `## ${formatAmount(pocket)}\n` +
+              `\`${formatFullAmount(pocket)}\``,
             inline: true
           },
           {
             name: '🏦 Banque',
             value:
-              `## ${formatCompact(bank)}\n` +
-              `\`${formatFull(bank)}\``,
+              `## ${formatAmount(bank)}\n` +
+              `\`${formatFullAmount(bank)}\``,
             inline: true
           },
           {
             name: '🔺 Réputation',
             value:
-              `## ${formatCompact(rep)}\n` +
-              `\`${formatFull(rep)}\``,
+              `## ${formatAmount(rep)}\n` +
+              `\`${formatFullAmount(rep)}\``,
             inline: true
           },
           {
             name: '💰 Fortune totale',
             value:
-              `**${formatCompact(total)} coins**  •  ` +
-              `\`${formatFull(total)}\``,
+              `**${formatAmount(total)} coins**  •  ` +
+              `\`${formatFullAmount(total)}\``,
             inline: false
           }
         )
