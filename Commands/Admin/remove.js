@@ -1,6 +1,7 @@
 const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const Owner = require("../../Models/Owner.js");
+const { formatAmount } = require('../../utils/formatAmount.js');
 
 module.exports = {
   name: 'remove',
@@ -38,17 +39,17 @@ module.exports = {
         userCoins.rep -= amount;
         if (userCoins.rep < 0) userCoins.rep = 0;
         await userCoins.save();
-        return message.reply(`Vous avez retiré ${amount} points de réputation à ${targetUser.tag}.`);
+        return message.reply(`Vous avez retiré ${formatAmount(amount)} points de réputation à ${targetUser.tag}.`);
       } else if (type === 'bank') {
         userCoins.coins -= amount;
         if (userCoins.coins < 0) userCoins.coins = 0;
         await userCoins.save();
-        return message.reply(`Vous avez retiré ${amount} coins en bank à ${targetUser.tag}.`);
+        return message.reply(`Vous avez retiré ${formatAmount(amount)} coins en bank à ${targetUser.tag}.`);
       } else if (type === 'coins') {
         userCoins.coins -= amount;
         if (userCoins.coins < 0) userCoins.coins = 0;
         await userCoins.save();
-        return message.reply(`Vous avez retiré ${amount} coins à ${targetUser.tag}.`);
+        return message.reply(`Vous avez retiré ${formatAmount(amount)} coins à ${targetUser.tag}.`);
       } else {
         return message.reply('Type invalide. Veuillez spécifier "rep", "bank" ou "coins".');
       }
