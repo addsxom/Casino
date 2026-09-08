@@ -33,6 +33,35 @@ function validateSource(source) {
   return source;
 }
 
+function isDuplicateKeyError(error) {
+  return error?.code === 11000;
+}
+
+async function ensureAccount(userId, guildId) {
+  try {
+    return await UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      {
+        $setOnInsert: {
+          userId,
+          guildId
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    return UserCoins.findOne({ userId, guildId });
+  }
+}
+
 async function getAccount(userId, guildId, options = {}) {
   return UserCoins.findOne({ userId, guildId })
     .session(options.session || null);
@@ -77,30 +106,55 @@ async function creditBalance({
   amount = validateAmount(amount, { allowZero: true });
 
   if (amount === 0) {
-    return getAccount(userId, guildId, { session });
+    return session
+      ? getAccount(userId, guildId, { session })
+      : ensureAccount(userId, guildId);
   }
 
-  return UserCoins.findOneAndUpdate(
-    {
-      userId,
-      guildId
-    },
-    {
-      $inc: {
-        [target]: amount
-      },
-      $setOnInsert: {
-        rep: 0,
-        messages: 0
-      }
-    },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true,
-      session
+  const update = {
+    $inc: {
+      [target]: amount
     }
-  );
+  };
+
+  if (session) {
+    return UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      update,
+      {
+        new: true,
+        session
+      }
+    );
+  }
+
+  try {
+    return await UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      {
+        ...update,
+        $setOnInsert: {
+          userId,
+          guildId
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    return UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      update,
+      { new: true }
+    );
+  }
 }
 
 async function moveBalance({
@@ -236,6 +290,8 @@ async function transferCoins({
     throw new TypeError('Invalid transfer participants.');
   }
 
+  await ensureAccount(recipientId, guildId);
+
   const session = await mongoose.startSession();
   let result = null;
 
@@ -299,22 +355,48 @@ async function incrementAccountField({
   field = validateAccountField(field);
   amount = validateAmount(amount);
 
-  return UserCoins.findOneAndUpdate(
-    { userId, guildId },
-    {
-      $inc: { [field]: amount },
-      $setOnInsert: {
-        userId,
-        guildId
+  const update = {
+    $inc: { [field]: amount }
+  };
+
+  if (session) {
+    return UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      update,
+      {
+        new: true,
+        session
       }
-    },
-    {
-      new: true,
-      upsert: true,
-      setDefaultsOnInsert: true,
-      session
+    );
+  }
+
+  try {
+    return await UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      {
+        ...update,
+        $setOnInsert: {
+          userId,
+          guildId
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
     }
-  );
+
+    return UserCoins.findOneAndUpdate(
+      { userId, guildId },
+      update,
+      { new: true }
+    );
+  }
 }
 
 async function removeUpTo({
@@ -403,6 +485,7 @@ async function resetAccount(userId, guildId) {
 module.exports = {
   InsufficientFundsError,
   getAccount,
+  ensureAccount,
   debitBalance,
   creditBalance,
   moveBalance,
