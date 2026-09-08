@@ -1,17 +1,16 @@
 const UserCoins = require('../../Models/UserCoins.js');
-const Owner = require("../../Models/Owner.js");
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+
+const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 
 module.exports = {
   name: 'reset',
   description: 'Retirer tout les coins à un membre',
   usage: 'reset <@utilisateur>',
   async execute(message, args) {
-    const isOwner = await Owner.exists({ userId: process.env.BUYER });
+    if (!(await requireBotOwner(message))) return;
 
-    if (!isOwner) return;
-
-    if (args.length !== 1) {
+if (args.length !== 1) {
       return message.reply('Utilisation incorrecte. Veuillez mentionner l\'utilisateur dont vous souhaitez réinitialiser les coins.');
     }
 
