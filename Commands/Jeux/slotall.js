@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const UserCoins = require('../../Models/UserCoins.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
+const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
 const SLOT_CHANNEL_ID = '1546311653564620897';
 
@@ -71,6 +72,21 @@ module.exports = {
         userCoins.coins += amount * 3;
         await userCoins.save();
       }
+
+      await sendStaffLog(
+        message.guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: result ? '🎰 Slot All — Gain' : '🎰 Slot All — Perte',
+          user: message.author,
+          delta: result ? amount * 2 : -amount,
+          pocket: userCoins.coins,
+          bank: userCoins.bank,
+          reason: '+slotall',
+          sourceChannel: message.channel,
+          details: `Mise : ${formatAmount(amount)} • Résultat : ${result ? 'x3' : 'perdu'}`
+        })
+      );
 
       const resultEmbed = new EmbedBuilder()
         .setTitle(result ? '🎉 YOU WIN' : '💀 YOU LOSE')
