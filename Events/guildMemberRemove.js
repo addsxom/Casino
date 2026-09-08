@@ -8,13 +8,11 @@ module.exports = async (_bot, member) => {
     member.guild,
     'discord-logs',
     buildDiscordLog({
-      title: '📤 Membre parti',
-      description: `**${member.user.tag}** a quitté le serveur.`,
-      color: 0xed4245,
-      fields: [
-        { name: 'ID', value: `\`${member.id}\``, inline: true },
-        { name: 'Membres', value: `${member.guild.memberCount}`, inline: true }
-      ]
+      title: '📤 Départ',
+      description:
+        `**${member.user.tag}** a quitté le serveur.\n` +
+        `-# ${member.guild.memberCount} membres`,
+      color: 0xed4245
     })
   );
 };
