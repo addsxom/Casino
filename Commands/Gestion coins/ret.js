@@ -1,38 +1,34 @@
-const { EmbedBuilder } = require("discord.js");
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildBankTransferLog } = require('../../utils/staffLogs.js');
-const UserCoins = require('../../Models/UserCoins.js');
 const parseAmount = require('../../utils/parseAmount.js');
+const { moveBalance } = require('../../utils/economyService.js');
 
 module.exports = {
   name: 'ret',
   description: 'Retirez des coins de votre banque vers votre poche.',
+
   async execute(message, args) {
     const guildId = message.guild.id;
+    const amountToWithdraw = parseAmount(args[0]);
+
+    if (!Number.isSafeInteger(amountToWithdraw) || amountToWithdraw <= 0) {
+      return message.reply('❓・Veuillez fournir un montant valide à retirer.');
+    }
 
     try {
-      const amountToWithdraw = parseAmount(args[0]);
+      const userCoins = await moveBalance({
+        userId: message.author.id,
+        guildId,
+        from: 'bank',
+        to: 'coins',
+        amount: amountToWithdraw
+      });
 
-      if (isNaN(amountToWithdraw) || amountToWithdraw <= 0) {
-        return message.reply('❓・Veuillez fournir un montant valide à retirer.');
+      if (!userCoins) {
+        return message.reply(
+          '❌・Vous n\'avez pas assez d\'argent dans la banque pour retirer cette somme.'
+        );
       }
-
-      let userCoins = await UserCoins.findOne({ userId: message.author.id, guildId });
-
-      if (!userCoins || userCoins.bank <= 0) {
-        return message.reply('❌・Vous n\'avez pas de coins a retiré.');
-      }
-
-      if (!userCoins || userCoins.bank < amountToWithdraw) {
-        return message.reply('❌・Vous n\'avez pas assez d\'argent dans la banque pour retirer cette somme.');
-      }
-
-      const bankBefore = userCoins.bank;
-      const pocketBefore = userCoins.coins;
-
-      userCoins.coins += amountToWithdraw;
-      userCoins.bank -= amountToWithdraw;
-      await userCoins.save();
 
       await sendStaffLog(
         message.guild,
@@ -41,18 +37,21 @@ module.exports = {
           title: '📤 Retrait de la banque',
           user: message.author,
           amount: amountToWithdraw,
-          bankBefore,
+          bankBefore: userCoins.bank + amountToWithdraw,
           bankAfter: userCoins.bank,
-          pocketBefore,
+          pocketBefore: userCoins.coins - amountToWithdraw,
           pocketAfter: userCoins.coins
         })
       );
 
-      return message.reply(`🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** coins de votre banque.`)
-
+      return message.reply(
+        `🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** coins de votre banque.`
+      );
     } catch (error) {
-      console.error(error);
-      message.reply('Une erreur s\'est produite lors du retrait des coins.');
+      console.error('Withdraw error:', error);
+      return message.reply(
+        'Une erreur s\'est produite lors du retrait des coins.'
+      );
     }
   },
 };
