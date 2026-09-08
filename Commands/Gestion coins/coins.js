@@ -119,37 +119,45 @@ module.exports = {
       });
 
       collector.on('collect', async interaction => {
-        if (interaction.user.id !== message.author.id) {
-          return interaction.reply({
-            content: '❌・Ce bouton ne vous appartient pas.',
-            ephemeral: true
-          }).catch(() => {});
-        }
+        try {
+          if (interaction.user.id !== message.author.id) {
+            return interaction.reply({
+              content: '❌・Ce bouton ne vous appartient pas.',
+              ephemeral: true
+            }).catch(() => {});
+          }
 
-        userCoins = await UserCoins.findOne({
-          userId: targetUser.id,
-          guildId
-        });
+          await interaction.deferUpdate();
 
-        if (!userCoins) {
-          userCoins = await UserCoins.create({
+          userCoins = await UserCoins.findOne({
             userId: targetUser.id,
             guildId
           });
-        }
 
-        if (interaction.customId === 'coins_details') {
-          return interaction.update({
-            embeds: [buildDetailsEmbed(message, targetUser, userCoins)],
-            components: [buildBackButton()]
-          });
-        }
+          if (!userCoins) {
+            userCoins = await UserCoins.create({
+              userId: targetUser.id,
+              guildId
+            });
+          }
 
-        if (interaction.customId === 'coins_back') {
-          return interaction.update({
-            embeds: [buildSummaryEmbed(message, targetUser, userCoins)],
-            components: [buildDetailsButton()]
-          });
+          if (interaction.customId === 'coins_details') {
+            return coinsMessage.edit({
+              embeds: [buildDetailsEmbed(message, targetUser, userCoins)],
+              components: [buildBackButton()]
+            });
+          }
+
+          if (interaction.customId === 'coins_back') {
+            return coinsMessage.edit({
+              embeds: [buildSummaryEmbed(message, targetUser, userCoins)],
+              components: [buildDetailsButton()]
+            });
+          }
+        } catch (error) {
+          if (error?.code !== 10062) {
+            console.error('Erreur bouton +coins :', error);
+          }
         }
       });
 
