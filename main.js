@@ -41,6 +41,7 @@ require(`./anti-crash.js`)()
 
 
 bot.commands = new Discord.Collection();
+bot.aliases = new Discord.Collection();
 bot.snipe = new Discord.Collection();
 bot.color = "#6B6DE6",
 
