@@ -5,6 +5,7 @@ const {
   ButtonStyle,
   PermissionFlagsBits
 } = require('discord.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 const { TICKET_TYPES } = require('../../utils/ticketSystem.js');
 
@@ -24,7 +25,7 @@ module.exports = {
       message.member.permissions.has(PermissionFlagsBits.Administrator);
 
     if (!isAllowed) {
-      return message.reply('❌・Tu dois être administrateur pour utiliser cette commande.');
+      return message.reply(replyEmbedPayload('Tu dois être administrateur pour utiliser cette commande.', { type: 'error' }));
     }
 
     const embed = new EmbedBuilder()
