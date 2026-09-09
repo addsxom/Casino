@@ -81,7 +81,14 @@ module.exports = async (bot, message) => {
       }
     } else {
       if (!message.author.bot) {
-        if (message.guild && message.guild.id) {
+        const messageLength =
+          String(message.content || '').trim().length;
+
+        if (
+          message.guild &&
+          message.guild.id &&
+          messageLength >= 3
+        ) {
           const userCoins = await incrementAccountField({
             userId: message.author.id,
             guildId: message.guild.id,
