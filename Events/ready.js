@@ -13,6 +13,7 @@ const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
+const { startVoiceRewardTracker } = require('../utils/voiceRewardTracker.js');
 const {
   DEFAULT_DYNAMIC_ACTIVITY,
   normalizeActivityTemplate,
@@ -46,6 +47,7 @@ module.exports = async (bot) => {
   });
 
   await ensureDatabaseIntegrity();
+  startVoiceRewardTracker(bot);
 
   const botInfo = await BotInfo.findOne();
 
