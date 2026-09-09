@@ -1,5 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
-const config = require('../config/botConfig.js');
+const { getConfiguredChannelId } = require('../utils/configService.js');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
 
@@ -8,8 +8,8 @@ module.exports = async (_bot, member) => {
 
   try {
     const welcomeChannel =
-      member.guild.channels.cache.get(config.channels.welcome) ||
-      await member.guild.channels.fetch(config.channels.welcome);
+      member.guild.channels.cache.get(getConfiguredChannelId('welcome', member.guild.id)) ||
+      await member.guild.channels.fetch(getConfiguredChannelId('welcome', member.guild.id));
 
     if (welcomeChannel?.isTextBased?.()) {
       const rulesChannel = member.guild.channels.cache.find(
