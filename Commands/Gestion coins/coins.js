@@ -83,6 +83,8 @@ function buildBackButton() {
   );
 }
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'coins',
   description: 'Affiche le solde de coins de l\'utilisateur.',
@@ -116,7 +118,10 @@ module.exports = {
         try {
           if (interaction.user.id !== message.author.id) {
             return interaction.reply({
-              content: '❌・Ce bouton ne vous appartient pas.',
+              ...replyEmbedPayload(
+                'Ce bouton ne vous appartient pas.',
+                { type: 'error' }
+              ),
               flags: MessageFlags.Ephemeral
             }).catch(() => {});
           }
@@ -159,7 +164,10 @@ module.exports = {
       console.error(error);
 
       return message.reply(
-        'Une erreur s\'est produite lors de la récupération des coins.'
+        replyEmbedPayload(
+          'Une erreur s\'est produite lors de la récupération des coins.',
+          { type: 'error' }
+        )
       );
     }
   },
