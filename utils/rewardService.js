@@ -2,7 +2,6 @@ const { EmbedBuilder } = require('discord.js');
 const config = require('../config/botConfig.js');
 const { formatAmount } = require('./formatAmount.js');
 
-const REWARD_CHANNEL_ID = config.channels.rewards;
 const MESSAGE_REWARDS =
   config.rewards.messages.milestones;
 const VOICE_REWARD_MIN_MS =
@@ -189,8 +188,8 @@ async function getRewardChannel(guild) {
   if (!guild) return null;
 
   let channel =
-    guild.channels.cache.get(REWARD_CHANNEL_ID) ||
-    await guild.channels.fetch(REWARD_CHANNEL_ID)
+    guild.channels.cache.get(config.channels.rewards) ||
+    await guild.channels.fetch(config.channels.rewards)
       .catch(() => null);
 
   return channel?.isTextBased?.()
@@ -279,7 +278,6 @@ async function sendVoiceRewardNotification({
 }
 
 module.exports = {
-  REWARD_CHANNEL_ID,
   MESSAGE_REWARDS,
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
