@@ -35,6 +35,8 @@ const {
   buildStatusContainer
 } = require('./ui.js');
 
+const { replyEmbedPayload } = require('../replyEmbed.js');
+
 async function startMinesGameSession({
   message,
   gameMessage,
@@ -218,8 +220,10 @@ async function startMinesGameSession({
         userId
       ) {
         return interaction.reply({
-          content:
-            '❌・Cette partie ne vous appartient pas.',
+          ...replyEmbedPayload(
+            'Cette partie ne vous appartient pas.',
+            { type: 'error' }
+          ),
           ephemeral: true
         });
       }
@@ -423,8 +427,10 @@ async function startMinesGameSession({
           await render();
 
           await interaction.followUp({
-            content:
-              `❌・Il te faut **${formatCoins(game.revealCost)} coins** en poche pour utiliser Reveal.`,
+            ...replyEmbedPayload(
+              `Il te faut **${formatCoins(game.revealCost)} coins** en poche pour utiliser Reveal.`,
+              { type: 'error' }
+            ),
             flags:
               MessageFlags.Ephemeral
           }).catch(() => {});
