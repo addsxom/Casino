@@ -1,3 +1,4 @@
+const config = require('../../config/botConfig.js');
 const {
   ActionRowBuilder,
   ButtonBuilder,
@@ -16,9 +17,11 @@ const {
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
 
-const HOUSE_EDGE = 0.03;
-const MAX_CRASH = 100;
-const LIVE_UPDATE_MS = 900;
+const {
+  houseEdge: HOUSE_EDGE,
+  maxCrash: MAX_CRASH,
+  liveUpdateMs: LIVE_UPDATE_MS
+} = config.games.crash;
 
 function generateCrashPoint() {
   const random = Math.random();
