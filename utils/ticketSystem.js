@@ -43,6 +43,18 @@ function getStaffRoles(guild) {
   });
 }
 
+function getTicketOwnerId(channel) {
+  return channel?.topic?.match(/ticketOwner:(\d+)/)?.[1] || null;
+}
+
+function getTicketTypeKey(channel) {
+  return channel?.topic?.match(/ticketType:([^;]+)/)?.[1] || null;
+}
+
+function isTicketChannel(channel) {
+  return Boolean(getTicketOwnerId(channel));
+}
+
 function makeTicketChannelName(prefix, user) {
   const username = (user.globalName || user.username || user.id)
     .normalize('NFD')
@@ -60,5 +72,8 @@ module.exports = {
   TICKET_TYPES,
   isStaff,
   getStaffRoles,
+  getTicketOwnerId,
+  getTicketTypeKey,
+  isTicketChannel,
   makeTicketChannelName
 };
