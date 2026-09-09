@@ -22,6 +22,7 @@ const {
   sendStaffLog,
   buildCoinMovementLog
 } = require('./staffLogs.js');
+const { replyEmbedPayload } = require('./replyEmbed.js');
 
 const voiceProgress = new Map();
 let trackerInterval = null;
@@ -178,11 +179,16 @@ function getEligibilityStatus({
 
 async function sendMuteTimeoutWarning(member) {
   await member.send(
-    '🎙️ **Récompenses vocales mises en pause**\n\n' +
-    `Ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**. ` +
-    'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
-    '✅ **Pour redevenir éligible :** réactive simplement ton micro. ' +
-    'Ton compteur de récompense repartira alors de **0** avec un nouveau délai aléatoire.'
+    replyEmbedPayload(
+      `Ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**. ` +
+      'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
+      '**Pour redevenir éligible :** réactive simplement ton micro. ' +
+      'Ton compteur de récompense repartira alors de **0** avec un nouveau délai aléatoire.',
+      {
+        type: 'warning',
+        title: '🎙️ Récompenses vocales en pause'
+      }
+    )
   ).catch(() => {});
 }
 
