@@ -118,7 +118,7 @@ async function sendOrUpdateVoiceStatus({
 
   if (message?.editable) {
     const edited = await message.edit({
-      content: `${user}`,
+      content: null,
       embeds: [embed]
     }).catch(() => null);
 
@@ -126,7 +126,6 @@ async function sendOrUpdateVoiceStatus({
   }
 
   return channel.send({
-    content: `${user}`,
     embeds: [embed]
   });
 }
@@ -367,7 +366,6 @@ async function sendVoiceRewardNotification({
     .setTimestamp();
 
   await channel.send({
-    content: `${user}`,
     embeds: [embed]
   });
 
