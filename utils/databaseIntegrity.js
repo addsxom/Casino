@@ -5,6 +5,7 @@ const UserWorkCooldown = require('../Models/UserWorkCooldown.js');
 const UserRepCooldown = require('../Models/UserRepCooldown.js');
 const UserRobCooldown = require('../Models/UserRobCooldown.js');
 const UserRobProtection = require('../Models/UserRobProtection.js');
+const VoiceRewardProgress = require('../Models/VoiceRewardProgress.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
 
@@ -123,6 +124,48 @@ async function mergeNumericCooldownDuplicates(Model) {
   return duplicates.length;
 }
 
+async function mergeVoiceRewardProgressDuplicates() {
+  const duplicates = await VoiceRewardProgress.aggregate([
+    {
+      $group: {
+        _id: {
+          userId: '$userId',
+          guildId: '$guildId'
+        },
+        ids: { $push: '$_id' },
+        count: { $sum: 1 },
+        latestUpdatedAt: { $max: '$updatedAt' }
+      }
+    },
+    {
+      $match: {
+        count: { $gt: 1 }
+      }
+    }
+  ]);
+
+  for (const duplicate of duplicates) {
+    const latest = await VoiceRewardProgress.findOne({
+      _id: { $in: duplicate.ids },
+      updatedAt: duplicate.latestUpdatedAt
+    }).lean();
+
+    if (!latest) continue;
+
+    const removeIds = duplicate.ids.filter(
+      id => String(id) !== String(latest._id)
+    );
+
+    if (removeIds.length) {
+      await VoiceRewardProgress.deleteMany({
+        _id: { $in: removeIds }
+      });
+    }
+  }
+
+  return duplicates.length;
+}
+
 async function mergeMinesCooldownDuplicates() {
   const duplicates = await MinesCooldown.aggregate([
     {
@@ -174,6 +217,7 @@ async function createDeclaredIndexes() {
     UserRepCooldown,
     UserRobCooldown,
     UserRobProtection,
+    VoiceRewardProgress,
     ServerPrefix,
     Owner
   ];
@@ -197,7 +241,9 @@ async function ensureDatabaseIntegrity() {
     robProtections:
       await hasUserGuildUniqueIndex(UserRobProtection),
     minesCooldowns:
-      await hasUserGuildUniqueIndex(MinesCooldown)
+      await hasUserGuildUniqueIndex(MinesCooldown),
+    voiceRewardProgress:
+      await hasUserGuildUniqueIndex(VoiceRewardProgress)
   };
 
   const results = {
@@ -221,7 +267,10 @@ async function ensureDatabaseIntegrity() {
       : await mergeNumericCooldownDuplicates(UserRobProtection),
     minesCooldowns: indexed.minesCooldowns
       ? 0
-      : await mergeMinesCooldownDuplicates()
+      : await mergeMinesCooldownDuplicates(),
+    voiceRewardProgress: indexed.voiceRewardProgress
+      ? 0
+      : await mergeVoiceRewardProgressDuplicates()
   };
 
   await createDeclaredIndexes();
