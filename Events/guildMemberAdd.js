@@ -1,8 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
+const config = require('../config/botConfig.js');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
 
-const WELCOME_CHANNEL_ID = '1546311653388189718';
+const WELCOME_CHANNEL_ID = config.channels.welcome;
 
 module.exports = async (_bot, member) => {
   await updateMemberCount(member.guild);
