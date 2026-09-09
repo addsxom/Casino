@@ -1,27 +1,46 @@
-const { EmbedBuilder } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
+const {
+  EmbedBuilder
+} = require('discord.js');
+const {
+  joinVoiceChannel
+} = require('@discordjs/voice');
+
 const {
   requireBotOwner
 } = require('../../utils/ownerPermissions.js');
+
 const {
   getChannelConfigList,
   resolveConfigKey,
-  setChannelConfig
+  setChannelConfig,
+  setChannelConfigList
 } = require('../../utils/configService.js');
+
 const {
   updateMemberCount
 } = require('../../utils/updateMemberCount.js');
 
-function extractChannelId(args) {
-  const raw = args.slice(1).join(' ');
-  return raw.match(/\d{17,20}/)?.[0] || null;
+function extractChannelIds(args) {
+  const raw =
+    args.join(' ');
+
+  return [
+    ...new Set(
+      raw.match(/\d{17,20}/g) || []
+    )
+  ];
 }
 
-function channelTypeMatches(entry, channel) {
+function channelTypeMatches(
+  entry,
+  channel
+) {
   if (!channel) return false;
 
   if (entry.type === 'voice') {
-    return channel.isVoiceBased?.() === true;
+    return (
+      channel.isVoiceBased?.() === true
+    );
   }
 
   if (entry.type === 'text') {
@@ -34,21 +53,30 @@ function channelTypeMatches(entry, channel) {
   return true;
 }
 
-async function getEntryStatus(message, entry) {
-  if (!entry.id) {
+async function resolveChannelById(
+  message,
+  entry,
+  id
+) {
+  if (!id) {
     return {
+      id: null,
       connected: false,
       channel: null
     };
   }
 
   const channel =
-    message.client.channels.cache.get(entry.id) ||
-    await message.client.channels.fetch(entry.id)
+    message.client.channels.cache.get(
+      id
+    ) ||
+    await message.client.channels
+      .fetch(id)
       .catch(() => null);
 
   if (!channel) {
     return {
+      id,
       connected: false,
       channel: null
     };
@@ -56,33 +84,135 @@ async function getEntryStatus(message, entry) {
 
   if (
     entry.scope !== 'global' &&
-    channel.guild?.id !== message.guild.id
+    channel.guild?.id !==
+      message.guild.id
   ) {
     return {
+      id,
       connected: false,
       channel
     };
   }
 
   return {
-    connected: channelTypeMatches(entry, channel),
+    id,
+    connected:
+      channelTypeMatches(
+        entry,
+        channel
+      ),
     channel
   };
 }
 
-function formatChannelLine(entry, status) {
-  const icon = status.connected ? '✅' : '❌';
+async function getEntryStatus(
+  message,
+  entry
+) {
+  if (entry.multiple) {
+    const items =
+      await Promise.all(
+        (entry.ids || []).map(id =>
+          resolveChannelById(
+            message,
+            entry,
+            id
+          )
+        )
+      );
 
-  const channelText = status.connected
-    ? `${status.channel} • \`${entry.id}\``
-    : `\`${entry.id || 'Aucun ID'}\``;
+    return {
+      connected:
+        items.length > 0 &&
+        items.every(item =>
+          item.connected
+        ),
+      items
+    };
+  }
 
-  const scopeText = entry.scope === 'global'
-    ? ' • global'
-    : '';
+  const item =
+    await resolveChannelById(
+      message,
+      entry,
+      entry.id
+    );
+
+  return {
+    ...item,
+    items: [item]
+  };
+}
+
+function getLiveChannelLabel(item) {
+  if (
+    !item?.connected ||
+    !item.channel
+  ) {
+    return (
+      `\`${item?.id || 'Aucun ID'}\``
+    );
+  }
+
+  const name =
+    String(
+      item.channel.name ||
+      'salon'
+    );
 
   return (
-    `${icon} **${entry.key}** → ${channelText}\n` +
+    `**${name}** • ${item.channel} • \`${item.id}\``
+  );
+}
+
+function formatChannelLine(
+  entry,
+  status
+) {
+  const icon =
+    status.connected
+      ? '✅'
+      : '❌';
+
+  const scopeText =
+    entry.scope === 'global'
+      ? ' • global'
+      : '';
+
+  if (entry.multiple) {
+    const items =
+      status.items || [];
+
+    if (!items.length) {
+      return (
+        `${icon} **${entry.key}** → \`Aucun ID\`\n` +
+        `-# ${entry.label} • multi${scopeText}`
+      );
+    }
+
+    const preview =
+      items.slice(0, 3)
+        .map(item =>
+          item.connected &&
+          item.channel
+            ? item.channel.name
+            : item.id
+        )
+        .join(', ');
+
+    const more =
+      items.length > 3
+        ? ` +${items.length - 3}`
+        : '';
+
+    return (
+      `${icon} **${entry.key}** → **${items.length} vocal${items.length > 1 ? 'aux' : ''}**\n` +
+      `-# ${preview}${more} • multi${scopeText}`
+    );
+  }
+
+  return (
+    `${icon} **${entry.key}** → ${getLiveChannelLabel(status)}\n` +
     `-# ${entry.label}${scopeText}`
   );
 }
@@ -92,12 +222,16 @@ async function applyImmediateSideEffect(
   key,
   channel
 ) {
-  if (key === 'botvoice' && channel?.isVoiceBased?.()) {
+  if (
+    key === 'botvoice' &&
+    channel?.isVoiceBased?.()
+  ) {
     joinVoiceChannel({
       channelId: channel.id,
       guildId: channel.guild.id,
       adapterCreator:
-        channel.guild.voiceAdapterCreator
+        channel.guild
+          .voiceAdapterCreator
     });
 
     return;
@@ -108,18 +242,108 @@ async function applyImmediateSideEffect(
     channel?.isTextBased?.() &&
     channel.guild
   ) {
-    await channel.guild.setSystemChannel(
-      channel,
-      'Mise à jour via +configlist'
-    ).catch(() => {});
+    await channel.guild
+      .setSystemChannel(
+        channel,
+        'Mise à jour via +configlist'
+      )
+      .catch(() => {});
+
     return;
   }
 
-  if (key === 'membercount' && channel?.guild) {
+  if (
+    key === 'membercount' &&
+    channel?.guild
+  ) {
     await updateMemberCount(
       channel.guild
     ).catch(() => {});
   }
+}
+
+function buildMultiHelp(key) {
+  return (
+    `**Commandes :**\n` +
+    `\`+configlist ${key} add <ID> [ID...]\`\n` +
+    `\`+configlist ${key} remove <ID> [ID...]\`\n` +
+    `\`+configlist ${key} set <ID> [ID...]\`\n` +
+    `\`+configlist ${key} clear\`\n` +
+    `-# Tu peux aussi faire directement +configlist ${key} <ID> <ID> pour remplacer toute la liste.`
+  );
+}
+
+async function replyMultiStatus(
+  message,
+  entry,
+  status
+) {
+  const items =
+    status.items || [];
+
+  const lines =
+    items.length
+      ? items.map(
+          (item, index) =>
+            `${item.connected ? '✅' : '❌'} **${index + 1}.** ${getLiveChannelLabel(item)}`
+        )
+      : ['❌ Aucun vocal configuré.'];
+
+  const embed =
+    new EmbedBuilder()
+      .setColor(
+        status.connected
+          ? 0x57f287
+          : 0x6b6de6
+      )
+      .setTitle(
+        `🎙️ ${entry.label}`
+      )
+      .setDescription(
+        lines.join('\n') +
+        '\n\n' +
+        buildMultiHelp(
+          entry.key
+        )
+      )
+      .setFooter({
+        text:
+          'Les noms sont lus en direct depuis Discord • l’ID reste la référence'
+      })
+      .setTimestamp();
+
+  return message.reply({
+    embeds: [embed]
+  });
+}
+
+async function validateChannels(
+  message,
+  entry,
+  ids
+) {
+  const results =
+    await Promise.all(
+      ids.map(id =>
+        resolveChannelById(
+          message,
+          entry,
+          id
+        )
+      )
+    );
+
+  const invalid =
+    results.filter(
+      result =>
+        !result.connected
+    );
+
+  return {
+    ok: invalid.length === 0,
+    results,
+    invalid
+  };
 }
 
 module.exports = {
@@ -130,58 +354,81 @@ module.exports = {
 
   async execute(message, args) {
     if (!message.guild) return;
-    if (!(await requireBotOwner(message))) return;
 
-    const guildId = message.guild.id;
-    const keyInput = args[0];
+    if (
+      !(await requireBotOwner(message))
+    ) {
+      return;
+    }
+
+    const guildId =
+      message.guild.id;
+
+    const keyInput =
+      args[0];
 
     if (!keyInput) {
       const entries =
-        getChannelConfigList(guildId);
+        getChannelConfigList(
+          guildId
+        );
 
-      const statuses = await Promise.all(
-        entries.map(entry =>
-          getEntryStatus(message, entry)
-        )
-      );
+      const statuses =
+        await Promise.all(
+          entries.map(entry =>
+            getEntryStatus(
+              message,
+              entry
+            )
+          )
+        );
 
       const connectedCount =
-        statuses.filter(status =>
-          status.connected
+        statuses.filter(
+          status =>
+            status.connected
         ).length;
 
-      const lines = entries.map(
-        (entry, index) =>
-          formatChannelLine(
-            entry,
-            statuses[index]
-          )
-      );
+      const lines =
+        entries.map(
+          (entry, index) =>
+            formatChannelLine(
+              entry,
+              statuses[index]
+            )
+        );
 
-      const embed = new EmbedBuilder()
-        .setColor(
-          connectedCount === entries.length
-            ? 0x57f287
-            : 0x6b6de6
-        )
-        .setTitle('⚙️ Configuration des salons')
-        .setDescription(
-          `✅ **${connectedCount}/${entries.length} connectés**\n` +
-          `❌ **${entries.length - connectedCount} à configurer**\n\n` +
-          lines.join('\n\n')
-        )
-        .setFooter({
-          text:
-            '+configlist <clé> <ID du salon>'
-        })
-        .setTimestamp();
+      const embed =
+        new EmbedBuilder()
+          .setColor(
+            connectedCount ===
+              entries.length
+              ? 0x57f287
+              : 0x6b6de6
+          )
+          .setTitle(
+            '⚙️ Configuration des salons'
+          )
+          .setDescription(
+            `✅ **${connectedCount}/${entries.length} connectés**\n` +
+            `❌ **${entries.length - connectedCount} à configurer**\n\n` +
+            lines.join('\n\n')
+          )
+          .setFooter({
+            text:
+              '+configlist <clé> <ID> • IDs prioritaires • noms Discord affichés en direct'
+          })
+          .setTimestamp();
 
       return message.reply({
         embeds: [embed]
       });
     }
 
-    const key = resolveConfigKey(keyInput);
+    const key =
+      resolveConfigKey(
+        keyInput
+      );
 
     if (!key) {
       return message.reply(
@@ -190,12 +437,205 @@ module.exports = {
     }
 
     const entries =
-      getChannelConfigList(guildId);
+      getChannelConfigList(
+        guildId
+      );
 
     const current =
-      entries.find(entry => entry.key === key);
+      entries.find(
+        entry =>
+          entry.key === key
+      );
 
-    const channelId = extractChannelId(args);
+    if (!current) {
+      return message.reply(
+        '❌・Configuration introuvable.'
+      );
+    }
+
+    if (current.multiple) {
+      const actionRaw =
+        String(
+          args[1] || ''
+        ).toLowerCase();
+
+      if (!actionRaw) {
+        const status =
+          await getEntryStatus(
+            message,
+            current
+          );
+
+        return replyMultiStatus(
+          message,
+          current,
+          status
+        );
+      }
+
+      const knownActions =
+        new Set([
+          'add',
+          'remove',
+          'set',
+          'clear'
+        ]);
+
+      const action =
+        knownActions.has(actionRaw)
+          ? actionRaw
+          : 'set';
+
+      const idArgs =
+        knownActions.has(actionRaw)
+          ? args.slice(2)
+          : args.slice(1);
+
+      const ids =
+        extractChannelIds(
+          idArgs
+        );
+
+      if (
+        action === 'clear'
+      ) {
+        const result =
+          await setChannelConfigList(
+            guildId,
+            key,
+            []
+          );
+
+        if (!result.ok) {
+          return message.reply(
+            '❌・Impossible de vider cette configuration.'
+          );
+        }
+
+        return message.reply(
+          `✅ **${current.label}** vidé.\n-# Tant que voicefarm est vide, le système vocal normal garde son comportement actuel.`
+        );
+      }
+
+      if (!ids.length) {
+        return message.reply(
+          `❌・Ajoute au moins un ID de salon vocal.\n\n${buildMultiHelp(key)}`
+        );
+      }
+
+      if (action !== 'remove') {
+        const validation =
+          await validateChannels(
+            message,
+            current,
+            ids
+          );
+
+        if (!validation.ok) {
+          const invalidIds =
+            validation.invalid
+              .map(item =>
+                `\`${item.id}\``
+              )
+              .join(', ');
+
+          return message.reply(
+            `❌・Ces IDs ne correspondent pas à des vocaux accessibles de ce serveur : ${invalidIds}`
+          );
+        }
+      }
+
+      let nextIds = [];
+
+      if (action === 'add') {
+        nextIds = [
+          ...new Set([
+            ...(current.ids || []),
+            ...ids
+          ])
+        ];
+      } else if (
+        action === 'remove'
+      ) {
+        const removeSet =
+          new Set(ids);
+
+        nextIds =
+          (current.ids || [])
+            .filter(
+              id =>
+                !removeSet.has(id)
+            );
+      } else {
+        nextIds = ids;
+      }
+
+      const result =
+        await setChannelConfigList(
+          guildId,
+          key,
+          nextIds
+        );
+
+      if (!result.ok) {
+        return message.reply(
+          '❌・Impossible de mettre à jour cette liste.'
+        );
+      }
+
+      const updated =
+        getChannelConfigList(
+          guildId
+        ).find(
+          entry =>
+            entry.key === key
+        );
+
+      const status =
+        await getEntryStatus(
+          message,
+          updated
+        );
+
+      const actionLabel =
+        action === 'add'
+          ? 'ajouté(s)'
+          : action === 'remove'
+            ? 'retiré(s)'
+            : 'remplacée';
+
+      const embed =
+        new EmbedBuilder()
+          .setColor(0x57f287)
+          .setTitle(
+            '✅ Configuration mise à jour'
+          )
+          .setDescription(
+            `**${current.label}** • ${actionLabel}\n` +
+            `**${result.ids.length} vocal${result.ids.length > 1 ? 'aux' : ''} configuré${result.ids.length > 1 ? 's' : ''}**\n\n` +
+            (status.items.length
+              ? status.items
+                  .map(item =>
+                    `${item.connected ? '✅' : '❌'} ${getLiveChannelLabel(item)}`
+                  )
+                  .join('\n')
+              : 'Aucun vocal configuré.') +
+            '\n\n-# Sauvegardé uniquement pour ce serveur.'
+          )
+          .setTimestamp();
+
+      return message.reply({
+        embeds: [embed]
+      });
+    }
+
+    const channelIds =
+      extractChannelIds(
+        args.slice(1)
+      );
+
+    const channelId =
+      channelIds[0] || null;
 
     if (!channelId) {
       const status =
@@ -205,54 +645,73 @@ module.exports = {
         );
 
       return message.reply(
-        `${status.connected ? '✅' : '❌'} **${key}** → ` +
-        `${status.connected ? status.channel : `\`${current.id || 'Aucun ID'}\``}\n` +
+        `${status.connected ? '✅' : '❌'} **${key}** → ${getLiveChannelLabel(status)}\n` +
+        `-# ${current.label}\n` +
         `Utilise : +configlist ${key} <ID>`
       );
     }
 
+    const validation =
+      await validateChannels(
+        message,
+        current,
+        [channelId]
+      );
+
+    if (!validation.ok) {
+      const channel =
+        validation.results[0]
+          ?.channel;
+
+      if (
+        channel &&
+        current.scope !== 'global' &&
+        channel.guild?.id !== guildId
+      ) {
+        return message.reply(
+          '❌・Ce salon appartient à un autre serveur. Utilise un salon de ce serveur.'
+        );
+      }
+
+      if (
+        channel &&
+        !channelTypeMatches(
+          current,
+          channel
+        )
+      ) {
+        if (
+          current.type === 'voice'
+        ) {
+          return message.reply(
+            '❌・Cette configuration attend un salon vocal.'
+          );
+        }
+
+        if (
+          current.type === 'text'
+        ) {
+          return message.reply(
+            '❌・Cette configuration attend un salon textuel.'
+          );
+        }
+      }
+
+      return message.reply(
+        '❌・Je ne trouve pas cet ID de salon ou je n’y ai pas accès.'
+      );
+    }
+
     const channel =
-      await message.client.channels.fetch(channelId)
-        .catch(() => null);
+      validation.results[0]
+        .channel;
 
-    if (!channel) {
-      return message.reply(
-        '❌・Je ne trouve pas ce salon ou je n’y ai pas accès.'
+    const result =
+      await setChannelConfig(
+        guildId,
+        key,
+        channelId
       );
-    }
-
-    if (
-      current.scope !== 'global' &&
-      channel.guild?.id !== guildId
-    ) {
-      return message.reply(
-        '❌・Ce salon appartient à un autre serveur. Utilise un salon de ce serveur.'
-      );
-    }
-
-    if (!channelTypeMatches(current, channel)) {
-      if (current.type === 'voice') {
-        return message.reply(
-          '❌・Cette configuration attend un salon vocal.'
-        );
-      }
-
-      if (current.type === 'text') {
-        return message.reply(
-          '❌・Cette configuration attend un salon textuel.'
-        );
-      }
-
-      return message.reply(
-        '❌・Le type de ce salon n’est pas compatible.'
-      );
-    }
-
-    const result = await setChannelConfig(
-      guildId,
-      key,
-      channelId
-    );
 
     if (!result.ok) {
       return message.reply(
@@ -266,20 +725,34 @@ module.exports = {
       channel
     );
 
-    const embed = new EmbedBuilder()
-      .setColor(0x57f287)
-      .setTitle('✅ Configuration mise à jour')
-      .setDescription(
-        `**${result.entry.label}**\n` +
-        `${channel} • \`${channelId}\`\n\n` +
-        (
-          result.entry.scope === 'global'
-            ? '-# Configuration globale du bot.'
-            : '-# Configuration sauvegardée uniquement pour ce serveur.'
-        ) +
-        '\n-# Conservé après redémarrage / git pull.'
-      )
-      .setTimestamp();
+    const immediateText =
+      key === 'rewards'
+        ? '\n-# Les prochaines notifications de récompenses utiliseront immédiatement ce salon.'
+        : '';
+
+    const embed =
+      new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle(
+          '✅ Configuration mise à jour'
+        )
+        .setDescription(
+          `**${result.entry.label}**\n` +
+          `${getLiveChannelLabel({
+            connected: true,
+            channel,
+            id: channelId
+          })}\n\n` +
+          (
+            result.entry.scope ===
+              'global'
+              ? '-# Configuration globale du bot.'
+              : '-# Configuration sauvegardée uniquement pour ce serveur.'
+          ) +
+          immediateText +
+          '\n-# Le nom affiché sera toujours relu directement depuis Discord.'
+        )
+        .setTimestamp();
 
     return message.reply({
       embeds: [embed]
