@@ -19,6 +19,8 @@ const MESSAGE_REWARDS = [
 const VOICE_REWARD_MIN_MS = 15 * 60 * 1000;
 const VOICE_REWARD_MAX_MS = 20 * 60 * 1000;
 const VOICE_REWARD_COINS = 1000;
+const VOICE_ACTIVITY_BONUS_PERCENT = 50;
+const VOICE_MUTE_GRACE_MS = 40 * 60 * 1000;
 
 function formatDuration(ms) {
   const totalSeconds = Math.max(
@@ -137,18 +139,36 @@ async function sendVoiceRewardNotification({
   user,
   account,
   earnedIntervalMs,
-  nextIntervalMs
+  nextIntervalMs,
+  baseCoins,
+  bonusCoins,
+  bonusPercent,
+  activityLabel
 }) {
   const channel = await getRewardChannel(guild);
   if (!channel) return false;
+
+  const totalCoins =
+    (Number(baseCoins) || 0) +
+    (Number(bonusCoins) || 0);
+
+  let rewardDetails =
+    `🪙 **+${formatAmount(totalCoins)} coins** dans ta poche.`;
+
+  if (bonusCoins > 0) {
+    rewardDetails +=
+      `\n📹 **Bonus activité : +${bonusPercent}%** ` +
+      `(+${formatAmount(bonusCoins)} coins) ` +
+      `— ${activityLabel}`;
+  }
 
   const embed = new EmbedBuilder()
     .setColor(0x57f287)
     .setTitle('🎙️ Récompense vocale')
     .setDescription(
       `${user}, tu as passé **${formatDuration(earnedIntervalMs)} valides** en vocal.\n\n` +
-      `🪙 **+${formatAmount(VOICE_REWARD_COINS)} coins** dans ta poche.\n` +
-      `-# Poche : ${formatAmount(account.coins)} coins\n\n` +
+      rewardDetails +
+      `\n-# Poche : ${formatAmount(account.coins)} coins\n\n` +
       `🎲 Prochaine récompense dans **${formatDuration(nextIntervalMs)} valides**.`
     )
     .setTimestamp();
@@ -167,6 +187,8 @@ module.exports = {
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
+  VOICE_ACTIVITY_BONUS_PERCENT,
+  VOICE_MUTE_GRACE_MS,
   formatDuration,
   getReachedMessageReward,
   buildMessageProgress,
