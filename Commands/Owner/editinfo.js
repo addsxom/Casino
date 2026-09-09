@@ -6,6 +6,7 @@ const {
 } = require('discord.js');
 
 const mongoose = require('mongoose');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const BotInfo = require('../../Models/BotInfo');
 const Owner = require('../../Models/Owner.js');
 const {
@@ -295,7 +296,10 @@ module.exports = {
 
     if (mongoose.connection.readyState !== 1) {
       return message.reply(
-        '❌・La connexion à la base de données n’est pas établie.'
+        replyEmbedPayload(
+          'La connexion à la base de données n’est pas établie.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -359,7 +363,13 @@ module.exports = {
         const field = interaction.values[0];
 
         const question = await message.channel.send(
-          promptFor(field)
+          replyEmbedPayload(
+            promptFor(field),
+            {
+              type: 'info',
+              title: '✏️ Modification du bot'
+            }
+          )
         );
 
         const collected = await message.channel.awaitMessages({
@@ -373,7 +383,13 @@ module.exports = {
 
         if (!response) {
           return question.edit(
-            '❌・Temps écoulé. Relance la sélection dans le menu.'
+            replyEmbedPayload(
+              'Temps écoulé. Relance la sélection dans le menu.',
+              {
+                type: 'warning',
+                title: '⌛ Temps écoulé'
+              }
+            )
           );
         }
 
@@ -413,7 +429,12 @@ module.exports = {
             console.error('Erreur +editbot :', error);
           }
 
-          const errorMessage = await message.channel.send(errorText);
+          const errorMessage = await message.channel.send(
+            replyEmbedPayload(
+              errorText.replace(/^❌・/, ''),
+              { type: 'error' }
+            )
+          );
 
           setTimeout(() => {
             errorMessage.delete().catch(() => {});
@@ -430,7 +451,10 @@ module.exports = {
       console.error('Erreur +editbot :', error);
 
       return message.reply(
-        '❌・Une erreur s’est produite lors de la modification des informations du bot.'
+        replyEmbedPayload(
+          'Une erreur s’est produite lors de la modification des informations du bot.',
+          { type: 'error' }
+        )
       );
     }
   }
