@@ -7,6 +7,7 @@ const {
   SeparatorBuilder,
   MessageFlags
 } = require('discord.js');
+const config = require('../../config/botConfig.js');
 
 const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
@@ -21,11 +22,13 @@ const {
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
 
-const MINES_CHANNEL_ID = '1546311653564620899';
-const BONUS_CHANCE = 0.10;
+const MINES_CHANNEL_ID = config.channels.games.mines;
+const {
+  bonusChance: BONUS_CHANCE,
+  revealCostPercent: REVEAL_COST_PERCENT,
+  revealCooldownMs: REVEAL_COOLDOWN_MS
+} = config.games.mines;
 const BONUS_BALANCE_FACTOR = 1 + BONUS_CHANCE;
-const REVEAL_COST_PERCENT = 0.20;
-const REVEAL_COOLDOWN_MS = 2 * 60 * 1000;
 
 const MODES = {
   rapide: { label: '⚡ Rapide', rows: 3, cols: 3, mines: 1, color: 0x3498db },
