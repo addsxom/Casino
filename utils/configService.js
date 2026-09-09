@@ -33,6 +33,13 @@ const CHANNEL_CONFIGS = {
     scope: 'guild',
     aliases: ['reward', 'reward-voc']
   },
+  afkfarm: {
+    label: 'Vocal AFK Farm',
+    path: ['channels', 'afkFarm'],
+    type: 'voice',
+    scope: 'guild',
+    aliases: ['afk', 'farm', 'afk-farm']
+  },
   botguildevents: {
     label: 'Arrivée/départ du bot',
     path: ['channels', 'botGuildEvents'],
