@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const config = require('../../config/botConfig.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
@@ -11,11 +12,14 @@ const {
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
 
-const SLOT_CHANNEL_ID = '1546311653564620897';
-
-const SLOT_GIF = 'https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif';
-const WIN_GIF = 'https://media.giphy.com/media/Vu5UbNpjpqfMq2UFg0/giphy.gif';
-const LOSE_GIF = 'https://media.giphy.com/media/eJ4j2VnYOZU8qJU3Py/giphy.gif';
+const SLOT_CHANNEL_ID = config.channels.games.slots;
+const {
+  winChance: SLOT_WIN_CHANCE,
+  spinMs: SLOT_SPIN_MS,
+  spinGif: SLOT_GIF,
+  winGif: WIN_GIF,
+  loseGif: LOSE_GIF
+} = config.games.slots;
 
 module.exports = {
   name: 'slot',
@@ -133,7 +137,7 @@ module.exports = {
         )
         .setImage(SLOT_GIF)
         .setFooter({
-          text: `${message.author.tag} | 5 secondes avant le résultat`,
+          text: `${message.author.tag} | ${SLOT_SPIN_MS / 1000} secondes avant le résultat`,
           iconURL: message.author.displayAvatarURL({ dynamic: true })
         })
         .setColor(0x6b6de6);
@@ -148,9 +152,9 @@ module.exports = {
         messageId: sentEmbed.id
       });
 
-      await sleep(5000);
+      await sleep(SLOT_SPIN_MS);
 
-      const result = Math.random() < 0.485;
+      const result = Math.random() < SLOT_WIN_CHANCE;
 
       if (result) {
         userCoins = await creditBalance({
