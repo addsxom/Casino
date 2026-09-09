@@ -1,6 +1,7 @@
 const ServerPrefix = require("../../Models/ServerPrefix");
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 module.exports = {
   name: "setprefix",
@@ -13,12 +14,15 @@ module.exports = {
 const newPrefix = args[0];
 
     if (!newPrefix) {
-      return message.channel.send("Veuillez fournir un nouveau préfixe.");
+      return message.channel.send(replyEmbedPayload("Veuillez fournir un nouveau préfixe.", { type: "error" }));
     }
 
     if (!message.guild) {
       return message.channel.send(
-        "Cette commande ne peut être utilisée que dans un serveur."
+        replyEmbedPayload(
+          "Cette commande ne peut être utilisée que dans un serveur.",
+          { type: 'error' }
+        )
       );
     }
 
@@ -39,12 +43,18 @@ const newPrefix = args[0];
       await serverPrefix.save();
 
       message.channel.send(
-        `Le préfixe du bot pour ce serveur a été défini sur \`${newPrefix}\`.`
+        replyEmbedPayload(
+          `Le préfixe du bot pour ce serveur a été défini sur \`${newPrefix}\`.`,
+          { type: 'success', title: '⌨️ Préfixe modifié' }
+        )
       );
     } catch (error) {
       console.error(error);
       message.channel.send(
-        "Une erreur s'est produite lors de la définition du préfixe."
+        replyEmbedPayload(
+          "Une erreur s'est produite lors de la définition du préfixe.",
+          { type: 'error' }
+        )
       );
     }
   },
