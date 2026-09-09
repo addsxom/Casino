@@ -1,6 +1,4 @@
 const config = require('../config/botConfig.js');
-const MEMBER_COUNT_CHANNEL_ID = config.channels.memberCount;
-
 // Discord limite les renommages répétés d'un même salon.
 // On espace les renommages et on garde une seule mise à jour en attente.
 const RENAME_INTERVAL_MS = config.system.memberCountRenameIntervalMs;
@@ -13,8 +11,8 @@ async function performMemberCountUpdate(guild) {
 
   try {
     const channel =
-      guild.channels.cache.get(MEMBER_COUNT_CHANNEL_ID) ||
-      await guild.channels.fetch(MEMBER_COUNT_CHANNEL_ID);
+      guild.channels.cache.get(config.channels.memberCount) ||
+      await guild.channels.fetch(config.channels.memberCount);
 
     if (!channel) {
       console.error('Salon compteur de membres introuvable.');
@@ -90,5 +88,5 @@ async function updateMemberCount(guild) {
 
 module.exports = {
   updateMemberCount,
-  MEMBER_COUNT_CHANNEL_ID
+  getMemberCountChannelId: () => config.channels.memberCount
 };
