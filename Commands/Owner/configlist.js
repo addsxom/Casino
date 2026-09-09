@@ -17,17 +17,73 @@ function extractChannelId(args) {
   return raw.match(/\d{17,20}/)?.[0] || null;
 }
 
-function formatChannelLine(message, entry) {
-  const channel =
-    message.client.channels.cache.get(entry.id);
+function channelTypeMatches(entry, channel) {
+  if (!channel) return false;
 
-  const name = channel?.name
-    ? ` • #${channel.name}`
+  if (entry.type === 'voice') {
+    return channel.isVoiceBased?.() === true;
+  }
+
+  if (entry.type === 'text') {
+    return (
+      channel.isTextBased?.() === true &&
+      channel.isVoiceBased?.() !== true
+    );
+  }
+
+  return true;
+}
+
+async function getEntryStatus(message, entry) {
+  if (!entry.id) {
+    return {
+      connected: false,
+      channel: null
+    };
+  }
+
+  const channel =
+    message.client.channels.cache.get(entry.id) ||
+    await message.client.channels.fetch(entry.id)
+      .catch(() => null);
+
+  if (!channel) {
+    return {
+      connected: false,
+      channel: null
+    };
+  }
+
+  if (
+    entry.scope !== 'global' &&
+    channel.guild?.id !== message.guild.id
+  ) {
+    return {
+      connected: false,
+      channel
+    };
+  }
+
+  return {
+    connected: channelTypeMatches(entry, channel),
+    channel
+  };
+}
+
+function formatChannelLine(entry, status) {
+  const icon = status.connected ? '✅' : '❌';
+
+  const channelText = status.connected
+    ? `${status.channel} • \`${entry.id}\``
+    : `\`${entry.id || 'Aucun ID'}\``;
+
+  const scopeText = entry.scope === 'global'
+    ? ' • global'
     : '';
 
   return (
-    `**${entry.key}** → <#${entry.id}>${name}\n` +
-    `-# ${entry.label}`
+    `${icon} **${entry.key}** → ${channelText}\n` +
+    `-# ${entry.label}${scopeText}`
   );
 }
 
@@ -76,20 +132,43 @@ module.exports = {
     if (!message.guild) return;
     if (!(await requireBotOwner(message))) return;
 
+    const guildId = message.guild.id;
     const keyInput = args[0];
 
     if (!keyInput) {
-      const entries = getChannelConfigList();
+      const entries =
+        getChannelConfigList(guildId);
+
+      const statuses = await Promise.all(
+        entries.map(entry =>
+          getEntryStatus(message, entry)
+        )
+      );
+
+      const connectedCount =
+        statuses.filter(status =>
+          status.connected
+        ).length;
+
+      const lines = entries.map(
+        (entry, index) =>
+          formatChannelLine(
+            entry,
+            statuses[index]
+          )
+      );
 
       const embed = new EmbedBuilder()
-        .setColor(0x6b6de6)
+        .setColor(
+          connectedCount === entries.length
+            ? 0x57f287
+            : 0x6b6de6
+        )
         .setTitle('⚙️ Configuration des salons')
         .setDescription(
-          entries
-            .map(entry =>
-              formatChannelLine(message, entry)
-            )
-            .join('\n\n')
+          `✅ **${connectedCount}/${entries.length} connectés**\n` +
+          `❌ **${entries.length - connectedCount} à configurer**\n\n` +
+          lines.join('\n\n')
         )
         .setFooter({
           text:
@@ -110,14 +189,24 @@ module.exports = {
       );
     }
 
+    const entries =
+      getChannelConfigList(guildId);
+
+    const current =
+      entries.find(entry => entry.key === key);
+
     const channelId = extractChannelId(args);
 
     if (!channelId) {
-      const current = getChannelConfigList()
-        .find(entry => entry.key === key);
+      const status =
+        await getEntryStatus(
+          message,
+          current
+        );
 
       return message.reply(
-        `⚙️ **${key}** est actuellement configuré sur <#${current.id}>.\n` +
+        `${status.connected ? '✅' : '❌'} **${key}** → ` +
+        `${status.connected ? status.channel : `\`${current.id || 'Aucun ID'}\``}\n` +
         `Utilise : +configlist ${key} <ID>`
       );
     }
@@ -132,29 +221,35 @@ module.exports = {
       );
     }
 
-    const current =
-      getChannelConfigList()
-        .find(entry => entry.key === key);
-
     if (
-      current.type === 'text' &&
-      !channel.isTextBased?.()
+      current.scope !== 'global' &&
+      channel.guild?.id !== guildId
     ) {
       return message.reply(
-        '❌・Cette configuration attend un salon textuel.'
+        '❌・Ce salon appartient à un autre serveur. Utilise un salon de ce serveur.'
       );
     }
 
-    if (
-      current.type === 'voice' &&
-      !channel.isVoiceBased?.()
-    ) {
+    if (!channelTypeMatches(current, channel)) {
+      if (current.type === 'voice') {
+        return message.reply(
+          '❌・Cette configuration attend un salon vocal.'
+        );
+      }
+
+      if (current.type === 'text') {
+        return message.reply(
+          '❌・Cette configuration attend un salon textuel.'
+        );
+      }
+
       return message.reply(
-        '❌・Cette configuration attend un salon vocal.'
+        '❌・Le type de ce salon n’est pas compatible.'
       );
     }
 
     const result = await setChannelConfig(
+      guildId,
       key,
       channelId
     );
@@ -176,8 +271,13 @@ module.exports = {
       .setTitle('✅ Configuration mise à jour')
       .setDescription(
         `**${result.entry.label}**\n` +
-        `<#${channelId}> • ${channelId}\n\n` +
-        '-# Sauvegardé dans MongoDB et conservé après redémarrage / git pull.'
+        `${channel} • \`${channelId}\`\n\n` +
+        (
+          result.entry.scope === 'global'
+            ? '-# Configuration globale du bot.'
+            : '-# Configuration sauvegardée uniquement pour ce serveur.'
+        ) +
+        '\n-# Conservé après redémarrage / git pull.'
       )
       .setTimestamp();
 
