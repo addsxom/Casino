@@ -7,6 +7,8 @@ const {
   buildStatusContainer
 } = require('./ui.js');
 
+const { replyEmbedPayload } = require('../replyEmbed.js');
+
 async function confirmMinesAll(
   message,
   gameMessage,
@@ -37,8 +39,10 @@ async function confirmMinesAll(
           message.author.id
         ) {
           return interaction.reply({
-            content:
-              '❌・Cette confirmation ne vous appartient pas.',
+            ...replyEmbedPayload(
+              'Cette confirmation ne vous appartient pas.',
+              { type: 'error' }
+            ),
             flags:
               MessageFlags.Ephemeral
           }).catch(() => {});
