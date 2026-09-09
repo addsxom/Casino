@@ -1,4 +1,5 @@
 const Owner = require('../../Models/Owner.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const {
   sendStaffLog,
   buildDiscordLog
@@ -126,7 +127,10 @@ module.exports = {
         requestedAmount <= 0
       ) {
         return message.reply(
-          '❌・Utilisation : **+clear** ou **+clear <nombre>**'
+          replyEmbedPayload(
+            'Utilisation : **+clear** ou **+clear <nombre>**',
+            { type: 'error' }
+          )
         );
       }
     }
@@ -153,7 +157,13 @@ module.exports = {
       );
 
       const confirmation = await channel.send(
-        `✅・**${deleted}** message${deleted > 1 ? 's' : ''} supprimé${deleted > 1 ? 's' : ''}.`
+        replyEmbedPayload(
+          `**${deleted}** message${deleted > 1 ? 's' : ''} supprimé${deleted > 1 ? 's' : ''}.`,
+          {
+            type: 'success',
+            title: '🧹 Messages supprimés'
+          }
+        )
       );
 
       setTimeout(() => {
@@ -163,7 +173,10 @@ module.exports = {
       console.error('Erreur +clear :', error);
 
       const errorMessage = await channel.send(
-        '❌・Une erreur est survenue pendant la suppression des messages.'
+        replyEmbedPayload(
+          'Une erreur est survenue pendant la suppression des messages.',
+          { type: 'error' }
+        )
       ).catch(() => null);
 
       if (errorMessage) {
