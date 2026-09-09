@@ -102,10 +102,10 @@ function getMuteEligibility(
 async function sendMuteTimeoutWarning(member) {
   await member.send(
     '🎙️ **Récompenses vocales mises en pause**\n\n' +
-    'Ton micro est coupé depuis **40 minutes**. ' +
+    `Ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**. ` +
     'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
     '✅ **Pour redevenir éligible :** réactive simplement ton micro. ' +
-    'Le délai de 40 minutes sera alors remis à zéro si tu le recoupes plus tard.'
+    `Le délai de ${formatDuration(VOICE_MUTE_GRACE_MS)} sera alors remis à zéro si tu le recoupes plus tard.`
   ).catch(() => {});
 }
 
@@ -317,7 +317,7 @@ function startVoiceRewardTracker(bot) {
   }, 1000);
 
   console.log(
-    'Rewards • vocal actif : 15-20 min • protections mute/casque • bonus caméra/stream'
+    `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${formatDuration(VOICE_MUTE_GRACE_MS)}`
   );
 }
 
