@@ -1,4 +1,5 @@
 const Discord = require("discord.js");
+const config = require('../config/botConfig.js');
 
 module.exports = (bot, guild) => {
 
@@ -24,5 +25,5 @@ module.exports = (bot, guild) => {
      .setThumbnail(guild.iconURL())
      .setTimestamp()
      .setColor("7FB3D5")
-     bot.channels.cache.get('1132784655817519225').send({embeds: [embed] }).catch(() => false)
+     bot.channels.cache.get(config.channels.botGuildEvents).send({embeds: [embed] }).catch(() => false)
   } 
