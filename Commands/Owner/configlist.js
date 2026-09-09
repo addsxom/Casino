@@ -23,6 +23,7 @@ const {
 const {
   updateMemberCount
 } = require('../../utils/updateMemberCount.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 function extractChannelIds(args) {
   const raw =
@@ -319,8 +320,10 @@ function attachConfiglistButtons(
         message.author.id
       ) {
         return interaction.reply({
-          content:
-            '❌・Ces boutons ne vous appartiennent pas.',
+          ...replyEmbedPayload(
+            'Ces boutons ne vous appartiennent pas.',
+            { type: 'error' }
+          ),
           flags:
             MessageFlags.Ephemeral
         }).catch(() => {});
@@ -633,7 +636,10 @@ module.exports = {
 
     if (!key) {
       return message.reply(
-        '❌・Clé inconnue. Fais +configlist pour voir les clés disponibles.'
+        replyEmbedPayload(
+          'Clé inconnue. Fais **+configlist** pour voir les clés disponibles.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -650,7 +656,10 @@ module.exports = {
 
     if (!current) {
       return message.reply(
-        '❌・Configuration introuvable.'
+        replyEmbedPayload(
+          'Configuration introuvable.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -709,18 +718,30 @@ module.exports = {
 
         if (!result.ok) {
           return message.reply(
-            '❌・Impossible de vider cette configuration.'
+            replyEmbedPayload(
+              'Impossible de vider cette configuration.',
+              { type: 'error' }
+            )
           );
         }
 
         return message.reply(
-          `✅ **${current.label}** vidé.\n-# Tant que voicefarm est vide, le système vocal normal garde son comportement actuel.`
+          replyEmbedPayload(
+            `**${current.label}** vidé.\nTant que **voicefarm** est vide, le système vocal normal garde son comportement actuel.`,
+            {
+              type: 'success',
+              title: '⚙️ Configuration vidée'
+            }
+          )
         );
       }
 
       if (!ids.length) {
         return message.reply(
-          `❌・Ajoute au moins un ID de salon vocal.\n\n${buildMultiHelp(key)}`
+          replyEmbedPayload(
+            `Ajoute au moins un ID de salon vocal.\n\n${buildMultiHelp(key)}`,
+            { type: 'error' }
+          )
         );
       }
 
@@ -741,7 +762,10 @@ module.exports = {
               .join(', ');
 
           return message.reply(
-            `❌・Ces IDs ne correspondent pas à des vocaux accessibles de ce serveur : ${invalidIds}`
+            replyEmbedPayload(
+              `Ces IDs ne correspondent pas à des vocaux accessibles de ce serveur : ${invalidIds}`,
+              { type: 'error' }
+            )
           );
         }
       }
@@ -780,7 +804,10 @@ module.exports = {
 
       if (!result.ok) {
         return message.reply(
-          '❌・Impossible de mettre à jour cette liste.'
+          replyEmbedPayload(
+            'Impossible de mettre à jour cette liste.',
+            { type: 'error' }
+          )
         );
       }
 
@@ -846,9 +873,17 @@ module.exports = {
         );
 
       return message.reply(
-        `${status.connected ? '✅' : '❌'} **${key}** → ${getLiveChannelLabel(status)}\n` +
-        `-# ${current.label}\n` +
-        `Utilise : +configlist ${key} <ID>`
+        replyEmbedPayload(
+          `**${key}** → ${getLiveChannelLabel(status)}\n` +
+          `${current.label}\n\n` +
+          `Utilise : \`+configlist ${key} <ID>\``,
+          {
+            type: status.connected
+              ? 'success'
+              : 'warning',
+            title: '⚙️ Configuration'
+          }
+        )
       );
     }
 
@@ -870,7 +905,10 @@ module.exports = {
         channel.guild?.id !== guildId
       ) {
         return message.reply(
-          '❌・Ce salon appartient à un autre serveur. Utilise un salon de ce serveur.'
+          replyEmbedPayload(
+            'Ce salon appartient à un autre serveur. Utilise un salon de ce serveur.',
+            { type: 'error' }
+          )
         );
       }
 
@@ -885,7 +923,10 @@ module.exports = {
           current.type === 'voice'
         ) {
           return message.reply(
-            '❌・Cette configuration attend un salon vocal.'
+            replyEmbedPayload(
+              'Cette configuration attend un salon vocal.',
+              { type: 'error' }
+            )
           );
         }
 
@@ -893,13 +934,19 @@ module.exports = {
           current.type === 'text'
         ) {
           return message.reply(
-            '❌・Cette configuration attend un salon textuel.'
+            replyEmbedPayload(
+              'Cette configuration attend un salon textuel.',
+              { type: 'error' }
+            )
           );
         }
       }
 
       return message.reply(
-        '❌・Je ne trouve pas cet ID de salon ou je n’y ai pas accès.'
+        replyEmbedPayload(
+          'Je ne trouve pas cet ID de salon ou je n’y ai pas accès.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -916,7 +963,10 @@ module.exports = {
 
     if (!result.ok) {
       return message.reply(
-        '❌・Impossible de mettre à jour cette configuration.'
+        replyEmbedPayload(
+          'Impossible de mettre à jour cette configuration.',
+          { type: 'error' }
+        )
       );
     }
 
