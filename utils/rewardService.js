@@ -4,16 +4,36 @@ const { formatAmount } = require('./formatAmount.js');
 const REWARD_CHANNEL_ID = '1547030803303637072';
 
 const MESSAGE_REWARDS = [
-  { threshold: 100, coins: 250 },
-  { threshold: 500, coins: 1000 },
-  { threshold: 1000, coins: 2500 },
-  { threshold: 2500, coins: 6000 },
-  { threshold: 5000, coins: 15000 },
-  { threshold: 10000, coins: 35000 }
+  { threshold: 10, coins: 100 },
+  { threshold: 25, coins: 250 },
+  { threshold: 50, coins: 500 },
+  { threshold: 100, coins: 1000 },
+  { threshold: 250, coins: 2500 },
+  { threshold: 500, coins: 5000 },
+  { threshold: 1000, coins: 10000 },
+  { threshold: 2500, coins: 20000 },
+  { threshold: 5000, coins: 35000 },
+  { threshold: 10000, coins: 60000 }
 ];
 
-const VOICE_REWARD_INTERVAL_MS = 15 * 1000;
+const VOICE_REWARD_MIN_MS = 15 * 60 * 1000;
+const VOICE_REWARD_MAX_MS = 20 * 60 * 1000;
 const VOICE_REWARD_COINS = 1000;
+
+function formatDuration(ms) {
+  const totalSeconds = Math.max(
+    0,
+    Math.round(ms / 1000)
+  );
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  if (seconds === 0) {
+    return `${minutes} min`;
+  }
+
+  return `${minutes} min ${seconds}s`;
+}
 
 function getReachedMessageReward(messages) {
   const count = Number(messages) || 0;
@@ -115,23 +135,21 @@ async function sendMessageRewardNotification({
 async function sendVoiceRewardNotification({
   guild,
   user,
-  account
+  account,
+  earnedIntervalMs,
+  nextIntervalMs
 }) {
   const channel = await getRewardChannel(guild);
   if (!channel) return false;
-
-  const seconds = Math.floor(
-    VOICE_REWARD_INTERVAL_MS / 1000
-  );
 
   const embed = new EmbedBuilder()
     .setColor(0x57f287)
     .setTitle('🎙️ Récompense vocale')
     .setDescription(
-      `${user}, tu as passé **${seconds} secondes valides** en vocal.\n\n` +
+      `${user}, tu as passé **${formatDuration(earnedIntervalMs)} valides** en vocal.\n\n` +
       `🪙 **+${formatAmount(VOICE_REWARD_COINS)} coins** dans ta poche.\n` +
       `-# Poche : ${formatAmount(account.coins)} coins\n\n` +
-      `⏳ Prochaine récompense dans **${seconds} secondes valides**.`
+      `🎲 Prochaine récompense dans **${formatDuration(nextIntervalMs)} valides**.`
     )
     .setTimestamp();
 
@@ -146,8 +164,10 @@ async function sendVoiceRewardNotification({
 module.exports = {
   REWARD_CHANNEL_ID,
   MESSAGE_REWARDS,
-  VOICE_REWARD_INTERVAL_MS,
+  VOICE_REWARD_MIN_MS,
+  VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
+  formatDuration,
   getReachedMessageReward,
   buildMessageProgress,
   sendMessageRewardNotification,
