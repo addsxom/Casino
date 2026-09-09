@@ -1,3 +1,5 @@
+const VoiceRewardProgress =
+  require('../Models/VoiceRewardProgress.js');
 const {
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
@@ -31,6 +33,33 @@ function getRandomVoiceInterval() {
   );
 }
 
+function normalizeTargetMs(value) {
+  const target = Number(value);
+
+  if (
+    !Number.isFinite(target) ||
+    target < VOICE_REWARD_MIN_MS ||
+    target > VOICE_REWARD_MAX_MS
+  ) {
+    return getRandomVoiceInterval();
+  }
+
+  return Math.floor(target);
+}
+
+function normalizeProgressMs(value, max) {
+  const number = Number(value);
+
+  if (!Number.isFinite(number) || number <= 0) {
+    return 0;
+  }
+
+  return Math.min(
+    Math.floor(number),
+    Math.max(0, max)
+  );
+}
+
 function hasEnoughHumans(channel) {
   if (!channel) return false;
 
@@ -42,7 +71,7 @@ function hasEnoughHumans(channel) {
 }
 
 function resetMuteGrace(progress) {
-  progress.mutedSince = null;
+  progress.mutedMs = 0;
   progress.muteWarningSent = false;
 }
 
@@ -54,13 +83,11 @@ function resetRewardProgress(progress) {
 
 function getMuteEligibility(
   voiceState,
-  progress,
-  now
+  progress
 ) {
   const selfMuted = voiceState.selfMute === true;
   const selfDeafened = voiceState.selfDeaf === true;
 
-  // Casque coupé uniquement : inéligible immédiatement.
   if (selfDeafened && !selfMuted) {
     resetMuteGrace(progress);
 
@@ -70,7 +97,6 @@ function getMuteEligibility(
     };
   }
 
-  // Micro actif : aucune limite mute en cours.
   if (!selfMuted) {
     resetMuteGrace(progress);
 
@@ -80,29 +106,18 @@ function getMuteEligibility(
     };
   }
 
-  // Micro coupé, avec ou sans casque :
-  // reste éligible pendant le délai de grâce.
-  if (!progress.mutedSince) {
-    progress.mutedSince = now;
-  }
-
-  const mutedForMs = Math.max(
-    0,
-    now - progress.mutedSince
-  );
-
-  if (mutedForMs >= VOICE_MUTE_GRACE_MS) {
+  if (progress.mutedMs >= VOICE_MUTE_GRACE_MS) {
     return {
       eligible: false,
       reason: 'mute_timeout',
-      mutedForMs
+      mutedForMs: progress.mutedMs
     };
   }
 
   return {
     eligible: true,
     reason: 'mute_grace',
-    mutedForMs
+    mutedForMs: progress.mutedMs
   };
 }
 
@@ -266,9 +281,129 @@ async function updateStatus(
     });
 }
 
+async function loadProgress(
+  guild,
+  member,
+  voiceState,
+  now
+) {
+  const saved =
+    await VoiceRewardProgress.findOne({
+      userId: member.id,
+      guildId: guild.id
+    }).lean();
+
+  const targetMs = normalizeTargetMs(
+    saved?.targetMs
+  );
+
+  const validMs = normalizeProgressMs(
+    saved?.validMs,
+    targetMs
+  );
+
+  return {
+    guild,
+    user: member.user,
+    validMs,
+    targetMs,
+    mutedMs: normalizeProgressMs(
+      saved?.mutedMs,
+      VOICE_MUTE_GRACE_MS
+    ),
+    rewardDueAt: null,
+    lastCheckedAt: now,
+    processing: false,
+    muteWarningSent: false,
+    previousSelfMute:
+      voiceState.selfMute === true,
+    status: null,
+    statusRewardDueAt: null,
+    statusMessage: null,
+    restoredFromDatabase: Boolean(saved)
+  };
+}
+
+async function persistProgressBatch(entries) {
+  if (!entries.length) return;
+
+  const operations = entries.map(progress => ({
+    updateOne: {
+      filter: {
+        userId: progress.user.id,
+        guildId: progress.guild.id
+      },
+      update: {
+        $set: {
+          validMs: Math.floor(progress.validMs),
+          targetMs: Math.floor(progress.targetMs),
+          mutedMs: Math.floor(progress.mutedMs),
+          previousSelfMute:
+            progress.previousSelfMute === true
+        },
+        $setOnInsert: {
+          userId: progress.user.id,
+          guildId: progress.guild.id
+        }
+      },
+      upsert: true
+    }
+  }));
+
+  await VoiceRewardProgress.bulkWrite(
+    operations,
+    { ordered: false }
+  );
+}
+
+async function cleanupDisconnectedProgress(bot) {
+  const saved =
+    await VoiceRewardProgress.find({})
+      .select('_id userId guildId')
+      .lean();
+
+  if (!saved.length) return;
+
+  const connectedKeys = new Set();
+
+  for (const guild of bot.guilds.cache.values()) {
+    for (
+      const voiceState
+      of guild.voiceStates.cache.values()
+    ) {
+      const member = voiceState.member;
+
+      if (
+        member &&
+        !member.user?.bot &&
+        voiceState.channel
+      ) {
+        connectedKeys.add(
+          getKey(guild.id, member.id)
+        );
+      }
+    }
+  }
+
+  const staleIds = saved
+    .filter(entry =>
+      !connectedKeys.has(
+        getKey(entry.guildId, entry.userId)
+      )
+    )
+    .map(entry => entry._id);
+
+  if (staleIds.length) {
+    await VoiceRewardProgress.deleteMany({
+      _id: { $in: staleIds }
+    });
+  }
+}
+
 async function tick(bot) {
   const now = Date.now();
   const connectedKeys = new Set();
+  const toPersist = [];
 
   for (const guild of bot.guilds.cache.values()) {
     for (const voiceState of guild.voiceStates.cache.values()) {
@@ -285,22 +420,12 @@ async function tick(bot) {
       let progress = voiceProgress.get(key);
 
       if (!progress) {
-        progress = {
+        progress = await loadProgress(
           guild,
-          user: member.user,
-          validMs: 0,
-          targetMs: getRandomVoiceInterval(),
-          rewardDueAt: null,
-          lastCheckedAt: now,
-          processing: false,
-          mutedSince: null,
-          muteWarningSent: false,
-          previousSelfMute:
-            voiceState.selfMute === true,
-          status: null,
-          statusRewardDueAt: null,
-          statusMessage: null
-        };
+          member,
+          voiceState,
+          now
+        );
 
         voiceProgress.set(key, progress);
       }
@@ -320,7 +445,6 @@ async function tick(bot) {
         selfMuted === false;
 
       if (justUnmuted) {
-        // Demute = nouveau cycle complet.
         resetRewardProgress(progress);
         resetMuteGrace(progress);
         elapsed = 0;
@@ -328,11 +452,17 @@ async function tick(bot) {
 
       progress.previousSelfMute = selfMuted;
 
+      if (selfMuted && elapsed > 0) {
+        progress.mutedMs = Math.min(
+          VOICE_MUTE_GRACE_MS,
+          progress.mutedMs + elapsed
+        );
+      }
+
       const muteEligibility =
         getMuteEligibility(
           voiceState,
-          progress,
-          now
+          progress
         );
 
       if (
@@ -359,13 +489,15 @@ async function tick(bot) {
       if (eligible) {
         progress.validMs += elapsed;
 
-        const remainingMs = Math.max(
-          0,
-          progress.targetMs - progress.validMs
-        );
+        if (!progress.rewardDueAt) {
+          const remainingMs = Math.max(
+            0,
+            progress.targetMs - progress.validMs
+          );
 
-        progress.rewardDueAt =
-          now + remainingMs;
+          progress.rewardDueAt =
+            now + remainingMs;
+        }
       } else {
         progress.rewardDueAt = null;
       }
@@ -428,10 +560,17 @@ async function tick(bot) {
           progress.processing = false;
         }
       }
+
+      toPersist.push(progress);
     }
   }
 
-  for (const [key, progress] of voiceProgress.entries()) {
+  await persistProgressBatch(toPersist);
+
+  for (
+    const [key, progress]
+    of voiceProgress.entries()
+  ) {
     if (connectedKeys.has(key)) {
       continue;
     }
@@ -442,16 +581,23 @@ async function tick(bot) {
       null
     );
 
+    await VoiceRewardProgress.deleteOne({
+      userId: progress.user.id,
+      guildId: progress.guild.id
+    });
+
     voiceProgress.delete(key);
   }
 }
 
-function startVoiceRewardTracker(bot) {
+async function startVoiceRewardTracker(bot) {
   if (trackerInterval) {
     clearInterval(trackerInterval);
   }
 
   voiceProgress.clear();
+
+  await cleanupDisconnectedProgress(bot);
 
   trackerInterval = setInterval(() => {
     tick(bot).catch(error => {
@@ -462,8 +608,15 @@ function startVoiceRewardTracker(bot) {
     });
   }, 1000);
 
+  tick(bot).catch(error => {
+    console.error(
+      'Erreur initialisation tracker vocal :',
+      error
+    );
+  });
+
   console.log(
-    `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${formatDuration(VOICE_MUTE_GRACE_MS)}`
+    `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${formatDuration(VOICE_MUTE_GRACE_MS)} • progression MongoDB`
   );
 }
 
