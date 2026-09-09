@@ -2,6 +2,8 @@ const {
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
+  VOICE_ACTIVITY_BONUS_PERCENT,
+  VOICE_MUTE_GRACE_MS,
   formatDuration,
   sendVoiceRewardNotification
 } = require('./rewardService.js');
@@ -28,8 +30,8 @@ function getRandomVoiceInterval() {
   );
 }
 
-function isValidVoiceChannel(guild, channel) {
-  if (!guild || !channel) return false;
+function hasEnoughHumans(channel) {
+  if (!channel) return false;
 
   const humanCount = channel.members.filter(
     member => !member.user.bot
@@ -38,16 +40,127 @@ function isValidVoiceChannel(guild, channel) {
   return humanCount >= 2;
 }
 
+function resetMuteGrace(progress) {
+  progress.mutedSince = null;
+  progress.muteWarningSent = false;
+}
+
+function getMuteEligibility(
+  voiceState,
+  progress,
+  now
+) {
+  const selfMuted = voiceState.selfMute === true;
+  const selfDeafened = voiceState.selfDeaf === true;
+
+  // Casque coupé uniquement : inéligible immédiatement.
+  if (selfDeafened && !selfMuted) {
+    resetMuteGrace(progress);
+
+    return {
+      eligible: false,
+      reason: 'headphones_only'
+    };
+  }
+
+  // Micro actif : le délai de 40 minutes repart à zéro.
+  if (!selfMuted) {
+    resetMuteGrace(progress);
+
+    return {
+      eligible: true,
+      reason: null
+    };
+  }
+
+  // Micro coupé, avec ou sans casque coupé :
+  // éligible pendant 40 minutes continues.
+  if (!progress.mutedSince) {
+    progress.mutedSince = now;
+  }
+
+  const mutedForMs = Math.max(
+    0,
+    now - progress.mutedSince
+  );
+
+  if (mutedForMs >= VOICE_MUTE_GRACE_MS) {
+    return {
+      eligible: false,
+      reason: 'mute_timeout',
+      mutedForMs
+    };
+  }
+
+  return {
+    eligible: true,
+    reason: 'mute_grace',
+    mutedForMs
+  };
+}
+
+async function sendMuteTimeoutWarning(member) {
+  await member.send(
+    '🎙️ **Récompenses vocales mises en pause**\n\n' +
+    'Ton micro est coupé depuis **40 minutes**. ' +
+    'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
+    '✅ **Pour redevenir éligible :** réactive simplement ton micro. ' +
+    'Le délai de 40 minutes sera alors remis à zéro si tu le recoupes plus tard.'
+  ).catch(() => {});
+}
+
+function getActivityBonus(voiceState) {
+  const hasStream = voiceState.streaming === true;
+  const hasCamera = voiceState.selfVideo === true;
+
+  if (!hasStream && !hasCamera) {
+    return {
+      bonusPercent: 0,
+      bonusCoins: 0,
+      activityLabel: null
+    };
+  }
+
+  const bonusCoins = Math.floor(
+    VOICE_REWARD_COINS *
+      (VOICE_ACTIVITY_BONUS_PERCENT / 100)
+  );
+
+  let activityLabel = 'Caméra';
+
+  if (hasStream && hasCamera) {
+    activityLabel = 'Caméra + stream';
+  } else if (hasStream) {
+    activityLabel = 'Stream';
+  }
+
+  return {
+    bonusPercent: VOICE_ACTIVITY_BONUS_PERCENT,
+    bonusCoins,
+    activityLabel
+  };
+}
+
 async function rewardMember(
   member,
+  voiceState,
   earnedIntervalMs,
   nextIntervalMs
 ) {
+  const {
+    bonusPercent,
+    bonusCoins,
+    activityLabel
+  } = getActivityBonus(voiceState);
+
+  const totalCoins =
+    VOICE_REWARD_COINS + bonusCoins;
+
   const account = await creditBalance({
     userId: member.id,
     guildId: member.guild.id,
     target: 'coins',
-    amount: VOICE_REWARD_COINS
+    amount: totalCoins
   });
 
   if (!account) return;
@@ -58,11 +171,14 @@ async function rewardMember(
     buildCoinMovementLog({
       title: '🎙️ Récompense vocale',
       user: member.user,
-      delta: VOICE_REWARD_COINS,
+      delta: totalCoins,
       pocket: account.coins,
       bank: account.bank,
       reason:
-        `${formatDuration(earnedIntervalMs)} valides en vocal`
+        `${formatDuration(earnedIntervalMs)} valides en vocal`,
+      details: bonusCoins > 0
+        ? `Bonus ${activityLabel} : +${bonusPercent}% (+${bonusCoins} coins)`
+        : null
     })
   );
 
@@ -71,7 +187,11 @@ async function rewardMember(
     user: member.user,
     account,
     earnedIntervalMs,
-    nextIntervalMs
+    nextIntervalMs,
+    baseCoins: VOICE_REWARD_COINS,
+    bonusCoins,
+    bonusPercent,
+    activityLabel
   }).catch(error => {
     console.error(
       'Erreur notification récompense vocale :',
@@ -103,10 +223,11 @@ async function tick(bot) {
           validMs: 0,
           targetMs: getRandomVoiceInterval(),
           lastCheckedAt: now,
-          processing: false
+          processing: false,
+          mutedSince: null,
+          muteWarningSent: false
         };
         voiceProgress.set(key, progress);
-        continue;
       }
 
       const elapsed = Math.max(
@@ -116,7 +237,26 @@ async function tick(bot) {
 
       progress.lastCheckedAt = now;
 
-      if (isValidVoiceChannel(guild, channel)) {
+      const muteEligibility =
+        getMuteEligibility(
+          voiceState,
+          progress,
+          now
+        );
+
+      if (
+        muteEligibility.reason === 'mute_timeout' &&
+        !progress.muteWarningSent
+      ) {
+        progress.muteWarningSent = true;
+        await sendMuteTimeoutWarning(member);
+      }
+
+      const eligible =
+        hasEnoughHumans(channel) &&
+        muteEligibility.eligible;
+
+      if (eligible) {
         progress.validMs += elapsed;
       }
 
@@ -134,6 +274,7 @@ async function tick(bot) {
         try {
           await rewardMember(
             member,
+            voiceState,
             earnedIntervalMs,
             nextIntervalMs
           );
@@ -175,7 +316,7 @@ function startVoiceRewardTracker(bot) {
   }, 1000);
 
   console.log(
-    'Rewards • vocal actif : délai aléatoire 15-20 min'
+    'Rewards • vocal actif : 15-20 min • protections mute/casque • bonus caméra/stream'
   );
 }
 
