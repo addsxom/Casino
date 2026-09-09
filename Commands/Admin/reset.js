@@ -1,4 +1,5 @@
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
 const { resetAccount } = require('../../utils/economyService.js');
@@ -11,13 +12,13 @@ module.exports = {
     if (!(await requireBotOwner(message))) return;
 
 if (args.length !== 1) {
-      return message.reply('Utilisation incorrecte. Veuillez mentionner l\'utilisateur dont vous souhaitez réinitialiser les coins.');
+      return message.reply(replyEmbedPayload('Utilisation incorrecte. Veuillez mentionner l\'utilisateur dont vous souhaitez réinitialiser les coins.', { type: 'error' }));
     }
 
     const targetUser = message.mentions.users.first();
 
     if (!targetUser) {
-      return message.reply('Veuillez mentionner un utilisateur.');
+      return message.reply(replyEmbedPayload('Veuillez mentionner un utilisateur.', { type: 'error' }));
     }
 
     try {
@@ -27,9 +28,7 @@ if (args.length !== 1) {
       );
 
       if (!reset) {
-        return message.reply(
-          targetUser.tag + " n'a pas de coins à réinitialiser."
-        );
+        return message.reply(replyEmbedPayload(targetUser.tag + " n'a pas de coins à réinitialiser.", { type: 'warning' }));
       }
 
       if (reset.removedCoins > 0) {
@@ -49,13 +48,10 @@ if (args.length !== 1) {
         );
       }
 
-      return message.reply(
-        'Vous avez réinitialisé tous les coins/rep de ' +
-        targetUser.tag + '.'
-      );
+      return message.reply(replyEmbedPayload('Vous avez réinitialisé tous les coins/rep de ' + targetUser.tag + '.', { type: 'success' }));
     } catch (error) {
       console.error(error);
-      return message.reply('Une erreur s\'est produite lors de la réinitialisation des coins.');
+      return message.reply(replyEmbedPayload('Une erreur s\'est produite lors de la réinitialisation des coins.', { type: 'error' }));
     }
   },
 };
