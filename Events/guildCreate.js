@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const { getConfiguredChannelId } = require('../utils/configService.js');
 const Owner = require("../Models/Owner");
+const { replyEmbedPayload } = require('../utils/replyEmbed.js');
 
 module.exports = async (bot, guild) => {
   try {
@@ -45,7 +46,15 @@ module.exports = async (bot, guild) => {
             const fetchedApplication = await guild.fetchAuditLogs({ type: '28' });
             const botAddLog = fetchedApplication.entries.first();
             const addedBy = botAddLog ? botAddLog.executor.tag : 'Inconnu';
-            await ownerUser.send(`${diff}${addedBy}${diff} viens de m'inviter sur ${diff}${guild.name}${diff} (${guild.memberCount} membres, propriétaire: ${diff}${ownerTag}${diff})\nIl n'y avait pas le buyer dessus, je l'ai quitté`);
+            await ownerUser.send(
+              replyEmbedPayload(
+                `**${addedBy}** vient de m'inviter sur **${guild.name}** (${guild.memberCount} membres, propriétaire : **${ownerTag}**).\n\nLe BUYER n'était pas présent sur le serveur, je l'ai donc quitté.`,
+                {
+                  type: 'warning',
+                  title: '⚠️ Invitation refusée'
+                }
+              )
+            );
           } catch (error) {
             console.error(`Impossible d'envoyer un message privé à ${ownerUser.tag}: ${error}`);
           }
@@ -61,7 +70,15 @@ module.exports = async (bot, guild) => {
             const fetchedApplication = await guild.fetchAuditLogs({ type: '28' });
             const botAddLog = fetchedApplication.entries.first();
             const addedBy = botAddLog ? botAddLog.executor.tag : 'Inconnu';
-            await ownerUser.send({ content: `${diff}${addedBy}${diff} viens de m'inviter sur ${diff}${guild.name}${diff} (${guild.memberCount} membres, propriétaire: ${diff}${ownerTag}${diff})` });
+            await ownerUser.send(
+              replyEmbedPayload(
+                `**${addedBy}** vient de m'inviter sur **${guild.name}** (${guild.memberCount} membres, propriétaire : **${ownerTag}**).`,
+                {
+                  type: 'info',
+                  title: '📥 Nouveau serveur'
+                }
+              )
+            );
           } catch (error) {
             console.error(`Impossible d'envoyer un message privé à ${ownerUser.tag}: ${error}`);
           }
