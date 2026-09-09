@@ -2,6 +2,8 @@ const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildBankTransferLog } = require('../../utils/staffLogs.js');
 const { moveAllBalance } = require('../../utils/economyService.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'retall',
   description: 'Retirez tous les coins de votre banque vers votre poche.',
@@ -18,7 +20,7 @@ module.exports = {
       });
 
       if (!movement) {
-        return message.reply('❌・Vous n\'avez pas de coins à retirer.');
+        return message.reply(replyEmbedPayload('Vous n\'avez pas de coins à retirer.', { type: 'warning' }));
       }
 
       await sendStaffLog(
@@ -36,12 +38,18 @@ module.exports = {
       );
 
       return message.reply(
-        `🏦・Vous avez retiré **${formatAmount(movement.amount)}** de votre banque.`
+        replyEmbedPayload(
+          `Vous avez retiré **${formatAmount(movement.amount)}** de votre banque.`,
+          { type: 'success', title: '🏦 Retrait total effectué' }
+        )
       );
     } catch (error) {
       console.error('Withdraw all error:', error);
       return message.reply(
-        'Une erreur s\'est produite lors du retrait des coins.'
+        replyEmbedPayload(
+          'Une erreur s\'est produite lors du retrait des coins.',
+          { type: 'error' }
+        )
       );
     }
   },
