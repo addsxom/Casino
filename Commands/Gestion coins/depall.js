@@ -2,6 +2,8 @@ const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildEconomyLog } = require('../../utils/staffLogs.js');
 const { moveAllBalance } = require('../../utils/economyService.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'depall',
   description: 'Déposez tous les coins de votre poche dans votre banque.',
@@ -18,7 +20,7 @@ module.exports = {
       });
 
       if (!movement) {
-        return message.reply('❌・Vous n\'avez pas de coins en poche.');
+        return message.reply(replyEmbedPayload('Vous n\'avez pas de coins en poche.', { type: 'warning' }));
       }
 
       await sendStaffLog(
@@ -36,12 +38,18 @@ module.exports = {
       );
 
       return message.reply(
-        `🏦・Vous avez déposé **${formatAmount(movement.amount)}** dans votre banque.`
+        replyEmbedPayload(
+          `Vous avez déposé **${formatAmount(movement.amount)}** dans votre banque.`,
+          { type: 'success', title: '🏦 Dépôt total effectué' }
+        )
       );
     } catch (error) {
       console.error('Deposit all error:', error);
       return message.reply(
-        'Une erreur s\'est produite lors du dépôt des coins.'
+        replyEmbedPayload(
+          'Une erreur s\'est produite lors du dépôt des coins.',
+          { type: 'error' }
+        )
       );
     }
   },
