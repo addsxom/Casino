@@ -57,6 +57,8 @@ function buildNavigationRow(page, totalPages) {
   );
 }
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'help',
   description: 'Affiche toutes les commandes et fonctionnalités du bot.',
@@ -180,7 +182,10 @@ module.exports = {
 
       if (interaction.user.id !== message.author.id) {
         return interaction.reply({
-          content: '❌・Seule la personne qui a lancé +help peut utiliser ces boutons.',
+          ...replyEmbedPayload(
+            'Seule la personne qui a lancé +help peut utiliser ces boutons.',
+            { type: 'error' }
+          ),
           flags: MessageFlags.Ephemeral
         }).catch(() => {});
       }
