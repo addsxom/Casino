@@ -1,4 +1,5 @@
 const Owner = require('../Models/Owner.js');
+const { replyEmbedPayload } = require('./replyEmbed.js');
 
 function isBuyer(userId) {
   return Boolean(userId) && userId === process.env.BUYER;
@@ -19,7 +20,7 @@ async function requireBotOwner(message, denialMessage = '❌・Tu dois être own
   }
 
   if (message?.reply) {
-    await message.reply(denialMessage).catch(() => {});
+    await message.reply(replyEmbedPayload(denialMessage.replace(/^❌・/, ''), { type: 'error' })).catch(() => {});
   }
 
   return false;
@@ -31,7 +32,7 @@ async function requireBuyer(message, denialMessage = '❌・Seul le BUYER du bot
   }
 
   if (message?.reply) {
-    await message.reply(denialMessage).catch(() => {});
+    await message.reply(replyEmbedPayload(denialMessage.replace(/^❌・/, ''), { type: 'error' })).catch(() => {});
   }
 
   return false;
