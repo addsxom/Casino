@@ -2,7 +2,8 @@ const VoiceRewardProgress =
   require('../Models/VoiceRewardProgress.js');
 const config = require('../config/botConfig.js');
 const {
-  getConfiguredChannelId
+  getConfiguredChannelId,
+  getConfiguredChannelIds
 } = require('./configService.js');
 const {
   VOICE_REWARD_MIN_MS,
@@ -74,6 +75,40 @@ function hasEnoughHumans(channel) {
 
   return humanCount >= config.rewards.voice.minimumHumans;
 }
+
+function isVoiceFarmChannel(
+  guild,
+  channel
+) {
+  if (!guild || !channel) {
+    return false;
+  }
+
+  const afkChannelId =
+    getConfiguredChannelId(
+      'afkfarm',
+      guild.id
+    );
+
+  if (channel.id === afkChannelId) {
+    return false;
+  }
+
+  const configuredFarmIds =
+    getConfiguredChannelIds(
+      'voicefarm',
+      guild.id
+    );
+
+  if (!configuredFarmIds.length) {
+    return true;
+  }
+
+  return configuredFarmIds.includes(
+    channel.id
+  );
+}
+
 
 function resetMuteGrace(progress) {
   progress.mutedMs = 0;
@@ -392,17 +427,15 @@ async function cleanupDisconnectedProgress(bot) {
     ) {
       const member = voiceState.member;
       const channel = voiceState.channel;
-      const afkChannelId =
-        getConfiguredChannelId(
-          'afkfarm',
-          guild.id
-        );
 
       if (
         member &&
         !member.user?.bot &&
         channel &&
-        channel.id !== afkChannelId
+        isVoiceFarmChannel(
+          guild,
+          channel
+        )
       ) {
         connectedKeys.add(
           getKey(guild.id, member.id)
@@ -435,17 +468,15 @@ async function tick(bot) {
     for (const voiceState of guild.voiceStates.cache.values()) {
       const member = voiceState.member;
       const channel = voiceState.channel;
-      const afkChannelId =
-        getConfiguredChannelId(
-          'afkfarm',
-          guild.id
-        );
 
       if (
         !member ||
         member.user?.bot ||
         !channel ||
-        channel.id === afkChannelId
+        !isVoiceFarmChannel(
+          guild,
+          channel
+        )
       ) {
         continue;
       }
