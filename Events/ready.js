@@ -4,14 +4,16 @@ const colors = require("colors");
 const mongoose = require("mongoose");
 const { joinVoiceChannel } = require('@discordjs/voice');
 const GUILD_ID = config.guildId;
-const BOT_VOICE_CHANNEL = config.channels.botVoice;
 const prefix = process.env.PREFIX || '+';
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
 const { startVoiceRewardTracker } = require('../utils/voiceRewardTracker.js');
-const { applyStoredChannelOverrides } = require('../utils/configService.js');
+const {
+  applyStoredChannelOverrides,
+  getConfiguredChannelId
+} = require('../utils/configService.js');
 const {
   DEFAULT_DYNAMIC_ACTIVITY,
   normalizeActivityTemplate,
@@ -154,11 +156,14 @@ module.exports = async (bot) => {
   await updateMemberCount(guild);
 
   try {
-    const welcomeChannel =
-      guild.channels.cache.get(config.channels.welcome) ||
-      await guild.channels.fetch(config.channels.welcome);
+    const welcomeChannelId =
+      getConfiguredChannelId('welcome', guild.id);
 
-    if (welcomeChannel && guild.systemChannelId !== config.channels.welcome) {
+    const welcomeChannel =
+      guild.channels.cache.get(welcomeChannelId) ||
+      await guild.channels.fetch(welcomeChannelId);
+
+    if (welcomeChannel && guild.systemChannelId !== welcomeChannelId) {
       await guild.setSystemChannel(
         welcomeChannel,
         'Salon système d’arrivée'
@@ -179,21 +184,24 @@ module.exports = async (bot) => {
     });
   }, MEMBER_COUNT_RESYNC_MS);
 
+  const botVoiceChannelId =
+    getConfiguredChannelId('botvoice', guild.id);
+
   let botVoiceChannel =
-    guild.channels.cache.get(BOT_VOICE_CHANNEL.id) ||
-    await guild.channels.fetch(BOT_VOICE_CHANNEL.id).catch(() => null);
+    guild.channels.cache.get(botVoiceChannelId) ||
+    await guild.channels.fetch(botVoiceChannelId).catch(() => null);
 
   if (!botVoiceChannel) {
     await guild.channels.fetch().catch(() => null);
 
     botVoiceChannel = guild.channels.cache.find(
-      channel => channel.name === BOT_VOICE_CHANNEL.name
+      channel => channel.name === config.channels.botVoice.name
     ) || null;
   }
 
   if (!botVoiceChannel) {
     console.error(
-      `Vocal ${BOT_VOICE_CHANNEL.name} introuvable (ID: ${BOT_VOICE_CHANNEL.id}).`
+      `Vocal ${config.channels.botVoice.name} introuvable (ID: ${botVoiceChannelId}).`
     );
     return;
   }
