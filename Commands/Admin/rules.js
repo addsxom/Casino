@@ -5,6 +5,7 @@ const {
   ButtonStyle,
   PermissionFlagsBits
 } = require('discord.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 module.exports = {
   name: 'rules',
@@ -19,7 +20,10 @@ module.exports = {
 
     if (!isAllowed) {
       return message.reply(
-        '❌・Tu dois être administrateur pour utiliser cette commande.'
+        replyEmbedPayload(
+          'Tu dois être administrateur pour utiliser cette commande.',
+          { type: 'error' }
+        )
       );
     }
 
