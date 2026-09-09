@@ -1,5 +1,9 @@
 const {
-  EmbedBuilder
+  EmbedBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags
 } = require('discord.js');
 const {
   joinVoiceChannel
@@ -217,6 +221,192 @@ function formatChannelLine(
   );
 }
 
+
+function buildMainConfigButtons() {
+  return [
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('configlist_details')
+          .setLabel('Détails')
+          .setEmoji('📖')
+          .setStyle(ButtonStyle.Primary),
+        new ButtonBuilder()
+          .setCustomId('configlist_close')
+          .setLabel('Fermer')
+          .setEmoji('✖️')
+          .setStyle(ButtonStyle.Danger)
+      )
+  ];
+}
+
+function buildDetailsButtons() {
+  return [
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId('configlist_back')
+          .setLabel('Retour')
+          .setEmoji('⬅️')
+          .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+          .setCustomId('configlist_close')
+          .setLabel('Fermer')
+          .setEmoji('✖️')
+          .setStyle(ButtonStyle.Danger)
+      )
+  ];
+}
+
+function buildConfigDetailsEmbed() {
+  return new EmbedBuilder()
+    .setColor(0x6b6de6)
+    .setTitle('📖 Détails de la configuration')
+    .setDescription(
+      '**Modifier un salon simple**\n' +
+      '`+configlist rewards <ID>` — salon des récompenses\n' +
+      '`+configlist afkfarm <ID>` — vocal AFK unique\n' +
+      '`+configlist mines <ID>` — salon Mines\n' +
+      '`+configlist slots <ID>` — salon Slots\n\n' +
+
+      '**Voir une configuration précise**\n' +
+      '`+configlist rewards`\n' +
+      '`+configlist afkfarm`\n' +
+      '`+configlist voicefarm`\n\n' +
+
+      '**Vocaux Farm multiples**\n' +
+      '`+configlist voicefarm add <ID> [ID...]`\n' +
+      'Ajoute un ou plusieurs vocaux sans supprimer les anciens.\n\n' +
+      '`+configlist voicefarm remove <ID> [ID...]`\n' +
+      'Retire un ou plusieurs vocaux précis.\n\n' +
+      '`+configlist voicefarm set <ID> [ID...]`\n' +
+      'Remplace toute la liste par les IDs donnés.\n\n' +
+      '`+configlist voicefarm clear`\n' +
+      'Vide complètement la liste.\n\n' +
+      '`+configlist voicefarm <ID> <ID> ...`\n' +
+      'Raccourci pour remplacer directement toute la liste.\n\n' +
+
+      '**Fonctionnement**\n' +
+      '• L’**ID** est toujours la référence principale.\n' +
+      '• Le **nom actuel** du salon est relu directement depuis Discord.\n' +
+      '• Renommer un salon ne casse donc pas sa configuration.\n' +
+      '• Les configurations serveur sont conservées après redémarrage / git pull.\n' +
+      '• **AFK Farm** reste limité à un seul vocal.\n' +
+      '• **voicefarm** peut contenir plusieurs dizaines de vocaux.'
+    )
+    .setFooter({
+      text:
+        'Retour = configuration principale • Fermer = supprime les deux messages'
+    })
+    .setTimestamp();
+}
+
+function attachConfiglistButtons(
+  message,
+  sentMessage,
+  mainEmbed
+) {
+  const collector =
+    sentMessage.createMessageComponentCollector({
+      time: 10 * 60 * 1000
+    });
+
+  collector.on(
+    'collect',
+    async interaction => {
+      if (
+        interaction.user.id !==
+        message.author.id
+      ) {
+        return interaction.reply({
+          content:
+            '❌・Ces boutons ne vous appartiennent pas.',
+          flags:
+            MessageFlags.Ephemeral
+        }).catch(() => {});
+      }
+
+      if (
+        interaction.customId ===
+        'configlist_close'
+      ) {
+        collector.stop('closed');
+
+        await interaction
+          .deferUpdate()
+          .catch(() => {});
+
+        await message
+          .delete()
+          .catch(() => {});
+
+        await sentMessage
+          .delete()
+          .catch(() => {});
+
+        return;
+      }
+
+      if (
+        interaction.customId ===
+        'configlist_details'
+      ) {
+        return interaction.update({
+          embeds: [
+            buildConfigDetailsEmbed()
+          ],
+          components:
+            buildDetailsButtons()
+        }).catch(() => {});
+      }
+
+      if (
+        interaction.customId ===
+        'configlist_back'
+      ) {
+        return interaction.update({
+          embeds: [mainEmbed],
+          components:
+            buildMainConfigButtons()
+        }).catch(() => {});
+      }
+    }
+  );
+
+  collector.on(
+    'end',
+    async (_, reason) => {
+      if (
+        reason === 'closed' ||
+        !sentMessage.editable
+      ) {
+        return;
+      }
+
+      const disabledRow =
+        new ActionRowBuilder()
+          .addComponents(
+            new ButtonBuilder()
+              .setCustomId(
+                'configlist_expired'
+              )
+              .setLabel(
+                'Interface expirée'
+              )
+              .setEmoji('⌛')
+              .setStyle(
+                ButtonStyle.Secondary
+              )
+              .setDisabled(true)
+          );
+
+      await sentMessage.edit({
+        components: [disabledRow]
+      }).catch(() => {});
+    }
+  );
+}
+
 async function applyImmediateSideEffect(
   message,
   key,
@@ -420,9 +610,20 @@ module.exports = {
           })
           .setTimestamp();
 
-      return message.reply({
-        embeds: [embed]
-      });
+      const sentMessage =
+        await message.reply({
+          embeds: [embed],
+          components:
+            buildMainConfigButtons()
+        });
+
+      attachConfiglistButtons(
+        message,
+        sentMessage,
+        embed
+      );
+
+      return sentMessage;
     }
 
     const key =
