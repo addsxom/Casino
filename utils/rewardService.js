@@ -16,11 +16,11 @@ const MESSAGE_REWARDS = [
   { threshold: 10000, coins: 60000 }
 ];
 
-const VOICE_REWARD_MIN_MS = 20 * 1000;
-const VOICE_REWARD_MAX_MS = 20 * 1000;
+const VOICE_REWARD_MIN_MS = 15 * 60 * 1000;
+const VOICE_REWARD_MAX_MS = 20 * 60 * 1000;
 const VOICE_REWARD_COINS = 1000;
 const VOICE_ACTIVITY_BONUS_PERCENT = 50;
-const VOICE_MUTE_GRACE_MS = 60 * 1000;
+const VOICE_MUTE_GRACE_MS = 40 * 60 * 1000;
 
 function formatDuration(ms) {
   const totalSeconds = Math.max(
@@ -35,6 +35,91 @@ function formatDuration(ms) {
   }
 
   return `${minutes} min ${seconds}s`;
+}
+
+function formatDiscordTimestamp(timestampMs) {
+  const unix = Math.floor(
+    Number(timestampMs) / 1000
+  );
+
+  return `<t:${unix}:R> • <t:${unix}:T>`;
+}
+
+function buildVoiceStatusEmbed({
+  user,
+  status,
+  nextRewardAt
+}) {
+  const embed = new EmbedBuilder()
+    .setColor(0x6b6de6)
+    .setTimestamp();
+
+  if (status === 'waiting_humans') {
+    return embed
+      .setTitle('👥 Récompense vocale en attente')
+      .setDescription(
+        `${user}, il faut au minimum **2 humains** dans le vocal pour que ton compteur avance.\n\n` +
+        '⏸️ Ton temps de récompense est en pause. Le timer démarrera automatiquement dès que vous serez au moins 2.'
+      );
+  }
+
+  if (status === 'headphones_only') {
+    return embed
+      .setTitle('🎧 Récompense vocale en pause')
+      .setDescription(
+        `${user}, ton casque est coupé alors que ton micro est actif.\n\n` +
+        '⏸️ Tu n’es pas éligible dans cet état. Réactive ton casque pour reprendre le compteur.'
+      );
+  }
+
+  if (status === 'mute_timeout') {
+    return embed
+      .setTitle('🔇 Récompense vocale en pause')
+      .setDescription(
+        `${user}, ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**.\n\n` +
+        '⏸️ Ton compteur est en pause. Réactive ton micro pour redevenir éligible.'
+      );
+  }
+
+  return embed
+    .setColor(0x57f287)
+    .setTitle('🎙️ Compteur vocal actif')
+    .setDescription(
+      `${user}, ton compteur de récompense vocale est actif.\n\n` +
+      `🎁 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
+      '-# Le timestamp reste exact tant que tu restes éligible.'
+    );
+}
+
+async function sendOrUpdateVoiceStatus({
+  guild,
+  user,
+  status,
+  nextRewardAt = null,
+  message = null
+}) {
+  const channel = await getRewardChannel(guild);
+  if (!channel) return null;
+
+  const embed = buildVoiceStatusEmbed({
+    user,
+    status,
+    nextRewardAt
+  });
+
+  if (message?.editable) {
+    const edited = await message.edit({
+      content: `${user}`,
+      embeds: [embed]
+    }).catch(() => null);
+
+    if (edited) return edited;
+  }
+
+  return channel.send({
+    content: `${user}`,
+    embeds: [embed]
+  });
 }
 
 function getReachedMessageReward(messages) {
@@ -140,6 +225,7 @@ async function sendVoiceRewardNotification({
   account,
   earnedIntervalMs,
   nextIntervalMs,
+  nextRewardAt,
   baseCoins,
   bonusCoins,
   bonusPercent,
@@ -169,7 +255,8 @@ async function sendVoiceRewardNotification({
       `${user}, tu as passé **${formatDuration(earnedIntervalMs)} valides** en vocal.\n\n` +
       rewardDetails +
       `\n-# Poche : ${formatAmount(account.coins)} coins\n\n` +
-      `🎲 Prochaine récompense dans **${formatDuration(nextIntervalMs)} valides**.`
+      `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
+      '-# Si tu restes éligible, le timestamp se met à jour automatiquement côté Discord.'
     )
     .setTimestamp();
 
@@ -190,8 +277,10 @@ module.exports = {
   VOICE_ACTIVITY_BONUS_PERCENT,
   VOICE_MUTE_GRACE_MS,
   formatDuration,
+  formatDiscordTimestamp,
   getReachedMessageReward,
   buildMessageProgress,
   sendMessageRewardNotification,
-  sendVoiceRewardNotification
+  sendVoiceRewardNotification,
+  sendOrUpdateVoiceStatus
 };
