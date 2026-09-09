@@ -12,8 +12,16 @@ const {
   TICKET_TYPES,
   isStaff,
   getStaffRoles,
+  isTicketChannel,
   makeTicketChannelName
 } = require('../utils/ticketSystem.js');
+
+const {
+  tryLockTicketClosure,
+  releaseTicketClosure,
+  deliverTicketTranscript,
+  deleteTicketChannel
+} = require('../utils/ticketTranscript.js');
 const { replyEmbedPayload } = require('../utils/replyEmbed.js');
 
 const MEMBER_ROLE_NAME = 'Member';
@@ -233,45 +241,125 @@ async function openTicket(bot, interaction) {
 }
 
 async function closeTicket(interaction) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  });
 
   const channel = interaction.channel;
-  const ownerId = channel?.topic?.match(/ticketOwner:(\d+)/)?.[1];
 
-  if (!ownerId) {
+  if (!isTicketChannel(channel)) {
     return interaction.editReply(
       replyEmbedPayload(
         'Ce salon ne semble pas être un ticket valide.',
-        { type: 'error' }
+        {
+          type: 'error',
+          title: '🎫 Ticket requis'
+        }
       )
     );
   }
 
-  const member = await interaction.guild.members
-    .fetch(interaction.user.id)
-    .catch(() => interaction.member);
+  const member =
+    await interaction.guild.members
+      .fetch(interaction.user.id)
+      .catch(() => interaction.member);
 
-  if (interaction.user.id !== ownerId && !isStaff(member)) {
+  if (!isStaff(member)) {
     return interaction.editReply(
       replyEmbedPayload(
-        'Seul le propriétaire du ticket ou le staff peut le fermer.',
-        { type: 'error' }
+        'Seuls les modérateurs peuvent fermer un ticket.',
+        {
+          type: 'error',
+          title: '🛡️ Permission requise'
+        }
+      )
+    );
+  }
+
+  if (
+    !tryLockTicketClosure(
+      channel.id
+    )
+  ) {
+    return interaction.editReply(
+      replyEmbedPayload(
+        'La fermeture de ce ticket est déjà en cours.',
+        {
+          type: 'warning',
+          title: '🔒 Fermeture en cours'
+        }
       )
     );
   }
 
   await interaction.editReply(
     replyEmbedPayload(
-      'Le ticket va être supprimé.',
-      { type: 'warning', title: '🔒 Fermeture du ticket' }
+      'Je génère le transcript HTML complet du ticket avant sa fermeture.',
+      {
+        type: 'info',
+        title: '📄 Création du transcript'
+      }
     )
   );
 
-  setTimeout(() => {
-    channel
-      .delete(`Ticket fermé par ${interaction.user.tag}`)
-      .catch(error => console.error('Erreur fermeture ticket :', error));
-  }, 1000);
+  try {
+    const result =
+      await deliverTicketTranscript({
+        channel,
+        closedBy:
+          interaction.user
+      });
+
+    await interaction.editReply(
+      replyEmbedPayload(
+        result.dmSent
+          ? 'Le transcript a été envoyé en DM au créateur du ticket.\n\nSuppression du salon dans **2 secondes**.'
+          : 'Les DM du créateur sont fermés ou indisponibles. Une copie du transcript a été envoyée au modérateur qui ferme le ticket.\n\nSuppression du salon dans **2 secondes**.',
+        {
+          type:
+            result.dmSent
+              ? 'success'
+              : 'warning',
+          title:
+            result.dmSent
+              ? '✅ Transcript envoyé'
+              : '⚠️ DM indisponibles'
+        }
+      )
+    );
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 2000)
+    );
+
+    await deleteTicketChannel(
+      channel,
+      interaction.user
+    );
+  } catch (error) {
+    console.error(
+      'Erreur fermeture ticket :',
+      error
+    );
+
+    releaseTicketClosure(
+      channel.id
+    );
+
+    return interaction.editReply(
+      replyEmbedPayload(
+        'Impossible de générer ou d’envoyer le transcript. Le ticket n’a pas été supprimé.',
+        {
+          type: 'error',
+          title: '❌ Fermeture annulée'
+        }
+      )
+    ).catch(() => {});
+  }
+
+  releaseTicketClosure(
+    channel.id
+  );
 }
 
 module.exports = async (bot, interaction) => {
