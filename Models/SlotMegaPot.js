@@ -3,8 +3,7 @@ const mongoose = require('mongoose');
 const slotMegaPotSchema = new mongoose.Schema({
   guildId: {
     type: String,
-    required: true,
-    unique: true
+    required: true
   },
   amount: {
     type: Number,
