@@ -1,4 +1,3 @@
-const { EmbedBuilder } = require("discord.js");
 const UserRobCooldown = require('../../Models/UserRobCooldown.js');
 const UserRobProtection = require('../../Models/UserRobProtection.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
@@ -17,174 +16,23 @@ const {
   releaseCooldown
 } = require('../../utils/cooldownService.js');
 
-const ROBBER_COOLDOWN_MS = 2 * 60 * 60 * 1000;
-const VICTIM_PROTECTION_MS = 60 * 60 * 1000;
-const MIN_TARGET_POCKET = 1000;
-
-const SUCCESS_CHANCE = 0.55;
-const JACKPOT_CHANCE = 0.05;
-const FINE_CHANCE = 0.50;
-
-function randomInt(min, max) {
-  return Math.floor(
-    Math.random() * (max - min + 1)
-  ) + min;
-}
-
-function formatDynamicTimer(timestampMs) {
-  if (!timestampMs || Date.now() >= timestampMs) {
-    return '**0s**';
-  }
-
-  return `<t:${Math.floor(timestampMs / 1000)}:R>`;
-}
-
-function buildInfoEmbed(
-  message,
-  {
-    title,
-    description,
-    color = 0x6b6de6,
-    thumbnail = null
-  }
-) {
-  const embed = new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(color)
-    .setFooter({
-      text: 'Kuromi Coins',
-      iconURL:
-        message.client.user.displayAvatarURL({
-          dynamic: true
-        })
-    });
-
-  if (thumbnail) {
-    embed.setThumbnail(thumbnail);
-  }
-
-  return embed;
-}
-
-async function replyEmbed(
-  message,
-  buildEmbed,
-  freezeAt = []
-) {
-  const sent = await message.reply({
-    embeds: [buildEmbed()]
-  });
-
-  const expirations = [
-    ...new Set(
-      freezeAt
-        .map(Number)
-        .filter(timestamp =>
-          Number.isFinite(timestamp) &&
-          timestamp > Date.now()
-        )
-    )
-  ];
-
-  for (const expiration of expirations) {
-    const delay = Math.max(
-      0,
-      expiration - Date.now() + 250
-    );
-
-    setTimeout(() => {
-      sent.edit({
-        embeds: [buildEmbed()]
-      }).catch(() => {});
-    }, delay);
-  }
-
-  return sent;
-}
-
-async function getProtection(userId, guildId) {
-  const protection = await UserRobProtection.findOne({
-    userId,
-    guildId
-  });
-
-  const availableAt = Number(protection?.cooldown) || 0;
-
-  return {
-    active: availableAt > Date.now(),
-    availableAt
-  };
-}
-
-function buildSuccessEmbed({
-  message,
-  targetUser,
-  stolenCoins,
-  stolenPercent,
-  jackpot,
-  robberAvailableAt,
-  victimAvailableAt
-}) {
-  const jackpotLine = jackpot
-    ? '\n💎 **JACKPOT !**'
-    : '';
-
-  return buildInfoEmbed(
-    message,
-    {
-      title: jackpot
-        ? '💎 Jackpot !'
-        : '🦹 Braquage réussi',
-      description:
-        `${message.author} ➜ ${targetUser}\n\n` +
-        `💰 **${formatAmount(stolenCoins)} coins**\n` +
-        `-# ${stolenPercent}% de la poche${jackpotLine}\n\n` +
-        `🛡️ Protection : ${formatDynamicTimer(victimAvailableAt)}\n` +
-        `⏳ Prochain rob : ${formatDynamicTimer(robberAvailableAt)}`,
-      color: jackpot
-        ? 0xf1c40f
-        : 0x57f287,
-      thumbnail:
-        targetUser.displayAvatarURL({
-          dynamic: true
-        })
-    }
-  );
-}
-
-function buildFailureEmbed({
-  message,
-  targetUser,
-  fineApplied,
-  finePercent,
-  fineAmount,
-  robberAvailableAt
-}) {
-  let resultText = '🍀 **Aucune amende**';
-
-  if (fineApplied) {
-    resultText = fineAmount > 0
-      ? `🚨 **-${formatAmount(fineAmount)} coins**\n-# Amende de ${finePercent}%`
-      : `🚨 **Amende de ${finePercent}%**\n-# Aucun coin en poche à payer`;
-  }
-
-  return buildInfoEmbed(
-    message,
-    {
-      title: '🚔 Braquage raté',
-      description:
-        `${message.author} ➜ ${targetUser}\n\n` +
-        resultText +
-        `\n\n⏳ Prochain rob : ${formatDynamicTimer(robberAvailableAt)}`,
-      color: 0xed4245,
-      thumbnail:
-        targetUser.displayAvatarURL({
-          dynamic: true
-        })
-    }
-  );
-}
+const {
+  ROBBER_COOLDOWN_MS,
+  VICTIM_PROTECTION_MS,
+  MIN_TARGET_POCKET,
+  SUCCESS_CHANCE,
+  JACKPOT_CHANCE,
+  FINE_CHANCE,
+  randomInt,
+  getProtection
+} = require('../../utils/rob/rules.js');
+const {
+  formatDynamicTimer,
+  buildInfoEmbed,
+  replyEmbed,
+  buildSuccessEmbed,
+  buildFailureEmbed
+} = require('../../utils/rob/ui.js');
 
 module.exports = {
   name: 'rob',
