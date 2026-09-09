@@ -1,6 +1,7 @@
 const { getVoiceConnection, joinVoiceChannel } = require("@discordjs/voice");
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 module.exports = {
   name: "joinvc",
@@ -15,14 +16,17 @@ const voiceChannelId = args[0];
 
     if (!voiceChannelId) {
       return message.channel.send(
-        "Veuillez fournir l'ID du canal vocal pour utiliser cette commande."
+        replyEmbedPayload(
+          "Veuillez fournir l'ID du canal vocal pour utiliser cette commande.",
+          { type: 'error' }
+        )
       );
     }
 
     const voiceChannel = message.guild.channels.cache.get(voiceChannelId);
 
     if (!voiceChannel) {
-      return message.channel.send("Le canal vocal spécifié est introuvable.");
+      return message.channel.send(replyEmbedPayload("Le canal vocal spécifié est introuvable.", { type: 'error' }));
     }
 
     const existingConnection = getVoiceConnection(message.guild.id);
@@ -30,7 +34,10 @@ const voiceChannelId = args[0];
     if (existingConnection) {
       if (existingConnection.joinConfig.channelId === voiceChannelId) {
         return message.channel.send(
-          "Le bot est déjà connecté à ce canal vocal."
+          replyEmbedPayload(
+            "Le bot est déjà connecté à ce canal vocal.",
+            { type: 'warning' }
+          )
         );
       } else {
         existingConnection.destroy();
@@ -44,7 +51,7 @@ const voiceChannelId = args[0];
     });
 
     voiceConnection.on("ready", () => {
-      message.channel.send("Le bot a rejoint le canal vocal avec succès.");
+      message.channel.send(replyEmbedPayload("Le bot a rejoint le canal vocal avec succès.", { type: 'success', title: '🎙️ Vocal rejoint' }));
     });
   },
 };
