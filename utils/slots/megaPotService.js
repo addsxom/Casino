@@ -9,26 +9,45 @@ function normalizeAmount(value) {
   return Math.max(0, amount);
 }
 
-async function getMegaPot(guildId) {
-  const doc =
-    await SlotMegaPot.findOneAndUpdate(
-      { guildId },
-      {
-        $setOnInsert: {
-          guildId,
-          amount: 0
-        }
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true
-      }
-    );
+function isDuplicateKeyError(error) {
+  return error?.code === 11000;
+}
 
-  return normalizeAmount(
-    doc?.amount
-  );
+async function getMegaPot(guildId) {
+  try {
+    const doc =
+      await SlotMegaPot.findOneAndUpdate(
+        { guildId },
+        {
+          $setOnInsert: {
+            guildId,
+            amount: 0
+          }
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true
+        }
+      );
+
+    return normalizeAmount(
+      doc?.amount
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    const doc =
+      await SlotMegaPot.findOne({
+        guildId
+      });
+
+    return normalizeAmount(
+      doc?.amount
+    );
+  }
 }
 
 async function addToMegaPot(
@@ -41,33 +60,61 @@ async function addToMegaPot(
     return getMegaPot(guildId);
   }
 
-  const doc =
-    await SlotMegaPot.findOneAndUpdate(
-      { guildId },
-      {
-        $inc: {
-          amount
+  try {
+    const doc =
+      await SlotMegaPot.findOneAndUpdate(
+        { guildId },
+        {
+          $inc: {
+            amount
+          },
+          $setOnInsert: {
+            guildId
+          }
         },
-        $setOnInsert: {
-          guildId
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true
         }
-      },
-      {
-        new: true,
-        upsert: true,
-        setDefaultsOnInsert: true
-      }
-    );
+      );
 
-  return normalizeAmount(
-    doc?.amount
-  );
+    return normalizeAmount(
+      doc?.amount
+    );
+  } catch (error) {
+    if (!isDuplicateKeyError(error)) {
+      throw error;
+    }
+
+    const doc =
+      await SlotMegaPot.findOneAndUpdate(
+        { guildId },
+        {
+          $inc: {
+            amount
+          }
+        },
+        {
+          new: true
+        }
+      );
+
+    return normalizeAmount(
+      doc?.amount
+    );
+  }
 }
 
 async function claimMegaPot(guildId) {
   const before =
     await SlotMegaPot.findOneAndUpdate(
-      { guildId },
+      {
+        guildId,
+        amount: {
+          $gte: 0
+        }
+      },
       {
         $set: {
           amount: 0
