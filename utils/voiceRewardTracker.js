@@ -20,6 +20,7 @@ const {
 
 const voiceProgress = new Map();
 let trackerInterval = null;
+let trackerTickRunning = false;
 
 function getKey(guildId, userId) {
   return `${guildId}:${userId}`;
@@ -293,24 +294,38 @@ async function loadProgress(
       guildId: guild.id
     }).lean();
 
-  const targetMs = normalizeTargetMs(
+  let targetMs = normalizeTargetMs(
     saved?.targetMs
   );
 
-  const validMs = normalizeProgressMs(
+  let validMs = normalizeProgressMs(
     saved?.validMs,
     targetMs
   );
+
+  let mutedMs = normalizeProgressMs(
+    saved?.mutedMs,
+    VOICE_MUTE_GRACE_MS
+  );
+
+  const currentSelfMute =
+    voiceState.selfMute === true;
+
+  if (
+    saved?.previousSelfMute === true &&
+    currentSelfMute === false
+  ) {
+    validMs = 0;
+    targetMs = getRandomVoiceInterval();
+    mutedMs = 0;
+  }
 
   return {
     guild,
     user: member.user,
     validMs,
     targetMs,
-    mutedMs: normalizeProgressMs(
-      saved?.mutedMs,
-      VOICE_MUTE_GRACE_MS
-    ),
+    mutedMs,
     rewardDueAt: null,
     lastCheckedAt: now,
     processing: false,
@@ -590,6 +605,18 @@ async function tick(bot) {
   }
 }
 
+async function runTick(bot) {
+  if (trackerTickRunning) return;
+
+  trackerTickRunning = true;
+
+  try {
+    await tick(bot);
+  } finally {
+    trackerTickRunning = false;
+  }
+}
+
 async function startVoiceRewardTracker(bot) {
   if (trackerInterval) {
     clearInterval(trackerInterval);
@@ -600,7 +627,7 @@ async function startVoiceRewardTracker(bot) {
   await cleanupDisconnectedProgress(bot);
 
   trackerInterval = setInterval(() => {
-    tick(bot).catch(error => {
+    runTick(bot).catch(error => {
       console.error(
         'Erreur tracker récompenses vocales :',
         error
@@ -608,12 +635,7 @@ async function startVoiceRewardTracker(bot) {
     });
   }, 1000);
 
-  tick(bot).catch(error => {
-    console.error(
-      'Erreur initialisation tracker vocal :',
-      error
-    );
-  });
+  await runTick(bot);
 
   console.log(
     `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${formatDuration(VOICE_MUTE_GRACE_MS)} • progression MongoDB`
