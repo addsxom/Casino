@@ -5,6 +5,8 @@ const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js
 const { creditBalance } = require('../../utils/economyService.js');
 const { tryAcquireCooldown, releaseCooldown } = require('../../utils/cooldownService.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'daily',
   aliases: ['dy'],
@@ -86,7 +88,7 @@ module.exports = {
       message.reply({ embeds: [embed] });
     } catch (error) {
       console.error(error);
-      message.reply('Une erreur s\'est produite lors de la récupération des coins.');
+      message.reply(replyEmbedPayload('Une erreur s\'est produite lors de la récupération des coins.', { type: 'error' }));
     }
   },
 };
