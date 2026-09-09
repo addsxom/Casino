@@ -95,21 +95,26 @@ async function deliverTicketTranscript({
   let dmSent = false;
 
   if (owner) {
-    dmSent = await owner.send({
-      ...replyEmbedPayload(
+    dmSent = await owner.send(
+      replyEmbedPayload(
         `Ton ticket **#${channel.name}** sur **${channel.guild.name}** a été fermé.\n\n` +
         `👮 **Fermé par :** ${closedBy}\n` +
         `📂 **Type :** ${typeKey || 'inconnu'}\n` +
         `🕒 **Fermé le :** <t:${closedAtUnix}:F>\n\n` +
-        'Le transcript HTML complet de la conversation est joint à ce message.',
+        'Le transcript HTML complet de la conversation arrive juste en dessous.',
         {
           type: 'info',
           title: '📄 Transcript de ton ticket'
         }
-      ),
-      files: [transcript]
-    })
-      .then(() => true)
+      )
+    )
+      .then(async () => {
+        await owner.send({
+          files: [transcript]
+        });
+
+        return true;
+      })
       .catch(() => false);
   }
 
@@ -117,15 +122,18 @@ async function deliverTicketTranscript({
     !dmSent &&
     closedBy?.send
   ) {
-    await closedBy.send({
-      ...replyEmbedPayload(
+    await closedBy.send(
+      replyEmbedPayload(
         `Le transcript du ticket **#${channel.name}** n’a pas pu être envoyé à <@${ownerId}> (DM probablement fermés).\n\n` +
-        'Je te l’envoie en sauvegarde avant la suppression du ticket.',
+        'Je te l’envoie en sauvegarde juste en dessous avant la suppression du ticket.',
         {
           type: 'warning',
           title: '📄 Transcript non livré'
         }
-      ),
+      )
+    ).catch(() => {});
+
+    await closedBy.send({
       files: [transcript]
     }).catch(() => {});
   }
