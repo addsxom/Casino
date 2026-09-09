@@ -261,6 +261,7 @@ async function tick(bot) {
       }
 
       if (
+        eligible &&
         progress.validMs >= progress.targetMs &&
         !progress.processing
       ) {
