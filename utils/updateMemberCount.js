@@ -1,8 +1,9 @@
-const MEMBER_COUNT_CHANNEL_ID = '1546311653388189716';
+const config = require('../config/botConfig.js');
+const MEMBER_COUNT_CHANNEL_ID = config.channels.memberCount;
 
 // Discord limite les renommages répétés d'un même salon.
 // On espace les renommages et on garde une seule mise à jour en attente.
-const RENAME_INTERVAL_MS = 5 * 60 * 1000 + 5000;
+const RENAME_INTERVAL_MS = config.system.memberCountRenameIntervalMs;
 
 const lastRenameAt = new Map();
 const pendingTimers = new Map();
