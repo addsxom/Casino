@@ -10,12 +10,19 @@ module.exports = {
         (Date.now() - message.client.readyAt) / 1000
       );
       const uptimeText = formatUptime(uptimeInSeconds);
+      const onlineSinceUnix = Math.floor(
+        message.client.readyAt.getTime() / 1000
+      );
 
       const uptimeEmbed = new Discord.EmbedBuilder()
+        .setTitle('🕒 Uptime du bot')
         .setDescription(
-          `<:time:1145535458382716938> Je suis en ligne depuis **\`${uptimeText}\`**`
+          `**Temps en ligne**\n\`${uptimeText}\`\n\n` +
+          `**En ligne depuis**\n<t:${onlineSinceUnix}:F>\n` +
+          `-# <t:${onlineSinceUnix}:R>`
         )
-        .setColor(0x6b6de6);
+        .setColor(0x6b6de6)
+        .setTimestamp(message.client.readyAt);
 
       await message.channel.send({ embeds: [uptimeEmbed] });
     } catch (err) {
