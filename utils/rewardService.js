@@ -81,6 +81,15 @@ function buildVoiceStatusEmbed({
       );
   }
 
+  if (status === 'left') {
+    return embed
+      .setTitle('👋 Session vocale terminée')
+      .setDescription(
+        `${user}, tu as quitté le vocal.\n\n` +
+        '⏹️ Le compteur de récompense a été arrêté.'
+      );
+  }
+
   return embed
     .setColor(0x57f287)
     .setTitle('🎙️ Compteur vocal actif')
