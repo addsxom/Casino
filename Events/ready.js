@@ -1,13 +1,11 @@
 const { ActivityType } = require("discord.js");
+const config = require('../config/botConfig.js');
 const colors = require("colors");
 const mongoose = require("mongoose");
 const { joinVoiceChannel } = require('@discordjs/voice');
-const GUILD_ID = '1546311652830351450';
-const BOT_VOICE_CHANNEL = {
-  id: '1546360551503044658',
-  name: '╰・BOT STATUT'
-};
-const WELCOME_CHANNEL_ID = '1546311653388189718';
+const GUILD_ID = config.guildId;
+const BOT_VOICE_CHANNEL = config.channels.botVoice;
+const WELCOME_CHANNEL_ID = config.channels.welcome;
 const prefix = process.env.PREFIX || '+';
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
@@ -19,7 +17,7 @@ const {
   normalizeActivityTemplate,
   renderActivityText
 } = require('../utils/activityText.js');
-const MEMBER_COUNT_RESYNC_MS = 10 * 60 * 1000;
+const MEMBER_COUNT_RESYNC_MS = config.system.memberCountResyncMs;
 
 const ACTIVITY_TYPES = {
   PLAYING: ActivityType.Playing,
