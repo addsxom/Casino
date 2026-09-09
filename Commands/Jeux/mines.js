@@ -22,7 +22,6 @@ const {
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
 
-const MINES_CHANNEL_ID = config.channels.games.mines;
 const {
   bonusChance: BONUS_CHANCE,
   revealCostPercent: REVEAL_COST_PERCENT,
@@ -520,17 +519,18 @@ module.exports = {
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
     const userId = message.author.id;
+    const minesChannelId = config.channels.games.mines;
     let activeGameToken = null;
 
-    if (message.channel.id !== MINES_CHANNEL_ID) {
+    if (message.channel.id !== minesChannelId) {
       const warningMessage = await message.reply(
-        `❌・Mines est uniquement disponible dans <#${MINES_CHANNEL_ID}>.\n🕒 Suppression dans **5 secondes**.`
+        `❌・Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **5 secondes**.`
       );
 
       for (let seconds = 4; seconds >= 1; seconds--) {
         await sleep(1000);
         await warningMessage.edit(
-          `❌・Mines est uniquement disponible dans <#${MINES_CHANNEL_ID}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
+          `❌・Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
         );
       }
 
