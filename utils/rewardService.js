@@ -16,11 +16,11 @@ const MESSAGE_REWARDS = [
   { threshold: 10000, coins: 60000 }
 ];
 
-const VOICE_REWARD_MIN_MS = 15 * 60 * 1000;
-const VOICE_REWARD_MAX_MS = 20 * 60 * 1000;
+const VOICE_REWARD_MIN_MS = 20 * 1000;
+const VOICE_REWARD_MAX_MS = 20 * 1000;
 const VOICE_REWARD_COINS = 1000;
 const VOICE_ACTIVITY_BONUS_PERCENT = 50;
-const VOICE_MUTE_GRACE_MS = 40 * 60 * 1000;
+const VOICE_MUTE_GRACE_MS = 60 * 1000;
 
 function formatDuration(ms) {
   const totalSeconds = Math.max(
