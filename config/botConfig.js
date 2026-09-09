@@ -9,6 +9,7 @@ module.exports = {
     welcome: '1546311653388189718',
     memberCount: '1546311653388189716',
     rewards: '1547030803303637072',
+    afkFarm: '1547368687579955290',
     botGuildEvents: '1132784655817519225',
 
     games: {
@@ -76,6 +77,12 @@ module.exports = {
       rewardCoins: 1000,
       activityBonusPercent: 50,
       muteGraceMs: 40 * 60 * 1000
+    },
+
+    afk: {
+      rewardMinMs: 30 * 60 * 1000,
+      rewardMaxMs: 40 * 60 * 1000,
+      rewardCoins: 250
     }
   },
 
