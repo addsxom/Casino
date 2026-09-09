@@ -32,7 +32,10 @@ if (args.length !== 3) {
     try {
       if (type !== 'rep' && type !== 'bank' && type !== 'coins') {
         return message.reply(
-          'Type invalide. Veuillez spécifier "rep", "bank" ou "coins".'
+          replyEmbedPayload(
+            'Type invalide. Veuillez spécifier **rep**, **bank** ou **coins**.',
+            { type: 'error' }
+          )
         );
       }
 
