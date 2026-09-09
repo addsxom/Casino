@@ -1,5 +1,6 @@
 const VoiceRewardProgress =
   require('../Models/VoiceRewardProgress.js');
+const config = require('../config/botConfig.js');
 const {
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
@@ -68,7 +69,7 @@ function hasEnoughHumans(channel) {
     member => !member.user.bot
   ).size;
 
-  return humanCount >= 2;
+  return humanCount >= config.rewards.voice.minimumHumans;
 }
 
 function resetMuteGrace(progress) {
