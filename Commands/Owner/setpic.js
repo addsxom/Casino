@@ -7,6 +7,7 @@ function restoreClientToken(client, token) {
 }
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 module.exports = {
   name: "setpic",
@@ -16,7 +17,10 @@ module.exports = {
 
 if (!args.length && !message.attachments.size) {
       return message.channel.send(
-        "Veuillez fournir une URL d'image ou une image en pièce jointe pour mettre à jour la photo de profil du bot."
+        replyEmbedPayload(
+          "Veuillez fournir une URL d'image ou une image en pièce jointe pour mettre à jour la photo de profil du bot.",
+          { type: 'error' }
+        )
       );
     }
 
@@ -42,7 +46,10 @@ if (!args.length && !message.attachments.size) {
     if (changeError) {
       if (changeError.code === 30007) {
         return message.channel.send(
-          "Changement de photo de profil trop fréquent. Veuillez réessayer plus tard."
+          replyEmbedPayload(
+            "Changement de photo de profil trop fréquent. Veuillez réessayer plus tard.",
+            { type: 'warning' }
+          )
         );
       }
 
@@ -52,12 +59,18 @@ if (!args.length && !message.attachments.size) {
       );
 
       return message.channel.send(
-        "❌・Impossible de mettre à jour la photo de profil du bot."
+        replyEmbedPayload(
+          "Impossible de mettre à jour la photo de profil du bot.",
+          { type: 'error' }
+        )
       );
     }
 
     return message.channel.send(
-      "✅・La photo de profil du bot a été mise à jour."
+      replyEmbedPayload(
+        "La photo de profil du bot a été mise à jour.",
+        { type: 'success', title: '🖼️ Avatar modifié' }
+      )
     );
   },
 };
