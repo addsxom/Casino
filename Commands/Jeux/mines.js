@@ -32,6 +32,8 @@ const {
   startMinesGameSession
 } = require('../../utils/mines/gameSession.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'mines',
   description: 'Jouez au Mines. Ajoutez `all` au nom pour miser toute votre poche.',
@@ -44,13 +46,25 @@ module.exports = {
 
     if (message.channel.id !== minesChannelId) {
       const warningMessage = await message.reply(
-        `❌・Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **5 secondes**.`
+        replyEmbedPayload(
+          `Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **5 secondes**.`,
+          {
+            type: 'error',
+            title: '💣 Mauvais salon'
+          }
+        )
       );
 
       for (let seconds = 4; seconds >= 1; seconds--) {
         await sleep(1000);
         await warningMessage.edit(
-          `❌・Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
+          replyEmbedPayload(
+            `Mines est uniquement disponible dans <#${minesChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`,
+            {
+              type: 'error',
+              title: '💣 Mauvais salon'
+            }
+          )
         );
       }
 
@@ -71,15 +85,21 @@ module.exports = {
 
     if (!Number.isInteger(amount) || amount <= 0) {
       return message.reply(
-        allIn
-          ? '❌・Vous n\'avez aucun coin en poche pour faire **+minesall**.'
-          : '❌・Utilisation : **+mines <mise>**\nExemple : **+mines 500**'
+        replyEmbedPayload(
+          allIn
+            ? 'Vous n\'avez aucun coin en poche pour faire **+minesall**.'
+            : 'Utilisation : **+mines <mise>**\nExemple : **+mines 500**',
+          { type: 'error' }
+        )
       );
     }
 
     if (!userCoins || userCoins.coins < amount) {
       return message.reply(
-        '❌・Vous n\'avez pas assez de coins pour cette mise.'
+        replyEmbedPayload(
+          'Vous n\'avez pas assez de coins pour cette mise.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -163,7 +183,10 @@ module.exports = {
     modeCollector.on('collect', async interaction => {
       if (interaction.user.id !== message.author.id) {
         return interaction.reply({
-          content: '❌・Cette partie ne vous appartient pas.',
+          ...replyEmbedPayload(
+            'Cette partie ne vous appartient pas.',
+            { type: 'error' }
+          ),
           ephemeral: true
         });
       }
