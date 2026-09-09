@@ -1,39 +1,16 @@
 const { EmbedBuilder } = require('discord.js');
+const config = require('../config/botConfig.js');
 const { formatAmount } = require('./formatAmount.js');
 
 const STAFF_LOG_CHANNELS = {
-  'warn': {
-    id: '1546311653933580418',
-    name: 'warn'
-  },
-  'economy-logs': {
-    id: '1546959903271157851',
-    name: 'economy-logs'
-  },
-  'bank-logs': {
-    id: '1546959947395371089',
-    name: 'bank-logs'
-  },
-  'transaction-logs': {
-    id: '1546959992207450193',
-    name: 'transaction-logs'
-  },
-  'message-logs': {
-    id: '1546960057168691291',
-    name: 'message-logs'
-  },
-  'server-logs': {
-    id: '1546960115914121276',
-    name: 'server-logs'
-  },
-  'voice-logs': {
-    id: '1546960169374720081',
-    name: 'voice-logs'
-  },
-  'moderation-logs': {
-    id: '1546960328502546484',
-    name: 'moderation-logs'
-  }
+  'warn': config.channels.staffLogs.warn,
+  'economy-logs': config.channels.staffLogs.economy,
+  'bank-logs': config.channels.staffLogs.bank,
+  'transaction-logs': config.channels.staffLogs.transaction,
+  'message-logs': config.channels.staffLogs.message,
+  'server-logs': config.channels.staffLogs.server,
+  'voice-logs': config.channels.staffLogs.voice,
+  'moderation-logs': config.channels.staffLogs.moderation
 };
 
 function normalizeChannelName(name) {
