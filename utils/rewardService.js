@@ -52,8 +52,8 @@ function buildVoiceStatusEmbed({
     return embed
       .setTitle('👥 Récompense vocale en attente')
       .setDescription(
-        `${user}, il faut au minimum **2 humains** dans le vocal pour que ton compteur avance.\n\n` +
-        '⏸️ Ton temps de récompense est en pause. Le timer démarrera automatiquement dès que vous serez au moins 2.'
+        `${user}, il faut au minimum **${config.rewards.voice.minimumHumans} humains** dans le vocal pour que ton compteur avance.\n\n` +
+        `⏸️ Ton temps de récompense est en pause. Le timer démarrera automatiquement dès que vous serez au moins ${config.rewards.voice.minimumHumans}.`
       );
   }
 
