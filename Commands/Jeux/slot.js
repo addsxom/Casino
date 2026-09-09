@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const config = require('../../config/botConfig.js');
+const { getConfiguredChannelId } = require('../../utils/configService.js');
 const parseAmount = require('../../utils/parseAmount.js');
 const { sleep } = require('../../utils');
 const { formatAmount } = require('../../utils/formatAmount.js');
@@ -26,7 +27,7 @@ module.exports = {
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
     const userId = message.author.id;
-    const slotChannelId = config.channels.games.slots;
+    const slotChannelId = getConfiguredChannelId('slots', guildId);
     let activeGameToken = null;
 
     if (message.channel.id !== slotChannelId) {
