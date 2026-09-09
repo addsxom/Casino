@@ -10,6 +10,7 @@ const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
 const { startVoiceRewardTracker } = require('../utils/voiceRewardTracker.js');
+const { startAfkRewardTracker } = require('../utils/afkRewardTracker.js');
 const {
   applyStoredChannelOverrides,
   getConfiguredChannelId
@@ -49,6 +50,7 @@ module.exports = async (bot) => {
   await ensureDatabaseIntegrity();
   await applyStoredChannelOverrides();
   await startVoiceRewardTracker(bot);
+  await startAfkRewardTracker(bot);
 
   const botInfo = await BotInfo.findOne();
 
