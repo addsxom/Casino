@@ -30,6 +30,8 @@ const {
   buildCashoutRow
 } = require('../../utils/crash/ui.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'crash',
   description:
@@ -51,8 +53,10 @@ module.exports = {
         amount <= 0
       ) {
         return message.reply(
-          '❌・Utilisation : **+crash <mise>**\n' +
-          'Exemple : **+crash 1000**'
+          replyEmbedPayload(
+            'Utilisation : **+crash <mise>**\nExemple : **+crash 1000**',
+            { type: 'error' }
+          )
         );
       }
     }
@@ -92,7 +96,10 @@ module.exports = {
         activeGameToken = null;
 
         return message.reply(
-          '❌・Vous n\'avez pas assez de coins pour cette mise.'
+          replyEmbedPayload(
+            'Vous n\'avez pas assez de coins pour cette mise.',
+            { type: 'error' }
+          )
         );
       }
 
@@ -118,7 +125,10 @@ module.exports = {
         activeGameToken = null;
 
         return message.reply(
-          '❌・Vous n\'avez pas assez de coins pour cette mise.'
+          replyEmbedPayload(
+            'Vous n\'avez pas assez de coins pour cette mise.',
+            { type: 'error' }
+          )
         );
       }
     }
@@ -170,7 +180,10 @@ module.exports = {
       );
 
       return message.reply(
-        '❌・Impossible de lancer le Crash.'
+        replyEmbedPayload(
+          'Impossible de lancer le Crash.',
+          { type: 'error' }
+        )
       );
     }
 
@@ -305,8 +318,10 @@ module.exports = {
           message.author.id
         ) {
           return interaction.reply({
-            content:
-              '❌・Cette partie ne vous appartient pas.',
+            ...replyEmbedPayload(
+              'Cette partie ne vous appartient pas.',
+              { type: 'error' }
+            ),
             ephemeral: true
           }).catch(() => {});
         }
@@ -316,8 +331,13 @@ module.exports = {
           game.locked
         ) {
           return interaction.reply({
-            content:
-              '💥・Cette partie est déjà terminée.',
+            ...replyEmbedPayload(
+              'Cette partie est déjà terminée.',
+              {
+                type: 'warning',
+                title: '💥 Partie terminée'
+              }
+            ),
             ephemeral: true
           }).catch(() => {});
         }
