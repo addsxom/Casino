@@ -63,7 +63,7 @@ function getMuteEligibility(
     };
   }
 
-  // Micro actif : le délai de 40 minutes repart à zéro.
+  // Micro actif : le délai de délai de grâce configuré repart à zéro.
   if (!selfMuted) {
     resetMuteGrace(progress);
 
@@ -74,7 +74,7 @@ function getMuteEligibility(
   }
 
   // Micro coupé, avec ou sans casque coupé :
-  // éligible pendant 40 minutes continues.
+  // éligible pendant délai de grâce configuré continues.
   if (!progress.mutedSince) {
     progress.mutedSince = now;
   }
