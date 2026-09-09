@@ -1,26 +1,20 @@
 const { EmbedBuilder } = require('discord.js');
+const config = require('../config/botConfig.js');
 const { formatAmount } = require('./formatAmount.js');
 
-const REWARD_CHANNEL_ID = '1547030803303637072';
-
-const MESSAGE_REWARDS = [
-  { threshold: 10, coins: 100 },
-  { threshold: 25, coins: 250 },
-  { threshold: 50, coins: 500 },
-  { threshold: 100, coins: 1000 },
-  { threshold: 250, coins: 2500 },
-  { threshold: 500, coins: 5000 },
-  { threshold: 1000, coins: 10000 },
-  { threshold: 2500, coins: 20000 },
-  { threshold: 5000, coins: 35000 },
-  { threshold: 10000, coins: 60000 }
-];
-
-const VOICE_REWARD_MIN_MS = 15 * 60 * 1000;
-const VOICE_REWARD_MAX_MS = 20 * 60 * 1000;
-const VOICE_REWARD_COINS = 1000;
-const VOICE_ACTIVITY_BONUS_PERCENT = 50;
-const VOICE_MUTE_GRACE_MS = 40 * 60 * 1000;
+const REWARD_CHANNEL_ID = config.channels.rewards;
+const MESSAGE_REWARDS =
+  config.rewards.messages.milestones;
+const VOICE_REWARD_MIN_MS =
+  config.rewards.voice.rewardMinMs;
+const VOICE_REWARD_MAX_MS =
+  config.rewards.voice.rewardMaxMs;
+const VOICE_REWARD_COINS =
+  config.rewards.voice.rewardCoins;
+const VOICE_ACTIVITY_BONUS_PERCENT =
+  config.rewards.voice.activityBonusPercent;
+const VOICE_MUTE_GRACE_MS =
+  config.rewards.voice.muteGraceMs;
 
 function formatDuration(ms) {
   const totalSeconds = Math.max(
