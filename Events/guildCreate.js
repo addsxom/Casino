@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require("discord.js");
+const config = require('../config/botConfig.js');
 const Owner = require("../Models/Owner");
 
 module.exports = async (bot, guild) => {
@@ -29,7 +30,7 @@ module.exports = async (bot, guild) => {
       .setTimestamp()
       .setColor("D240F5");
 
-    await bot.channels.cache.get('1132784655817519225').send({ embeds: [embed] }).catch(() => false);
+    await bot.channels.cache.get(config.channels.botGuildEvents).send({ embeds: [embed] }).catch(() => false);
 
     const diff = "``"; 
     const ownerserver = await guild.fetchOwner();
