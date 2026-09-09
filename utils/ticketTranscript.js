@@ -10,6 +10,25 @@ const {
   getTicketTypeKey
 } = require('./ticketSystem.js');
 
+const closingTickets = new Set();
+
+function tryLockTicketClosure(channelId) {
+  const id = String(channelId || '');
+
+  if (!id || closingTickets.has(id)) {
+    return false;
+  }
+
+  closingTickets.add(id);
+  return true;
+}
+
+function releaseTicketClosure(channelId) {
+  closingTickets.delete(
+    String(channelId || '')
+  );
+}
+
 function sanitizeFilename(value) {
   return String(value || 'ticket')
     .toLowerCase()
@@ -128,6 +147,8 @@ async function deleteTicketChannel(
 }
 
 module.exports = {
+  tryLockTicketClosure,
+  releaseTicketClosure,
   createTicketTranscript,
   deliverTicketTranscript,
   deleteTicketChannel
