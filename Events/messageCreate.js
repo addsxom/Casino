@@ -1,4 +1,5 @@
 const Discord = require("discord.js");
+const config = require('../config/botConfig.js');
 const ServerPrefix = require("../Models/ServerPrefix");
 const {
   incrementAccountField,
@@ -87,7 +88,7 @@ module.exports = async (bot, message) => {
         if (
           message.guild &&
           message.guild.id &&
-          messageLength >= 3
+          messageLength >= config.rewards.messages.minimumCharacters
         ) {
           const userCoins = await incrementAccountField({
             userId: message.author.id,
