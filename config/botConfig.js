@@ -90,13 +90,11 @@ module.exports = {
   games: {
     slots: {
       winChance: 0.485,
-      spinMs: 5 * 1000,
-      spinGif:
-        'https://media.tenor.com/WUWygJ0Fwz8AAAAC/jago33-slot-machine.gif',
-      winGif:
-        'https://media.giphy.com/media/Vu5UbNpjpqfMq2UFg0/giphy.gif',
-      loseGif:
-        'https://media.giphy.com/media/eJ4j2VnYOZU8qJU3Py/giphy.gif'
+      megaPotMinBet: 1000,
+      sevenOnWinChance: 0.02,
+      animationStepMs: 450,
+      resultDisplayMs: 1800,
+      sessionIdleMs: 2 * 60 * 1000
     },
 
     mines: {
