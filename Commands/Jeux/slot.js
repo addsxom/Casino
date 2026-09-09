@@ -12,7 +12,6 @@ const {
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
 
-const SLOT_CHANNEL_ID = config.channels.games.slots;
 const {
   winChance: SLOT_WIN_CHANCE,
   spinMs: SLOT_SPIN_MS,
@@ -27,17 +26,18 @@ module.exports = {
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
     const userId = message.author.id;
+    const slotChannelId = config.channels.games.slots;
     let activeGameToken = null;
 
-    if (message.channel.id !== SLOT_CHANNEL_ID) {
+    if (message.channel.id !== slotChannelId) {
       const warningMessage = await message.reply(
-        `❌・Les slots sont uniquement disponibles dans <#${SLOT_CHANNEL_ID}>.\n🕒 Suppression dans **5 secondes**.`
+        `❌・Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **5 secondes**.`
       );
 
       for (let seconds = 4; seconds >= 1; seconds--) {
         await sleep(1000);
         await warningMessage.edit(
-          `❌・Les slots sont uniquement disponibles dans <#${SLOT_CHANNEL_ID}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
+          `❌・Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
         );
       }
 
