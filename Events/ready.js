@@ -47,7 +47,7 @@ module.exports = async (bot) => {
   });
 
   await ensureDatabaseIntegrity();
-  startVoiceRewardTracker(bot);
+  await startVoiceRewardTracker(bot);
 
   const botInfo = await BotInfo.findOne();
 
