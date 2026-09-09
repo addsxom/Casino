@@ -5,13 +5,13 @@ const mongoose = require("mongoose");
 const { joinVoiceChannel } = require('@discordjs/voice');
 const GUILD_ID = config.guildId;
 const BOT_VOICE_CHANNEL = config.channels.botVoice;
-const WELCOME_CHANNEL_ID = config.channels.welcome;
 const prefix = process.env.PREFIX || '+';
 const Owner = require('../Models/Owner');
 const BotInfo = require('../Models/BotInfo');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
 const { startVoiceRewardTracker } = require('../utils/voiceRewardTracker.js');
+const { applyStoredChannelOverrides } = require('../utils/configService.js');
 const {
   DEFAULT_DYNAMIC_ACTIVITY,
   normalizeActivityTemplate,
@@ -45,6 +45,7 @@ module.exports = async (bot) => {
   });
 
   await ensureDatabaseIntegrity();
+  await applyStoredChannelOverrides();
   await startVoiceRewardTracker(bot);
 
   const botInfo = await BotInfo.findOne();
@@ -154,10 +155,10 @@ module.exports = async (bot) => {
 
   try {
     const welcomeChannel =
-      guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
-      await guild.channels.fetch(WELCOME_CHANNEL_ID);
+      guild.channels.cache.get(config.channels.welcome) ||
+      await guild.channels.fetch(config.channels.welcome);
 
-    if (welcomeChannel && guild.systemChannelId !== WELCOME_CHANNEL_ID) {
+    if (welcomeChannel && guild.systemChannelId !== config.channels.welcome) {
       await guild.setSystemChannel(
         welcomeChannel,
         'Salon système d’arrivée'
