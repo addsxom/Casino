@@ -82,7 +82,7 @@ module.exports = async (bot, message) => {
     } else {
       if (!message.author.bot) {
         const messageLength =
-          String(message.content || '').trim().length;
+          [...String(message.content || '').trim()].length;
 
         if (
           message.guild &&
