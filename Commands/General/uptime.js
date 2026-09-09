@@ -13,8 +13,7 @@ module.exports = {
       const uptimeEmbed = new Discord.EmbedBuilder()
         .setTitle('🕒 Uptime du bot')
         .setDescription(
-          `**En ligne depuis**\n<t:${onlineSinceUnix}:F>\n` +
-          `-# <t:${onlineSinceUnix}:R>`
+          `**En ligne depuis**\n<t:${onlineSinceUnix}:F>`
         )
         .setColor(0x6b6de6)
         .setTimestamp(message.client.readyAt);
