@@ -6,6 +6,7 @@ const UserRepCooldown = require('../Models/UserRepCooldown.js');
 const UserRobCooldown = require('../Models/UserRobCooldown.js');
 const UserRobProtection = require('../Models/UserRobProtection.js');
 const VoiceRewardProgress = require('../Models/VoiceRewardProgress.js');
+const BotConfigOverride = require('../Models/BotConfigOverride.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
 
@@ -218,6 +219,7 @@ async function createDeclaredIndexes() {
     UserRobCooldown,
     UserRobProtection,
     VoiceRewardProgress,
+    BotConfigOverride,
     ServerPrefix,
     Owner
   ];
