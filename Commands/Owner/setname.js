@@ -7,6 +7,7 @@ function restoreClientToken(client, token) {
 }
 
 const { requireBotOwner } = require('../../utils/ownerPermissions.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 
 module.exports = {
   name: "setname",
@@ -16,7 +17,10 @@ module.exports = {
 
 if (!args.length) {
       return message.channel.send(
-        "Veuillez fournir un nouveau nom pour le bot."
+        replyEmbedPayload(
+          "Veuillez fournir un nouveau nom pour le bot.",
+          { type: 'error' }
+        )
       );
     }
 
@@ -36,7 +40,10 @@ if (!args.length) {
     if (changeError) {
       if (changeError.code === 30029) {
         return message.channel.send(
-          "Changement de nom trop fréquent. Veuillez réessayer plus tard."
+          replyEmbedPayload(
+            "Changement de nom trop fréquent. Veuillez réessayer plus tard.",
+            { type: 'warning' }
+          )
         );
       }
 
@@ -46,12 +53,18 @@ if (!args.length) {
       );
 
       return message.channel.send(
-        "❌・Impossible de changer le nom du bot."
+        replyEmbedPayload(
+          "Impossible de changer le nom du bot.",
+          { type: 'error' }
+        )
       );
     }
 
     return message.channel.send(
-      `✅・Le nom du bot a été changé en : ${newBotName}`
+      replyEmbedPayload(
+        `Le nom du bot a été changé en : **${newBotName}**`,
+        { type: 'success', title: '🤖 Nom du bot modifié' }
+      )
     );
   },
 };
