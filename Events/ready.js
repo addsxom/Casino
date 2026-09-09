@@ -189,21 +189,17 @@ module.exports = async (bot) => {
   const botVoiceChannelId =
     getConfiguredChannelId('botvoice', guild.id);
 
-  let botVoiceChannel =
-    guild.channels.cache.get(botVoiceChannelId) ||
-    await guild.channels.fetch(botVoiceChannelId).catch(() => null);
-
-  if (!botVoiceChannel) {
-    await guild.channels.fetch().catch(() => null);
-
-    botVoiceChannel = guild.channels.cache.find(
-      channel => channel.name === config.channels.botVoice.name
-    ) || null;
-  }
+  const botVoiceChannel =
+    guild.channels.cache.get(
+      botVoiceChannelId
+    ) ||
+    await guild.channels
+      .fetch(botVoiceChannelId)
+      .catch(() => null);
 
   if (!botVoiceChannel) {
     console.error(
-      `Vocal ${config.channels.botVoice.name} introuvable (ID: ${botVoiceChannelId}).`
+      `Vocal du bot introuvable par ID : ${botVoiceChannelId}.`
     );
     return;
   }
