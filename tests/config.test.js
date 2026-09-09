@@ -6,6 +6,7 @@ const {
   CHANNEL_CONFIGS,
   resolveConfigKey,
   getConfiguredChannelId,
+  getConfiguredChannelIds,
   getChannelConfigList
 } = require('../utils/configService.js');
 
@@ -17,6 +18,8 @@ test('important config aliases resolve correctly', () => {
   assert.equal(resolveConfigKey('voicebot'), 'botvoice');
   assert.equal(resolveConfigKey('afk'), 'afkfarm');
   assert.equal(resolveConfigKey('afk-farm'), 'afkfarm');
+  assert.equal(resolveConfigKey('vocfarm'), 'voicefarm');
+  assert.equal(resolveConfigKey('voice-farm'), 'voicefarm');
   assert.equal(resolveConfigKey('unknown-setting'), null);
 });
 
@@ -49,6 +52,27 @@ test('default channel ids are used without an override', () => {
     null
   );
 });
+
+test('reward channel and voice farm configuration use ids', () => {
+  assert.equal(
+    getConfiguredChannelId('rewards', 'unconfigured-guild'),
+    config.channels.rewards
+  );
+
+  assert.deepEqual(
+    getConfiguredChannelIds('voicefarm', 'unconfigured-guild'),
+    []
+  );
+
+  const voiceFarmEntry =
+    getChannelConfigList('unconfigured-guild')
+      .find(entry => entry.key === 'voicefarm');
+
+  assert.equal(voiceFarmEntry.multiple, true);
+  assert.equal(voiceFarmEntry.type, 'voice');
+  assert.deepEqual(voiceFarmEntry.ids, []);
+});
+
 
 test('reward safety settings stay centralized', () => {
   assert.equal(config.rewards.messages.minimumCharacters, 3);
