@@ -3,15 +3,13 @@ const config = require('../config/botConfig.js');
 const { updateMemberCount } = require('../utils/updateMemberCount.js');
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
 
-const WELCOME_CHANNEL_ID = config.channels.welcome;
-
 module.exports = async (_bot, member) => {
   await updateMemberCount(member.guild);
 
   try {
     const welcomeChannel =
-      member.guild.channels.cache.get(WELCOME_CHANNEL_ID) ||
-      await member.guild.channels.fetch(WELCOME_CHANNEL_ID);
+      member.guild.channels.cache.get(config.channels.welcome) ||
+      await member.guild.channels.fetch(config.channels.welcome);
 
     if (welcomeChannel?.isTextBased?.()) {
       const rulesChannel = member.guild.channels.cache.find(
