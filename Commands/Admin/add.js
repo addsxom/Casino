@@ -45,7 +45,10 @@ if (args.length !== 3) {
 
       if (type !== 'bank' && type !== 'coins') {
         return message.reply(
-          'Type invalide. Veuillez spécifier "rep", "bank" ou "coins".'
+          replyEmbedPayload(
+            'Type invalide. Veuillez spécifier **rep**, **bank** ou **coins**.',
+            { type: 'error' }
+          )
         );
       }
 
