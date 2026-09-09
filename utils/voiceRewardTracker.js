@@ -30,7 +30,6 @@ function getRandomVoiceInterval() {
 
 function isValidVoiceChannel(guild, channel) {
   if (!guild || !channel) return false;
-  if (guild.afkChannelId === channel.id) return false;
 
   const humanCount = channel.members.filter(
     member => !member.user.bot
