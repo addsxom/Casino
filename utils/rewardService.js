@@ -139,7 +139,10 @@ function getReachedMessageReward(messages) {
     .find(reward => count >= reward.threshold) || null;
 }
 
-function buildMessageProgress(messages) {
+function buildMessageProgress(
+  messages,
+  { showRemaining = false } = {}
+) {
   const count = Number(messages) || 0;
   const nextReward = MESSAGE_REWARDS.find(
     reward => count < reward.threshold
@@ -162,10 +165,14 @@ function buildMessageProgress(messages) {
         reward.threshold - count
       );
 
+      const remainingText = showRemaining
+        ? ` (**${formatAmount(remaining)} restants**)`
+        : '';
+
       return (
         `➡️ **${formatAmount(reward.threshold)} messages** ` +
-        `— ${formatAmount(reward.coins)} coins ` +
-        `(**${formatAmount(remaining)} restants**)`
+        `— ${formatAmount(reward.coins)} coins` +
+        remainingText
       );
     }
 
