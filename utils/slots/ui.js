@@ -479,7 +479,30 @@ function buildExpiredContainer(
     );
 }
 
+function buildStatusContainer(
+  title,
+  text,
+  color = 0x6b6de6
+) {
+  return new ContainerBuilder()
+    .setAccentColor(color)
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# ' + title
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(text)
+    );
+}
+
 module.exports = {
+  buildStatusContainer,
   formatSigned,
   getSessionBalance,
   buildMenuContainer,
