@@ -21,6 +21,8 @@ const {
   loseGif: LOSE_GIF
 } = config.games.slots;
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'slot',
   description: 'Jouez aux machines à sous. Ajoutez `all` au nom pour miser toute votre poche.',
@@ -32,13 +34,25 @@ module.exports = {
 
     if (message.channel.id !== slotChannelId) {
       const warningMessage = await message.reply(
-        `❌・Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **5 secondes**.`
+        replyEmbedPayload(
+          `Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **5 secondes**.`,
+          {
+            type: 'error',
+            title: '🎰 Mauvais salon'
+          }
+        )
       );
 
       for (let seconds = 4; seconds >= 1; seconds--) {
         await sleep(1000);
         await warningMessage.edit(
-          `❌・Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`
+          replyEmbedPayload(
+            `Les slots sont uniquement disponibles dans <#${slotChannelId}>.\n🕒 Suppression dans **${seconds} seconde${seconds > 1 ? 's' : ''}**.`,
+            {
+              type: 'error',
+              title: '🎰 Mauvais salon'
+            }
+          )
         );
       }
 
@@ -58,7 +72,10 @@ module.exports = {
 
         if (isNaN(amount) || amount <= 0) {
           return message.reply(
-            '❌・Veuillez miser un montant valide de coins.'
+            replyEmbedPayload(
+              'Veuillez miser un montant valide de coins.',
+              { type: 'error' }
+            )
           );
         }
       }
@@ -98,7 +115,10 @@ module.exports = {
           activeGameToken = null;
 
           return message.reply(
-            '❌・Vous n\'avez pas assez de coins pour jouer.'
+            replyEmbedPayload(
+              'Vous n\'avez pas assez de coins pour jouer.',
+              { type: 'error' }
+            )
           );
         }
 
@@ -124,7 +144,10 @@ module.exports = {
           activeGameToken = null;
 
           return message.reply(
-            '❌・Vous n\'avez pas assez de coins pour jouer.'
+            replyEmbedPayload(
+              'Vous n\'avez pas assez de coins pour jouer.',
+              { type: 'error' }
+            )
           );
         }
       }
@@ -216,7 +239,7 @@ module.exports = {
       }
 
       console.error(error);
-      message.reply('Une erreur s\'est produite lors du jeu aux machines à sous.');
+      message.reply(replyEmbedPayload('Une erreur s\'est produite lors du jeu aux machines à sous.', { type: 'error' }));
     }
   },
 };
