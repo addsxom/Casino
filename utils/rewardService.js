@@ -15,6 +15,12 @@ const VOICE_ACTIVITY_BONUS_PERCENT =
   config.rewards.voice.activityBonusPercent;
 const VOICE_MUTE_GRACE_MS =
   config.rewards.voice.muteGraceMs;
+const AFK_REWARD_MIN_MS =
+  config.rewards.afk.rewardMinMs;
+const AFK_REWARD_MAX_MS =
+  config.rewards.afk.rewardMaxMs;
+const AFK_REWARD_COINS =
+  config.rewards.afk.rewardCoins;
 
 function formatDuration(ms) {
   const totalSeconds = Math.max(
@@ -123,6 +129,96 @@ async function sendOrUpdateVoiceStatus({
     content: `${user}`,
     embeds: [embed]
   });
+}
+
+function buildAfkStatusEmbed({
+  user,
+  status,
+  nextRewardAt
+}) {
+  const embed = new EmbedBuilder()
+    .setColor(0x6b6de6)
+    .setTimestamp();
+
+  if (status === 'left') {
+    return embed
+      .setTitle('🛌 Session AFK terminée')
+      .setDescription(
+        `${user}, tu as quitté **AFK Farm**.\n\n` +
+        '⏹️ Le compteur de récompense AFK a été arrêté.'
+      );
+  }
+
+  return embed
+    .setColor(0x57f287)
+    .setTitle('🛌 Compteur AFK actif')
+    .setDescription(
+      `${user}, ton compteur **AFK Farm** est actif.\n\n` +
+      `🎁 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
+      '-# Micro/casque mute autorisés : rester dans AFK Farm suffit.'
+    );
+}
+
+async function sendOrUpdateAfkStatus({
+  guild,
+  user,
+  status,
+  nextRewardAt = null,
+  message = null
+}) {
+  const channel = await getRewardChannel(guild);
+  if (!channel) return null;
+
+  const embed = buildAfkStatusEmbed({
+    user,
+    status,
+    nextRewardAt
+  });
+
+  if (message?.editable) {
+    const edited = await message.edit({
+      content: `${user}`,
+      embeds: [embed]
+    }).catch(() => null);
+
+    if (edited) return edited;
+  }
+
+  return channel.send({
+    content: `${user}`,
+    embeds: [embed]
+  });
+}
+
+async function sendAfkRewardNotification({
+  guild,
+  user,
+  account,
+  earnedIntervalMs,
+  nextRewardAt,
+  coins
+}) {
+  const channel = await getRewardChannel(guild);
+  if (!channel) return false;
+
+  const embed = new EmbedBuilder()
+    .setColor(0x57f287)
+    .setTitle('🛌 Récompense AFK Farm')
+    .setDescription(
+      `${user}, tu as passé **${formatDuration(earnedIntervalMs)}** dans **AFK Farm**.\n\n` +
+      `🪙 **+${formatAmount(coins)} coins** dans ta poche.\n` +
+      `-# Poche : ${formatAmount(account.coins)} coins\n\n` +
+      `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
+      '-# Aucun état micro/casque ne bloque les récompenses AFK.'
+    )
+    .setTimestamp();
+
+  await channel.send({
+    content: `${user}`,
+    embeds: [embed]
+  });
+
+  return true;
 }
 
 function getReachedMessageReward(messages) {
@@ -285,11 +381,16 @@ module.exports = {
   VOICE_REWARD_COINS,
   VOICE_ACTIVITY_BONUS_PERCENT,
   VOICE_MUTE_GRACE_MS,
+  AFK_REWARD_MIN_MS,
+  AFK_REWARD_MAX_MS,
+  AFK_REWARD_COINS,
   formatDuration,
   formatDiscordTimestamp,
   getReachedMessageReward,
   buildMessageProgress,
   sendMessageRewardNotification,
   sendVoiceRewardNotification,
-  sendOrUpdateVoiceStatus
+  sendOrUpdateVoiceStatus,
+  sendAfkRewardNotification,
+  sendOrUpdateAfkStatus
 };
