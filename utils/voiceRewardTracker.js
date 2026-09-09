@@ -1,6 +1,8 @@
 const {
-  VOICE_REWARD_INTERVAL_MS,
+  VOICE_REWARD_MIN_MS,
+  VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
+  formatDuration,
   sendVoiceRewardNotification
 } = require('./rewardService.js');
 const {
@@ -18,6 +20,14 @@ function getKey(guildId, userId) {
   return `${guildId}:${userId}`;
 }
 
+function getRandomVoiceInterval() {
+  return Math.floor(
+    VOICE_REWARD_MIN_MS +
+    Math.random() *
+      (VOICE_REWARD_MAX_MS - VOICE_REWARD_MIN_MS + 1)
+  );
+}
+
 function isValidVoiceChannel(guild, channel) {
   if (!guild || !channel) return false;
   if (guild.afkChannelId === channel.id) return false;
@@ -29,7 +39,11 @@ function isValidVoiceChannel(guild, channel) {
   return humanCount >= 2;
 }
 
-async function rewardMember(member) {
+async function rewardMember(
+  member,
+  earnedIntervalMs,
+  nextIntervalMs
+) {
   const account = await creditBalance({
     userId: member.id,
     guildId: member.guild.id,
@@ -49,14 +63,16 @@ async function rewardMember(member) {
       pocket: account.coins,
       bank: account.bank,
       reason:
-        `${VOICE_REWARD_INTERVAL_MS / 1000} secondes valides en vocal`
+        `${formatDuration(earnedIntervalMs)} valides en vocal`
     })
   );
 
   await sendVoiceRewardNotification({
     guild: member.guild,
     user: member.user,
-    account
+    account,
+    earnedIntervalMs,
+    nextIntervalMs
   }).catch(error => {
     console.error(
       'Erreur notification récompense vocale :',
@@ -86,6 +102,7 @@ async function tick(bot) {
       if (!progress) {
         progress = {
           validMs: 0,
+          targetMs: getRandomVoiceInterval(),
           lastCheckedAt: now,
           processing: false
         };
@@ -105,16 +122,25 @@ async function tick(bot) {
       }
 
       if (
-        progress.validMs >= VOICE_REWARD_INTERVAL_MS &&
+        progress.validMs >= progress.targetMs &&
         !progress.processing
       ) {
-        progress.validMs -= VOICE_REWARD_INTERVAL_MS;
+        const earnedIntervalMs = progress.targetMs;
+        progress.validMs -= earnedIntervalMs;
         progress.processing = true;
 
+        const nextIntervalMs =
+          getRandomVoiceInterval();
+
         try {
-          await rewardMember(member);
+          await rewardMember(
+            member,
+            earnedIntervalMs,
+            nextIntervalMs
+          );
+          progress.targetMs = nextIntervalMs;
         } catch (error) {
-          progress.validMs += VOICE_REWARD_INTERVAL_MS;
+          progress.validMs += earnedIntervalMs;
           console.error(
             'Erreur récompense vocale :',
             error
@@ -150,7 +176,7 @@ function startVoiceRewardTracker(bot) {
   }, 1000);
 
   console.log(
-    `Rewards • vocal test actif : ${VOICE_REWARD_INTERVAL_MS / 1000}s`
+    'Rewards • vocal actif : délai aléatoire 15-20 min'
   );
 }
 
