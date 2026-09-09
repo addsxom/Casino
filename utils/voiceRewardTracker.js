@@ -2,6 +2,9 @@ const VoiceRewardProgress =
   require('../Models/VoiceRewardProgress.js');
 const config = require('../config/botConfig.js');
 const {
+  getConfiguredChannelId
+} = require('./configService.js');
+const {
   VOICE_REWARD_MIN_MS,
   VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
@@ -388,11 +391,18 @@ async function cleanupDisconnectedProgress(bot) {
       of guild.voiceStates.cache.values()
     ) {
       const member = voiceState.member;
+      const channel = voiceState.channel;
+      const afkChannelId =
+        getConfiguredChannelId(
+          'afkfarm',
+          guild.id
+        );
 
       if (
         member &&
         !member.user?.bot &&
-        voiceState.channel
+        channel &&
+        channel.id !== afkChannelId
       ) {
         connectedKeys.add(
           getKey(guild.id, member.id)
@@ -425,8 +435,18 @@ async function tick(bot) {
     for (const voiceState of guild.voiceStates.cache.values()) {
       const member = voiceState.member;
       const channel = voiceState.channel;
+      const afkChannelId =
+        getConfiguredChannelId(
+          'afkfarm',
+          guild.id
+        );
 
-      if (!member || member.user?.bot || !channel) {
+      if (
+        !member ||
+        member.user?.bot ||
+        !channel ||
+        channel.id === afkChannelId
+      ) {
         continue;
       }
 
