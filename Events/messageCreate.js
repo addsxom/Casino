@@ -11,6 +11,7 @@ const {
 } = require("../utils/rewardService.js");
 const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
 const { cacheMessage } = require("../utils/messageCache.js");
+const { replyEmbedPayload } = require("../utils/replyEmbed.js");
 
 module.exports = async (bot, message) => {
   cacheMessage(message);
@@ -33,9 +34,15 @@ module.exports = async (bot, message) => {
 
     if (message.content === `<@${bot.user.id}>`) {
       const diff = "``";
-      message.channel.send({
-        content: `Mon préfixe sur ce serveur est: ${diff}${prefix}${diff}`,
-      });
+      message.channel.send(
+        replyEmbedPayload(
+          `Mon préfixe sur ce serveur est : \`${prefix}\``,
+          {
+            type: 'info',
+            title: '⌨️ Préfixe du bot'
+          }
+        )
+      );
     } else if (message.content.startsWith(prefix)) {
       const args = message.content.slice(prefix.length).trim().split(/ +/);
       const commandName = args.shift().toLowerCase();
@@ -76,7 +83,10 @@ module.exports = async (bot, message) => {
         } catch (error) {
           console.error(error);
           message.channel.send(
-            "Une erreur s'est produite lors de l'exécution de la commande."
+            replyEmbedPayload(
+              "Une erreur s'est produite lors de l'exécution de la commande.",
+              { type: 'error' }
+            )
           );
         }
       }
