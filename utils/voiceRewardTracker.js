@@ -5,7 +5,8 @@ const {
   VOICE_ACTIVITY_BONUS_PERCENT,
   VOICE_MUTE_GRACE_MS,
   formatDuration,
-  sendVoiceRewardNotification
+  sendVoiceRewardNotification,
+  sendOrUpdateVoiceStatus
 } = require('./rewardService.js');
 const {
   creditBalance
@@ -45,6 +46,12 @@ function resetMuteGrace(progress) {
   progress.muteWarningSent = false;
 }
 
+function resetRewardProgress(progress) {
+  progress.validMs = 0;
+  progress.targetMs = getRandomVoiceInterval();
+  progress.rewardDueAt = null;
+}
+
 function getMuteEligibility(
   voiceState,
   progress,
@@ -63,7 +70,7 @@ function getMuteEligibility(
     };
   }
 
-  // Micro actif : le délai de délai de grâce configuré repart à zéro.
+  // Micro actif : aucune limite mute en cours.
   if (!selfMuted) {
     resetMuteGrace(progress);
 
@@ -73,8 +80,8 @@ function getMuteEligibility(
     };
   }
 
-  // Micro coupé, avec ou sans casque coupé :
-  // éligible pendant délai de grâce configuré continues.
+  // Micro coupé, avec ou sans casque :
+  // reste éligible pendant le délai de grâce.
   if (!progress.mutedSince) {
     progress.mutedSince = now;
   }
@@ -99,13 +106,28 @@ function getMuteEligibility(
   };
 }
 
+function getEligibilityStatus({
+  enoughHumans,
+  muteEligibility
+}) {
+  if (!enoughHumans) {
+    return 'waiting_humans';
+  }
+
+  if (!muteEligibility.eligible) {
+    return muteEligibility.reason;
+  }
+
+  return 'eligible';
+}
+
 async function sendMuteTimeoutWarning(member) {
   await member.send(
     '🎙️ **Récompenses vocales mises en pause**\n\n' +
     `Ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**. ` +
     'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
     '✅ **Pour redevenir éligible :** réactive simplement ton micro. ' +
-    `Le délai de ${formatDuration(VOICE_MUTE_GRACE_MS)} sera alors remis à zéro si tu le recoupes plus tard.`
+    'Ton compteur de récompense repartira alors de **0** avec un nouveau délai aléatoire.'
   ).catch(() => {});
 }
 
@@ -163,7 +185,10 @@ async function rewardMember(
     amount: totalCoins
   });
 
-  if (!account) return;
+  if (!account) return null;
+
+  const nextRewardAt =
+    Date.now() + nextIntervalMs;
 
   await sendStaffLog(
     member.guild,
@@ -188,6 +213,7 @@ async function rewardMember(
     account,
     earnedIntervalMs,
     nextIntervalMs,
+    nextRewardAt,
     baseCoins: VOICE_REWARD_COINS,
     bonusCoins,
     bonusPercent,
@@ -198,6 +224,46 @@ async function rewardMember(
       error
     );
   });
+
+  return {
+    nextRewardAt
+  };
+}
+
+async function updateStatus(
+  progress,
+  status,
+  nextRewardAt = null
+) {
+  const forceUpdate =
+    progress.status !== status ||
+    (
+      status === 'eligible' &&
+      progress.statusRewardDueAt !== nextRewardAt
+    );
+
+  if (!forceUpdate) return;
+
+  progress.status = status;
+  progress.statusRewardDueAt =
+    status === 'eligible'
+      ? nextRewardAt
+      : null;
+
+  progress.statusMessage =
+    await sendOrUpdateVoiceStatus({
+      guild: progress.guild,
+      user: progress.user,
+      status,
+      nextRewardAt,
+      message: progress.statusMessage
+    }).catch(error => {
+      console.error(
+        'Erreur statut récompense vocale :',
+        error
+      );
+      return progress.statusMessage;
+    });
 }
 
 async function tick(bot) {
@@ -220,22 +286,47 @@ async function tick(bot) {
 
       if (!progress) {
         progress = {
+          guild,
+          user: member.user,
           validMs: 0,
           targetMs: getRandomVoiceInterval(),
+          rewardDueAt: null,
           lastCheckedAt: now,
           processing: false,
           mutedSince: null,
-          muteWarningSent: false
+          muteWarningSent: false,
+          previousSelfMute:
+            voiceState.selfMute === true,
+          status: null,
+          statusRewardDueAt: null,
+          statusMessage: null
         };
+
         voiceProgress.set(key, progress);
       }
 
-      const elapsed = Math.max(
+      let elapsed = Math.max(
         0,
         now - progress.lastCheckedAt
       );
 
       progress.lastCheckedAt = now;
+
+      const selfMuted =
+        voiceState.selfMute === true;
+
+      const justUnmuted =
+        progress.previousSelfMute === true &&
+        selfMuted === false;
+
+      if (justUnmuted) {
+        // Demute = nouveau cycle complet.
+        resetRewardProgress(progress);
+        resetMuteGrace(progress);
+        elapsed = 0;
+      }
+
+      progress.previousSelfMute = selfMuted;
 
       const muteEligibility =
         getMuteEligibility(
@@ -252,36 +343,83 @@ async function tick(bot) {
         await sendMuteTimeoutWarning(member);
       }
 
+      const enoughHumans =
+        hasEnoughHumans(channel);
+
       const eligible =
-        hasEnoughHumans(channel) &&
+        enoughHumans &&
         muteEligibility.eligible;
+
+      const status =
+        getEligibilityStatus({
+          enoughHumans,
+          muteEligibility
+        });
 
       if (eligible) {
         progress.validMs += elapsed;
+
+        const remainingMs = Math.max(
+          0,
+          progress.targetMs - progress.validMs
+        );
+
+        progress.rewardDueAt =
+          now + remainingMs;
+      } else {
+        progress.rewardDueAt = null;
       }
+
+      await updateStatus(
+        progress,
+        status,
+        progress.rewardDueAt
+      );
 
       if (
         eligible &&
         progress.validMs >= progress.targetMs &&
         !progress.processing
       ) {
-        const earnedIntervalMs = progress.targetMs;
-        progress.validMs -= earnedIntervalMs;
+        const earnedIntervalMs =
+          progress.targetMs;
+
+        const previousValidMs =
+          progress.validMs;
+
         progress.processing = true;
 
         const nextIntervalMs =
           getRandomVoiceInterval();
 
         try {
-          await rewardMember(
-            member,
-            voiceState,
-            earnedIntervalMs,
-            nextIntervalMs
-          );
+          const rewardResult =
+            await rewardMember(
+              member,
+              voiceState,
+              earnedIntervalMs,
+              nextIntervalMs
+            );
+
+          if (!rewardResult) {
+            throw new Error(
+              'Voice reward account unavailable.'
+            );
+          }
+
+          progress.validMs = 0;
           progress.targetMs = nextIntervalMs;
+          progress.rewardDueAt =
+            rewardResult.nextRewardAt;
+
+          await updateStatus(
+            progress,
+            'eligible',
+            progress.rewardDueAt
+          );
         } catch (error) {
-          progress.validMs += earnedIntervalMs;
+          progress.validMs = previousValidMs;
+
           console.error(
             'Erreur récompense vocale :',
             error
@@ -293,10 +431,18 @@ async function tick(bot) {
     }
   }
 
-  for (const key of voiceProgress.keys()) {
-    if (!connectedKeys.has(key)) {
-      voiceProgress.delete(key);
+  for (const [key, progress] of voiceProgress.entries()) {
+    if (connectedKeys.has(key)) {
+      continue;
     }
+
+    await updateStatus(
+      progress,
+      'left',
+      null
+    );
+
+    voiceProgress.delete(key);
   }
 }
 
