@@ -1,17 +1,52 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config/botConfig.js');
+const { getConfiguredChannelId } = require('./configService.js');
 const { formatAmount } = require('./formatAmount.js');
 
 const STAFF_LOG_CHANNELS = {
-  'warn': config.channels.staffLogs.warn,
-  'economy-logs': config.channels.staffLogs.economy,
-  'bank-logs': config.channels.staffLogs.bank,
-  'transaction-logs': config.channels.staffLogs.transaction,
-  'message-logs': config.channels.staffLogs.message,
-  'server-logs': config.channels.staffLogs.server,
-  'voice-logs': config.channels.staffLogs.voice,
-  'moderation-logs': config.channels.staffLogs.moderation
+  'warn': {
+    configKey: 'warn',
+    name: config.channels.staffLogs.warn.name
+  },
+  'economy-logs': {
+    configKey: 'economylogs',
+    name: config.channels.staffLogs.economy.name
+  },
+  'bank-logs': {
+    configKey: 'banklogs',
+    name: config.channels.staffLogs.bank.name
+  },
+  'transaction-logs': {
+    configKey: 'transactionlogs',
+    name: config.channels.staffLogs.transaction.name
+  },
+  'message-logs': {
+    configKey: 'messagelogs',
+    name: config.channels.staffLogs.message.name
+  },
+  'server-logs': {
+    configKey: 'serverlogs',
+    name: config.channels.staffLogs.server.name
+  },
+  'voice-logs': {
+    configKey: 'voicelogs',
+    name: config.channels.staffLogs.voice.name
+  },
+  'moderation-logs': {
+    configKey: 'moderationlogs',
+    name: config.channels.staffLogs.moderation.name
+  }
 };
+
+function getStaffLogId(guild, key) {
+  const entry = STAFF_LOG_CHANNELS[key];
+  if (!guild || !entry) return null;
+
+  return getConfiguredChannelId(
+    entry.configKey,
+    guild.id
+  );
+}
 
 function normalizeChannelName(name) {
   return String(name || '').toLowerCase().trim();
@@ -30,7 +65,8 @@ function findStaffLogChannel(guild, key) {
   const config = STAFF_LOG_CHANNELS[key];
   if (!config) return null;
 
-  const channelById = guild.channels.cache.get(config.id);
+  const channelId = getStaffLogId(guild, key);
+  const channelById = guild.channels.cache.get(channelId);
 
   if (channelById?.isTextBased?.()) {
     if (!channelNameMatches(channelById, config.name)) {
@@ -57,7 +93,7 @@ async function sendStaffLog(guild, key, embed) {
 
     if (!channel) {
       const fetchedById =
-        await guild.channels.fetch(config.id).catch(() => null);
+        await guild.channels.fetch(getStaffLogId(guild, key)).catch(() => null);
 
       if (fetchedById?.isTextBased?.()) {
         channel = fetchedById;
@@ -75,7 +111,7 @@ async function sendStaffLog(guild, key, embed) {
 
     if (!channel?.isTextBased?.()) {
       console.error(
-        `Salon de log introuvable pour ${key} (ID: ${config.id}, nom: ${config.name})`
+        `Salon de log introuvable pour ${key} (ID: ${getStaffLogId(guild, key)}, nom: ${config.name})`
       );
       return false;
     }
