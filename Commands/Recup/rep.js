@@ -5,6 +5,8 @@ const { tryAcquireCooldown, releaseCooldown } = require('../../utils/cooldownSer
 
 const cooldowns = new Map();
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'rep',
   description: 'Donne un point de réputation à un utilisateur.',
@@ -16,11 +18,11 @@ module.exports = {
       const targetUser = message.mentions.users.first() || message.client.users.cache.get(args[0]);
 
       if (!targetUser) {
-        return message.reply('Veuillez mentionner un utilisateur ou fournir un ID valide.');
+        return message.reply(replyEmbedPayload('Veuillez mentionner un utilisateur ou fournir un ID valide.', { type: 'error' }));
       }
 
       if (targetUser.id === message.author.id) {
-        return message.reply('Vous ne pouvez pas vous donner de point de réputation.');
+        return message.reply(replyEmbedPayload('Vous ne pouvez pas vous donner de point de réputation.', { type: 'error' }));
       }
       const cooldown = await tryAcquireCooldown(
         UserRepCooldown,
@@ -76,7 +78,7 @@ module.exports = {
       message.reply({ embeds: [embed] });
     } catch (error) {
       console.error(error);
-      message.reply('Une erreur s\'est produite lors de l\'ajout du point de réputation.');
+      message.reply(replyEmbedPayload('Une erreur s\'est produite lors de l\'ajout du point de réputation.', { type: 'error' }));
     }
   },
 };
