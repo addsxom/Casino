@@ -1,4 +1,5 @@
 const parseAmount = require('../../utils/parseAmount.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
 
@@ -13,7 +14,7 @@ module.exports = {
     if (!(await requireBotOwner(message))) return;
 
 if (args.length !== 3) {
-      return message.reply('Utilisation incorrecte. Veuillez spécifier le type (rep/bank/coins), le nombre et mentionner l\'utilisateur.');
+      return message.reply(replyEmbedPayload('Utilisation incorrecte. Veuillez spécifier le type (rep/bank/coins), le nombre et mentionner l\'utilisateur.', { type: 'error' }));
     }
 
     const type = args[0].toLowerCase();
@@ -21,11 +22,11 @@ if (args.length !== 3) {
     const targetUser = message.mentions.users.first();
 
     if (!targetUser) {
-      return message.reply('Veuillez mentionner un utilisateur.');
+      return message.reply(replyEmbedPayload('Veuillez mentionner un utilisateur.', { type: 'error' }));
     }
 
     if (!Number.isSafeInteger(amount) || amount <= 0) {
-      return message.reply('Veuillez spécifier un nombre valide supérieur à zéro.');
+      return message.reply(replyEmbedPayload('Veuillez spécifier un nombre valide supérieur à zéro.', { type: 'error' }));
     }
 
     try {
@@ -39,10 +40,7 @@ if (args.length !== 3) {
           amount
         });
 
-        return message.reply(
-          'Vous avez ajouté ' + formatAmount(amount) +
-          ' points de réputation à ' + targetUser.tag + '.'
-        );
+        return message.reply(replyEmbedPayload('Vous avez ajouté ' + formatAmount(amount) + ' points de réputation à ' + targetUser.tag + '.', { type: 'success' }));
       }
 
       if (type !== 'bank' && type !== 'coins') {
@@ -76,16 +74,10 @@ if (args.length !== 3) {
         })
       );
 
-      return message.reply(
-        type === 'bank'
-          ? 'Vous avez ajouté ' + formatAmount(amount) +
-            ' coins en bank à ' + targetUser.tag + '.'
-          : 'Vous avez ajouté ' + formatAmount(amount) +
-            ' coins à ' + targetUser.tag + '.'
-      );
+      return message.reply(replyEmbedPayload(type === 'bank' ? 'Vous avez ajouté ' + formatAmount(amount) + ' coins en bank à ' + targetUser.tag + '.' : 'Vous avez ajouté ' + formatAmount(amount) + ' coins à ' + targetUser.tag + '.', { type: 'success' }));
     } catch (error) {
       console.error(error);
-      return message.reply('Une erreur s\'est produite lors de l\'ajout de points de réputation/coins.');
+      return message.reply(replyEmbedPayload('Une erreur s\'est produite lors de l\'ajout de points de réputation/coins.', { type: 'error' }));
     }
   },
 };
