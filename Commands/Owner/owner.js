@@ -1,6 +1,7 @@
 const Discord = require("discord.js");
 const Owner = require("../../Models/Owner");
 const { requireBotOwner, requireBuyer } = require("../../utils/ownerPermissions.js");
+const { replyEmbedPayload } = require("../../utils/replyEmbed.js");
 
 module.exports = {
   name: "owner",
@@ -20,7 +21,7 @@ async function addOwner(message, mentionOrId) {
   const userId = String(mentionOrId).replace(/<@!?|>/g, "");
 
   if (!/^\d{17,20}$/.test(userId)) {
-    return message.channel.send("Veuillez mentionner un utilisateur valide ou fournir un ID Discord valide.");
+    return message.channel.send(replyEmbedPayload("Veuillez mentionner un utilisateur valide ou fournir un ID Discord valide.", { type: "error" }));
   }
 
   try {
@@ -28,19 +29,19 @@ async function addOwner(message, mentionOrId) {
     const userName = user ? user.user.username : `<@${userId}>`;
 
     if (userId === process.env.BUYER) {
-      return message.channel.send(`${userName} est déjà le BUYER du bot.`);
+      return message.channel.send(replyEmbedPayload(`${userName} est déjà le BUYER du bot.`, { type: "warning" }));
     }
 
     const existingOwner = await Owner.findOne({ userId });
     if (existingOwner) {
-      return message.channel.send(`${userName} est déjà owner.`);
+      return message.channel.send(replyEmbedPayload(`${userName} est déjà owner.`, { type: "warning" }));
     }
 
     await Owner.create({ userId });
-    return message.channel.send(`✅・${userName} est maintenant owner.`);
+    return message.channel.send(replyEmbedPayload(`${userName} est maintenant owner.`, { type: "success", title: "👑 Owner ajouté" }));
   } catch (error) {
     console.error("Erreur ajout owner :", error);
-    return message.channel.send("Une erreur est survenue lors de l'ajout du owner.");
+    return message.channel.send(replyEmbedPayload("Une erreur est survenue lors de l'ajout du owner.", { type: "error" }));
   }
 }
 
@@ -54,7 +55,7 @@ async function listOwners(message) {
     }
 
     if (ownerIds.size === 0) {
-      return message.channel.send("Il n'y a actuellement aucun owner enregistré.");
+      return message.channel.send(replyEmbedPayload("Il n'y a actuellement aucun owner enregistré.", { type: "info" }));
     }
 
     const ownerMentions = [...ownerIds]
@@ -74,6 +75,6 @@ async function listOwners(message) {
     return message.channel.send({ embeds: [embed] });
   } catch (error) {
     console.error("Erreur liste owners :", error);
-    return message.channel.send("Une erreur est survenue lors de la récupération de la liste des owners.");
+    return message.channel.send(replyEmbedPayload("Une erreur est survenue lors de la récupération de la liste des owners.", { type: "error" }));
   }
 }
