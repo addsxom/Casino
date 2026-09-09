@@ -1,4 +1,5 @@
 const UserCoins = require('../../Models/UserCoins.js');
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const { formatAmount } = require('../../utils/formatAmount.js');
 const { sendStaffLog, buildDiscordLog } = require('../../utils/staffLogs.js');
 
@@ -24,7 +25,7 @@ try {
       const result = await UserCoins.deleteMany({ guildId: message.guild.id });
 
       if (result.deletedCount === 0) {
-        return message.reply('Aucun membre du serveur n\'a de points de réputation ni de coins à réinitialiser.');
+        return message.reply(replyEmbedPayload('Aucun membre du serveur n\'a de points de réputation ni de coins à réinitialiser.', { type: 'warning' }));
       }
 
       await sendStaffLog(
@@ -39,10 +40,10 @@ try {
         })
       );
 
-      return message.reply(`Vous avez réinitialisé tous les points de réputation et les coins de tous les membres du serveur.`);
+      return message.reply(replyEmbedPayload('Vous avez réinitialisé tous les points de réputation et les coins de tous les membres du serveur.', { type: 'success' }));
     } catch (error) {
       console.error(error);
-      return message.reply('Une erreur s\'est produite lors de la réinitialisation des points de réputation et des coins.');
+      return message.reply(replyEmbedPayload('Une erreur s\'est produite lors de la réinitialisation des points de réputation et des coins.', { type: 'error' }));
     }
   },
 };
