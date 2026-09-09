@@ -8,6 +8,7 @@ const {
   MessageFlags
 } = require('discord.js');
 const config = require('../../config/botConfig.js');
+const { getConfiguredChannelId } = require('../../utils/configService.js');
 
 const parseAmount = require('../../utils/parseAmount.js');
 const MinesCooldown = require('../../Models/MinesCooldown.js');
@@ -519,7 +520,7 @@ module.exports = {
   async execute(message, args, options = {}) {
     const guildId = message.guild.id;
     const userId = message.author.id;
-    const minesChannelId = config.channels.games.mines;
+    const minesChannelId = getConfiguredChannelId('mines', guildId);
     let activeGameToken = null;
 
     if (message.channel.id !== minesChannelId) {
