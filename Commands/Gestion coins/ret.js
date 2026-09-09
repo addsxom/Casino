@@ -3,6 +3,8 @@ const { sendStaffLog, buildBankTransferLog } = require('../../utils/staffLogs.js
 const parseAmount = require('../../utils/parseAmount.js');
 const { moveBalance } = require('../../utils/economyService.js');
 
+const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+
 module.exports = {
   name: 'ret',
   description: 'Retirez des coins de votre banque vers votre poche.',
@@ -12,7 +14,7 @@ module.exports = {
     const amountToWithdraw = parseAmount(args[0]);
 
     if (!Number.isSafeInteger(amountToWithdraw) || amountToWithdraw <= 0) {
-      return message.reply('❓・Veuillez fournir un montant valide à retirer.');
+      return message.reply(replyEmbedPayload('Veuillez fournir un montant valide à retirer.', { type: 'error' }));
     }
 
     try {
@@ -26,7 +28,10 @@ module.exports = {
 
       if (!userCoins) {
         return message.reply(
-          '❌・Vous n\'avez pas assez d\'argent dans la banque pour retirer cette somme.'
+          replyEmbedPayload(
+            'Vous n\'avez pas assez d\'argent dans la banque pour retirer cette somme.',
+            { type: 'error' }
+          )
         );
       }
 
@@ -45,12 +50,18 @@ module.exports = {
       );
 
       return message.reply(
-        `🏦・Vous avez retiré **${formatAmount(amountToWithdraw)}** coins de votre banque.`
+        replyEmbedPayload(
+          `Vous avez retiré **${formatAmount(amountToWithdraw)}** coins de votre banque.`,
+          { type: 'success', title: '🏦 Retrait effectué' }
+        )
       );
     } catch (error) {
       console.error('Withdraw error:', error);
       return message.reply(
-        'Une erreur s\'est produite lors du retrait des coins.'
+        replyEmbedPayload(
+          'Une erreur s\'est produite lors du retrait des coins.',
+          { type: 'error' }
+        )
       );
     }
   },
