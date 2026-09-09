@@ -1,5 +1,6 @@
 const Owner = require("../../Models/Owner");
 const { requireBuyer } = require("../../utils/ownerPermissions.js");
+const { replyEmbedPayload } = require("../../utils/replyEmbed.js");
 
 module.exports = {
   name: "unowner",
@@ -12,7 +13,10 @@ module.exports = {
 
     if (!mentionOrId) {
       return message.channel.send(
-        "Veuillez mentionner un utilisateur à supprimer de la liste des propriétaires."
+        replyEmbedPayload(
+          "Veuillez mentionner un utilisateur à supprimer de la liste des propriétaires.",
+          { type: 'error' }
+        )
       );
     }
 
@@ -20,13 +24,19 @@ module.exports = {
 
     if (!/^\d{17,20}$/.test(userId)) {
       return message.channel.send(
-        "Veuillez mentionner un utilisateur valide ou fournir un ID Discord valide."
+        replyEmbedPayload(
+          "Veuillez mentionner un utilisateur valide ou fournir un ID Discord valide.",
+          { type: 'error' }
+        )
       );
     }
 
     if (userId === process.env.BUYER) {
       return message.channel.send(
-        "❌・Impossible de retirer le BUYER de la liste des propriétaires."
+        replyEmbedPayload(
+          "Impossible de retirer le BUYER de la liste des propriétaires.",
+          { type: 'error' }
+        )
       );
     }
 
@@ -37,16 +47,19 @@ module.exports = {
       const existingOwner = await Owner.findOne({ userId });
 
       if (!existingOwner) {
-        return message.channel.send(`${userName} n'était pas owner.`);
+        return message.channel.send(replyEmbedPayload(`${userName} n'était pas owner.`, { type: 'warning' }));
       }
 
       await Owner.deleteOne({ userId });
 
-      return message.channel.send(`✅・${userName} n'est plus owner.`);
+      return message.channel.send(replyEmbedPayload(`${userName} n'est plus owner.`, { type: 'success', title: '👑 Owner retiré' }));
     } catch (error) {
       console.error("Erreur suppression owner :", error);
       return message.channel.send(
-        "Une erreur est survenue lors de la suppression du owner."
+        replyEmbedPayload(
+          "Une erreur est survenue lors de la suppression du owner.",
+          { type: 'error' }
+        )
       );
     }
   },
