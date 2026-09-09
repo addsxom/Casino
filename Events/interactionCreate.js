@@ -16,12 +16,6 @@ const {
   makeTicketChannelName
 } = require('../utils/ticketSystem.js');
 
-const {
-  tryLockTicketClosure,
-  releaseTicketClosure,
-  deliverTicketTranscript,
-  deleteTicketChannel
-} = require('../utils/ticketTranscript.js');
 const { replyEmbedPayload } = require('../utils/replyEmbed.js');
 
 const MEMBER_ROLE_NAME = 'Member';
@@ -244,6 +238,16 @@ async function closeTicket(interaction) {
   await interaction.deferReply({
     flags: MessageFlags.Ephemeral
   });
+
+  // Charge le générateur de transcript uniquement lors de la fermeture.
+  // Ainsi, un module de transcript absent/cassé ne désactive pas
+  // tout interactionCreate et n'empêche pas l'ouverture des tickets.
+  const {
+    tryLockTicketClosure,
+    releaseTicketClosure,
+    deliverTicketTranscript,
+    deleteTicketChannel
+  } = require('../utils/ticketTranscript.js');
 
   const channel = interaction.channel;
 
