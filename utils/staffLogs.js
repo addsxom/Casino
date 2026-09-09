@@ -1,40 +1,31 @@
 const { EmbedBuilder } = require('discord.js');
-const config = require('../config/botConfig.js');
 const { getConfiguredChannelId } = require('./configService.js');
 const { formatAmount } = require('./formatAmount.js');
 
 const STAFF_LOG_CHANNELS = {
   'warn': {
-    configKey: 'warn',
-    name: config.channels.staffLogs.warn.name
+    configKey: 'warn'
   },
   'economy-logs': {
-    configKey: 'economylogs',
-    name: config.channels.staffLogs.economy.name
+    configKey: 'economylogs'
   },
   'bank-logs': {
-    configKey: 'banklogs',
-    name: config.channels.staffLogs.bank.name
+    configKey: 'banklogs'
   },
   'transaction-logs': {
-    configKey: 'transactionlogs',
-    name: config.channels.staffLogs.transaction.name
+    configKey: 'transactionlogs'
   },
   'message-logs': {
-    configKey: 'messagelogs',
-    name: config.channels.staffLogs.message.name
+    configKey: 'messagelogs'
   },
   'server-logs': {
-    configKey: 'serverlogs',
-    name: config.channels.staffLogs.server.name
+    configKey: 'serverlogs'
   },
   'voice-logs': {
-    configKey: 'voicelogs',
-    name: config.channels.staffLogs.voice.name
+    configKey: 'voicelogs'
   },
   'moderation-logs': {
-    configKey: 'moderationlogs',
-    name: config.channels.staffLogs.moderation.name
+    configKey: 'moderationlogs'
   }
 };
 
@@ -48,78 +39,85 @@ function getStaffLogId(guild, key) {
   );
 }
 
-function normalizeChannelName(name) {
-  return String(name || '').toLowerCase().trim();
-}
-
-function channelNameMatches(channel, expectedName) {
-  const actual = normalizeChannelName(channel?.name);
-  const expected = normalizeChannelName(expectedName);
-
-  return actual === expected || actual.endsWith(expected);
-}
-
 function findStaffLogChannel(guild, key) {
   if (!guild) return null;
 
-  const config = STAFF_LOG_CHANNELS[key];
-  if (!config) return null;
+  const entry =
+    STAFF_LOG_CHANNELS[key];
 
-  const channelId = getStaffLogId(guild, key);
-  const channelById = guild.channels.cache.get(channelId);
+  if (!entry) return null;
 
-  if (channelById?.isTextBased?.()) {
-    if (!channelNameMatches(channelById, config.name)) {
-      console.warn(
-        `Salon de log ${key} trouvé par ID mais renommé : ${channelById.name}`
-      );
-    }
+  const channelId =
+    getStaffLogId(guild, key);
 
-    return channelById;
-  }
+  if (!channelId) return null;
 
-  return guild.channels.cache.find(channel =>
-    channel?.isTextBased?.() &&
-    channelNameMatches(channel, config.name)
-  ) || null;
+  const channel =
+    guild.channels.cache.get(
+      channelId
+    );
+
+  return channel?.isTextBased?.()
+    ? channel
+    : null;
 }
 
-async function sendStaffLog(guild, key, embed) {
+async function sendStaffLog(
+  guild,
+  key,
+  embed
+) {
   try {
-    const config = STAFF_LOG_CHANNELS[key];
-    if (!guild || !config) return false;
+    const entry =
+      STAFF_LOG_CHANNELS[key];
 
-    let channel = findStaffLogChannel(guild, key);
-
-    if (!channel) {
-      const fetchedById =
-        await guild.channels.fetch(getStaffLogId(guild, key)).catch(() => null);
-
-      if (fetchedById?.isTextBased?.()) {
-        channel = fetchedById;
-      }
+    if (!guild || !entry) {
+      return false;
     }
 
-    if (!channel) {
-      await guild.channels.fetch().catch(() => null);
+    const channelId =
+      getStaffLogId(
+        guild,
+        key
+      );
 
-      channel = guild.channels.cache.find(candidate =>
-        candidate?.isTextBased?.() &&
-        channelNameMatches(candidate, config.name)
-      ) || null;
+    if (!channelId) {
+      return false;
     }
 
-    if (!channel?.isTextBased?.()) {
+    let channel =
+      findStaffLogChannel(
+        guild,
+        key
+      );
+
+    if (!channel) {
+      channel =
+        await guild.channels
+          .fetch(channelId)
+          .catch(() => null);
+    }
+
+    if (
+      !channel?.isTextBased?.()
+    ) {
       console.error(
-        `Salon de log introuvable pour ${key} (ID: ${getStaffLogId(guild, key)}, nom: ${config.name})`
+        `Salon de log introuvable pour ${key} (ID: ${channelId})`
       );
       return false;
     }
 
-    await channel.send({ embeds: [embed] });
+    await channel.send({
+      embeds: [embed]
+    });
+
     return true;
   } catch (error) {
-    console.error(`Erreur log staff (${key}) :`, error);
+    console.error(
+      `Erreur log staff (${key}) :`,
+      error
+    );
+
     return false;
   }
 }
