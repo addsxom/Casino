@@ -6,6 +6,7 @@ const UserRepCooldown = require('../Models/UserRepCooldown.js');
 const UserRobCooldown = require('../Models/UserRobCooldown.js');
 const UserRobProtection = require('../Models/UserRobProtection.js');
 const VoiceRewardProgress = require('../Models/VoiceRewardProgress.js');
+const AfkRewardProgress = require('../Models/AfkRewardProgress.js');
 const BotConfigOverride = require('../Models/BotConfigOverride.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
@@ -167,6 +168,56 @@ async function mergeVoiceRewardProgressDuplicates() {
   return duplicates.length;
 }
 
+async function mergeAfkRewardProgressDuplicates() {
+  const duplicates =
+    await AfkRewardProgress.aggregate([
+      {
+        $group: {
+          _id: {
+            userId: '$userId',
+            guildId: '$guildId'
+          },
+          ids: { $push: '$_id' },
+          count: { $sum: 1 },
+          latestUpdatedAt: {
+            $max: '$updatedAt'
+          }
+        }
+      },
+      {
+        $match: {
+          count: { $gt: 1 }
+        }
+      }
+    ]);
+
+  for (const duplicate of duplicates) {
+    const latest =
+      await AfkRewardProgress.findOne({
+        _id: { $in: duplicate.ids },
+        updatedAt:
+          duplicate.latestUpdatedAt
+      }).lean();
+
+    if (!latest) continue;
+
+    const removeIds =
+      duplicate.ids.filter(
+        id =>
+          String(id) !==
+          String(latest._id)
+      );
+
+    if (removeIds.length) {
+      await AfkRewardProgress.deleteMany({
+        _id: { $in: removeIds }
+      });
+    }
+  }
+
+  return duplicates.length;
+}
+
 async function mergeMinesCooldownDuplicates() {
   const duplicates = await MinesCooldown.aggregate([
     {
@@ -219,6 +270,7 @@ async function createDeclaredIndexes() {
     UserRobCooldown,
     UserRobProtection,
     VoiceRewardProgress,
+    AfkRewardProgress,
     BotConfigOverride,
     ServerPrefix,
     Owner
@@ -245,7 +297,9 @@ async function ensureDatabaseIntegrity() {
     minesCooldowns:
       await hasUserGuildUniqueIndex(MinesCooldown),
     voiceRewardProgress:
-      await hasUserGuildUniqueIndex(VoiceRewardProgress)
+      await hasUserGuildUniqueIndex(VoiceRewardProgress),
+    afkRewardProgress:
+      await hasUserGuildUniqueIndex(AfkRewardProgress)
   };
 
   const results = {
@@ -272,7 +326,10 @@ async function ensureDatabaseIntegrity() {
       : await mergeMinesCooldownDuplicates(),
     voiceRewardProgress: indexed.voiceRewardProgress
       ? 0
-      : await mergeVoiceRewardProgressDuplicates()
+      : await mergeVoiceRewardProgressDuplicates(),
+    afkRewardProgress: indexed.afkRewardProgress
+      ? 0
+      : await mergeAfkRewardProgressDuplicates()
   };
 
   await createDeclaredIndexes();
