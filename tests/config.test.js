@@ -15,6 +15,8 @@ test('important config aliases resolve correctly', () => {
   assert.equal(resolveConfigKey('reward-voc'), 'rewards');
   assert.equal(resolveConfigKey('economy-logs'), 'economylogs');
   assert.equal(resolveConfigKey('voicebot'), 'botvoice');
+  assert.equal(resolveConfigKey('afk'), 'afkfarm');
+  assert.equal(resolveConfigKey('afk-farm'), 'afkfarm');
   assert.equal(resolveConfigKey('unknown-setting'), null);
 });
 
@@ -55,4 +57,8 @@ test('reward safety settings stay centralized', () => {
   assert.equal(config.rewards.voice.rewardMaxMs, 20 * 60 * 1000);
   assert.equal(config.rewards.voice.muteGraceMs, 40 * 60 * 1000);
   assert.equal(config.rewards.voice.activityBonusPercent, 50);
+  assert.equal(config.rewards.afk.rewardMinMs, 30 * 60 * 1000);
+  assert.equal(config.rewards.afk.rewardMaxMs, 40 * 60 * 1000);
+  assert.equal(config.rewards.afk.rewardCoins, 250);
+  assert.equal(config.channels.afkFarm, '1547368687579955290');
 });
