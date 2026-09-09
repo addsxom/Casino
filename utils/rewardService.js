@@ -1,5 +1,6 @@
 const { EmbedBuilder } = require('discord.js');
 const config = require('../config/botConfig.js');
+const { getConfiguredChannelId } = require('./configService.js');
 const { formatAmount } = require('./formatAmount.js');
 
 const MESSAGE_REWARDS =
@@ -188,8 +189,8 @@ async function getRewardChannel(guild) {
   if (!guild) return null;
 
   let channel =
-    guild.channels.cache.get(config.channels.rewards) ||
-    await guild.channels.fetch(config.channels.rewards)
+    guild.channels.cache.get(getConfiguredChannelId('rewards', guild.id)) ||
+    await guild.channels.fetch(getConfiguredChannelId('rewards', guild.id))
       .catch(() => null);
 
   return channel?.isTextBased?.()
