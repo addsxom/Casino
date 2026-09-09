@@ -14,6 +14,7 @@ const {
   getStaffRoles,
   makeTicketChannelName
 } = require('../utils/ticketSystem.js');
+const { replyEmbedPayload } = require('../utils/replyEmbed.js');
 
 const MEMBER_ROLE_NAME = 'Member';
 
@@ -34,19 +35,28 @@ async function acceptRules(interaction) {
 
   if (!memberRole) {
     return interaction.editReply(
-      '❌・Le rôle **Member** est introuvable. Contacte un administrateur.'
+      replyEmbedPayload(
+        'Le rôle **Member** est introuvable. Contacte un administrateur.',
+        { type: 'error' }
+      )
     );
   }
 
   if (member.roles.cache.has(memberRole.id)) {
     return interaction.editReply(
-      '✅・Tu as déjà accepté le règlement et tu possèdes déjà le rôle Member.'
+      replyEmbedPayload(
+        'Tu as déjà accepté le règlement et tu possèdes déjà le rôle **Member**.',
+        { type: 'success', title: '✅ Règlement déjà accepté' }
+      )
     );
   }
 
   if (!memberRole.editable) {
     return interaction.editReply(
-      '❌・Je ne peux pas attribuer le rôle **Member**. Mon rôle doit être placé au-dessus dans la hiérarchie.'
+      replyEmbedPayload(
+        'Je ne peux pas attribuer le rôle **Member**. Mon rôle doit être placé au-dessus dans la hiérarchie.',
+        { type: 'error' }
+      )
     );
   }
 
@@ -56,7 +66,10 @@ async function acceptRules(interaction) {
   );
 
   return interaction.editReply(
-    '✅・Règlement accepté ! Le rôle **Member** t’a été attribué. Bienvenue sur le serveur.'
+    replyEmbedPayload(
+      'Le rôle **Member** t’a été attribué. Bienvenue sur le serveur.',
+      { type: 'success', title: '✅ Règlement accepté' }
+    )
   );
 }
 
@@ -116,7 +129,12 @@ async function openTicket(bot, interaction) {
   const type = TICKET_TYPES[typeKey];
 
   if (!type) {
-    return interaction.editReply('❌・Ce type de ticket est invalide.');
+    return interaction.editReply(
+      replyEmbedPayload(
+        'Ce type de ticket est invalide.',
+        { type: 'error' }
+      )
+    );
   }
 
   const guild = interaction.guild;
@@ -129,7 +147,10 @@ async function openTicket(bot, interaction) {
 
   if (existingTicket) {
     return interaction.editReply(
-      `❌・Tu as déjà un ticket ouvert : ${existingTicket}`
+      replyEmbedPayload(
+        `Tu as déjà un ticket ouvert : ${existingTicket}`,
+        { type: 'warning', title: '🎫 Ticket déjà ouvert' }
+      )
     );
   }
 
@@ -198,7 +219,10 @@ async function openTicket(bot, interaction) {
   });
 
   await interaction.editReply(
-    `✅・Ton ticket a été créé : ${channel}`
+    replyEmbedPayload(
+      `Ton ticket a été créé : ${channel}`,
+      { type: 'success', title: '🎫 Ticket créé' }
+    )
   );
 
   setTimeout(() => {
@@ -216,7 +240,10 @@ async function closeTicket(interaction) {
 
   if (!ownerId) {
     return interaction.editReply(
-      '❌・Ce salon ne semble pas être un ticket valide.'
+      replyEmbedPayload(
+        'Ce salon ne semble pas être un ticket valide.',
+        { type: 'error' }
+      )
     );
   }
 
@@ -226,11 +253,19 @@ async function closeTicket(interaction) {
 
   if (interaction.user.id !== ownerId && !isStaff(member)) {
     return interaction.editReply(
-      '❌・Seul le propriétaire du ticket ou le staff peut le fermer.'
+      replyEmbedPayload(
+        'Seul le propriétaire du ticket ou le staff peut le fermer.',
+        { type: 'error' }
+      )
     );
   }
 
-  await interaction.editReply('🔒・Fermeture du ticket...');
+  await interaction.editReply(
+    replyEmbedPayload(
+      'Le ticket va être supprimé.',
+      { type: 'warning', title: '🔒 Fermeture du ticket' }
+    )
+  );
 
   setTimeout(() => {
     channel
@@ -259,13 +294,21 @@ module.exports = async (bot, interaction) => {
 
     if (interaction.deferred || interaction.replied) {
       return interaction
-        .editReply('❌・Une erreur est survenue avec le système de tickets.')
+        .editReply(
+          replyEmbedPayload(
+            'Une erreur est survenue avec le système de tickets.',
+            { type: 'error' }
+          )
+        )
         .catch(() => {});
     }
 
     return interaction
       .reply({
-        content: '❌・Une erreur est survenue avec le système de tickets.',
+        ...replyEmbedPayload(
+          'Une erreur est survenue avec le système de tickets.',
+          { type: 'error' }
+        ),
         flags: MessageFlags.Ephemeral
       })
       .catch(() => {});
