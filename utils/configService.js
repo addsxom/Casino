@@ -2,93 +2,110 @@ const config = require('../config/botConfig.js');
 const BotConfigOverride =
   require('../Models/BotConfigOverride.js');
 
+const overrideCache = new Map();
+
 const CHANNEL_CONFIGS = {
   botvoice: {
     label: 'Vocal du bot',
     path: ['channels', 'botVoice', 'id'],
     type: 'voice',
+    scope: 'guild',
     aliases: ['bot-voice', 'voicebot']
   },
   welcome: {
     label: 'Salon de bienvenue',
     path: ['channels', 'welcome'],
     type: 'text',
+    scope: 'guild',
     aliases: ['bienvenue']
   },
   membercount: {
     label: 'Compteur de membres',
     path: ['channels', 'memberCount'],
     type: 'any',
+    scope: 'guild',
     aliases: ['members', 'membres']
   },
   rewards: {
     label: 'Récompenses messages/vocal',
     path: ['channels', 'rewards'],
     type: 'text',
+    scope: 'guild',
     aliases: ['reward', 'reward-voc']
   },
   botguildevents: {
     label: 'Arrivée/départ du bot',
     path: ['channels', 'botGuildEvents'],
     type: 'text',
+    scope: 'global',
     aliases: ['guildevents', 'bot-events']
   },
   slots: {
     label: 'Slots',
     path: ['channels', 'games', 'slots'],
     type: 'text',
+    scope: 'guild',
     aliases: ['slot']
   },
   mines: {
     label: 'Mines',
     path: ['channels', 'games', 'mines'],
-    type: 'text'
+    type: 'text',
+    scope: 'guild'
   },
   warn: {
     label: 'Logs warn',
     path: ['channels', 'staffLogs', 'warn', 'id'],
-    type: 'text'
+    type: 'text',
+    scope: 'guild'
   },
   economylogs: {
     label: 'Logs économie',
     path: ['channels', 'staffLogs', 'economy', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['economy', 'economy-logs']
   },
   banklogs: {
     label: 'Logs banque',
     path: ['channels', 'staffLogs', 'bank', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['bank', 'bank-logs']
   },
   transactionlogs: {
     label: 'Logs transactions',
     path: ['channels', 'staffLogs', 'transaction', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['transaction', 'transaction-logs']
   },
   messagelogs: {
     label: 'Logs messages',
     path: ['channels', 'staffLogs', 'message', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['message', 'message-logs']
   },
   serverlogs: {
     label: 'Logs serveur',
     path: ['channels', 'staffLogs', 'server', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['server', 'server-logs']
   },
   voicelogs: {
     label: 'Logs vocal',
     path: ['channels', 'staffLogs', 'voice', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['voice', 'voice-logs']
   },
   moderationlogs: {
     label: 'Logs modération',
     path: ['channels', 'staffLogs', 'moderation', 'id'],
     type: 'text',
+    scope: 'guild',
     aliases: ['moderation', 'moderation-logs']
   }
 };
@@ -130,45 +147,100 @@ function getPathValue(path) {
   return current;
 }
 
-function setPathValue(path, value) {
-  let current = config;
+function getStorageKey(key, guildId) {
+  const entry = CHANNEL_CONFIGS[key];
 
-  for (let i = 0; i < path.length - 1; i++) {
-    current = current[path[i]];
-  }
+  if (!entry) return null;
 
-  current[path[path.length - 1]] = value;
+  const scope = entry.scope === 'global'
+    ? 'global'
+    : String(guildId || config.guildId);
+
+  return `${scope}:${key}`;
 }
 
-function getChannelConfigList() {
+function getConfiguredChannelId(keyInput, guildId) {
+  const key = resolveConfigKey(keyInput);
+  if (!key) return null;
+
+  const storageKey = getStorageKey(key, guildId);
+
+  return (
+    overrideCache.get(storageKey) ||
+    String(getPathValue(CHANNEL_CONFIGS[key].path) || '')
+  );
+}
+
+function getChannelConfigList(guildId) {
   return Object.entries(CHANNEL_CONFIGS).map(
     ([key, entry]) => ({
       key,
       label: entry.label,
       type: entry.type,
-      id: String(getPathValue(entry.path) || '')
+      scope: entry.scope,
+      id: getConfiguredChannelId(key, guildId)
     })
   );
 }
 
+async function migrateLegacyOverrides() {
+  for (const [key, entry] of Object.entries(CHANNEL_CONFIGS)) {
+    const legacy = await BotConfigOverride.findOne({ key }).lean();
+
+    if (!legacy) continue;
+
+    const targetKey = getStorageKey(
+      key,
+      entry.scope === 'global'
+        ? null
+        : config.guildId
+    );
+
+    const targetExists =
+      await BotConfigOverride.exists({
+        key: targetKey
+      });
+
+    if (!targetExists) {
+      await BotConfigOverride.updateOne(
+        { _id: legacy._id },
+        {
+          $set: {
+            key: targetKey
+          }
+        }
+      );
+    } else {
+      await BotConfigOverride.deleteOne({
+        _id: legacy._id
+      });
+    }
+  }
+}
+
 async function applyStoredChannelOverrides() {
-  const rows = await BotConfigOverride.find({
-    key: { $in: Object.keys(CHANNEL_CONFIGS) }
-  }).lean();
+  await migrateLegacyOverrides();
+
+  overrideCache.clear();
+
+  const rows = await BotConfigOverride.find({}).lean();
 
   for (const row of rows) {
-    const entry = CHANNEL_CONFIGS[row.key];
-    if (!entry || !/^\d{17,20}$/.test(row.value)) {
+    if (!/^\d{17,20}$/.test(row.value)) {
       continue;
     }
 
-    setPathValue(entry.path, row.value);
+    overrideCache.set(row.key, row.value);
   }
 
-  return rows.length;
+  return overrideCache.size;
 }
 
-async function setChannelConfig(keyInput, channelId) {
+async function setChannelConfig(
+  guildId,
+  keyInput,
+  channelId
+) {
   const key = resolveConfigKey(keyInput);
 
   if (!key) {
@@ -188,8 +260,13 @@ async function setChannelConfig(keyInput, channelId) {
     };
   }
 
+  const storageKey = getStorageKey(
+    key,
+    guildId
+  );
+
   await BotConfigOverride.findOneAndUpdate(
-    { key },
+    { key: storageKey },
     {
       $set: {
         value: id
@@ -202,10 +279,7 @@ async function setChannelConfig(keyInput, channelId) {
     }
   );
 
-  setPathValue(
-    CHANNEL_CONFIGS[key].path,
-    id
-  );
+  overrideCache.set(storageKey, id);
 
   return {
     ok: true,
@@ -218,6 +292,7 @@ async function setChannelConfig(keyInput, channelId) {
 module.exports = {
   CHANNEL_CONFIGS,
   resolveConfigKey,
+  getConfiguredChannelId,
   getChannelConfigList,
   applyStoredChannelOverrides,
   setChannelConfig
