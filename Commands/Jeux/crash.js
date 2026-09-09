@@ -1,184 +1,34 @@
-const config = require('../../config/botConfig.js');
 const {
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  EmbedBuilder
-} = require('discord.js');
-
-const { formatAmount: formatCoins } = require('../../utils/formatAmount.js');
-const parseAmount = require('../../utils/parseAmount.js');
-const { sendStaffLog, buildCoinMovementLog } = require('../../utils/staffLogs.js');
-const { debitBalance, drainPocket, creditBalance, getAccount } = require('../../utils/economyService.js');
+  formatAmount: formatCoins
+} = require('../../utils/formatAmount.js');
+const parseAmount =
+  require('../../utils/parseAmount.js');
+const {
+  sendStaffLog,
+  buildCoinMovementLog
+} = require('../../utils/staffLogs.js');
+const {
+  debitBalance,
+  drainPocket,
+  creditBalance,
+  getAccount
+} = require('../../utils/economyService.js');
 const {
   tryAcquireActiveGame,
   updateActiveGame,
   releaseActiveGame,
   buildActiveGameEmbed
 } = require('../../utils/activeGameLock.js');
-
 const {
-  houseEdge: HOUSE_EDGE,
-  maxCrash: MAX_CRASH,
-  liveUpdateMs: LIVE_UPDATE_MS
-} = config.games.crash;
-
-function generateCrashPoint() {
-  const random = Math.random();
-  const raw = (1 - HOUSE_EDGE) / (1 - random);
-  const point = Math.floor(raw * 100) / 100;
-
-  return Math.min(
-    MAX_CRASH,
-    Math.max(1, point)
-  );
-}
-
-function getMultiplierAt(startedAt, at = Date.now()) {
-  const elapsedSeconds = Math.max(
-    0,
-    (at - startedAt) / 1000
-  );
-
-  // Courbe continue : douce au départ puis accélère progressivement.
-  const exponent =
-    0.05 * elapsedSeconds +
-    0.0015 * elapsedSeconds * elapsedSeconds;
-
-  return Number(
-    Math.min(
-      MAX_CRASH,
-      Math.exp(exponent)
-    ).toFixed(2)
-  );
-}
-
-function getFlightPhase(multiplier) {
-  if (multiplier < 1.35) {
-    return {
-      name: 'Décollage',
-      icon: '🛫'
-    };
-  }
-
-  if (multiplier < 2) {
-    return {
-      name: 'Ascension',
-      icon: '🚀'
-    };
-  }
-
-  if (multiplier < 5) {
-    return {
-      name: 'Haute altitude',
-      icon: '☁️'
-    };
-  }
-
-  if (multiplier < 15) {
-    return {
-      name: 'Stratosphère',
-      icon: '🌌'
-    };
-  }
-
-  return {
-    name: 'Orbite',
-    icon: '🪐'
-  };
-}
-
-function buildFlightTrack(multiplier) {
-  const length = 14;
-
-  const normalized = Math.min(
-    1,
-    Math.log10(Math.max(1, multiplier)) / 2
-  );
-
-  const rocketIndex = Math.min(
-    length - 1,
-    Math.floor(normalized * (length - 1))
-  );
-
-  const track = [];
-
-  for (let i = 0; i < length; i++) {
-    if (i === rocketIndex) {
-      track.push('🚀');
-    } else if (i < rocketIndex) {
-      track.push('━');
-    } else {
-      track.push('·');
-    }
-  }
-
-  return track.join('');
-}
-
-function buildPlayingEmbed(message, game) {
-  const potential = Math.floor(
-    game.amount * game.multiplier
-  );
-
-  return new EmbedBuilder()
-    .setColor(0x8b8df8)
-    .setTitle(
-      `🚀 x${game.multiplier.toFixed(2)}`
-    )
-    .setDescription(
-      `**Gain actuel :** ${formatCoins(potential)} coins🪙\n` +
-      `**Mise :** ${formatCoins(game.amount)} coins🪙\n\n` +
-      `🟢 **En cours**`
-    )
-    .setFooter({
-      text:
-        `${message.author.tag} • Cash Out avant le crash`
-    });
-}
-
-function buildResultEmbed(message, game) {
-  if (game.status === 'lost') {
-    return new EmbedBuilder()
-      .setColor(0xef476f)
-      .setTitle(
-        `💥 Crash à x${game.crashPoint.toFixed(2)}`
-      )
-      .setDescription(
-        `**Perte :** -${formatCoins(game.amount)} coins🪙`
-      )
-      .setFooter({
-        text:
-          `${message.author.tag} • Terminé`
-      });
-  }
-
-  return new EmbedBuilder()
-    .setColor(0x46d18c)
-    .setTitle(
-      `✅ Cash Out à x${game.cashoutMultiplier.toFixed(2)}`
-    )
-    .setDescription(
-      `**Gain :** ${formatCoins(game.payout)} coins🪙\n` +
-      `**Mise :** ${formatCoins(game.amount)} coins🪙`
-    )
-    .setFooter({
-      text:
-        `${message.author.tag} • Terminé`
-    });
-}
-
-function buildCashoutRow() {
-  return [
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('crash_cashout')
-        .setLabel('Cash Out')
-        .setEmoji('💰')
-        .setStyle(ButtonStyle.Success)
-    )
-  ];
-}
+  LIVE_UPDATE_MS,
+  generateCrashPoint,
+  getMultiplierAt
+} = require('../../utils/crash/gameRules.js');
+const {
+  buildPlayingEmbed,
+  buildResultEmbed,
+  buildCashoutRow
+} = require('../../utils/crash/ui.js');
 
 module.exports = {
   name: 'crash',
