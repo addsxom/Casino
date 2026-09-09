@@ -1,4 +1,5 @@
 const { EmbedBuilder } = require('discord.js');
+const config = require('../../config/botConfig.js');
 const { getAccount } = require('../../utils/economyService.js');
 const {
   MESSAGE_REWARDS,
@@ -55,7 +56,7 @@ module.exports = {
         )
       })
       .setFooter({
-        text: 'Seuls les messages d’au moins 3 caractères comptent.'
+        text: `Seuls les messages d’au moins ${config.rewards.messages.minimumCharacters} caractères comptent.`
       })
       .setTimestamp();
 
