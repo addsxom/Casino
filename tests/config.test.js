@@ -14,6 +14,7 @@ test('important config aliases resolve correctly', () => {
   assert.equal(resolveConfigKey('mines'), 'mines');
   assert.equal(resolveConfigKey('slot'), 'slots');
   assert.equal(resolveConfigKey('reward-voc'), 'rewards');
+  assert.equal(resolveConfigKey('misc-cmd'), 'misccmd');
   assert.equal(resolveConfigKey('economy-logs'), 'economylogs');
   assert.equal(resolveConfigKey('voicebot'), 'botvoice');
   assert.equal(resolveConfigKey('afk'), 'afkfarm');
@@ -45,6 +46,11 @@ test('default channel ids are used without an override', () => {
   assert.equal(
     getConfiguredChannelId('slots', 'unconfigured-guild'),
     config.channels.games.slots
+  );
+
+  assert.equal(
+    getConfiguredChannelId('misccmd', 'unconfigured-guild'),
+    config.channels.miscCommands
   );
 
   assert.equal(
