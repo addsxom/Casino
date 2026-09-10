@@ -51,6 +51,82 @@ function getActivityOptions(type, streamingUrl) {
   return options;
 }
 
+function getStoredActivityTexts(botInfo) {
+  const stored =
+    Array.isArray(
+      botInfo?.activityTexts
+    )
+      ? botInfo.activityTexts
+          .map(
+            normalizeActivityTemplate
+          )
+          .filter(Boolean)
+      : [];
+
+  if (stored.length) {
+    return stored;
+  }
+
+  return [
+    botInfo?.activityText,
+    botInfo?.activityText2
+  ]
+    .map(
+      normalizeActivityTemplate
+    )
+    .filter(Boolean);
+}
+
+async function migrateActivityTexts(botInfo) {
+  if (!botInfo) {
+    return [
+      'Kuromi-Coins 🎀',
+      DEFAULT_DYNAMIC_ACTIVITY
+    ];
+  }
+
+  let texts =
+    getStoredActivityTexts(
+      botInfo
+    );
+
+  if (!texts.length) {
+    texts = [
+      'Kuromi-Coins 🎀',
+      DEFAULT_DYNAMIC_ACTIVITY
+    ];
+  }
+
+  const current =
+    Array.isArray(
+      botInfo.activityTexts
+    )
+      ? botInfo.activityTexts
+          .map(
+            normalizeActivityTemplate
+          )
+          .filter(Boolean)
+      : [];
+
+  if (
+    JSON.stringify(current) !==
+    JSON.stringify(texts)
+  ) {
+    botInfo.activityTexts =
+      texts;
+
+    await botInfo.save()
+      .catch(error => {
+        console.error(
+          'Erreur migration activityTexts :',
+          error?.message || error
+        );
+      });
+  }
+
+  return texts;
+}
+
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
   mongoose.set("autoIndex", false);
@@ -67,26 +143,12 @@ module.exports = async (bot) => {
 
   const botInfo = await BotInfo.findOne();
 
-  if (botInfo?.activityText2) {
-    const normalizedText2 =
-      normalizeActivityTemplate(botInfo.activityText2);
-
-    if (normalizedText2 !== botInfo.activityText2) {
-      botInfo.activityText2 = normalizedText2;
-      await botInfo.save().catch(error => {
-        console.error(
-          'Erreur migration activityText2 :',
-          error?.message || error
-        );
-      });
-    }
-  }
+  const activityTexts =
+    await migrateActivityTexts(
+      botInfo
+    );
 
   const botName = bot.user.username;
-  const activitytext = botInfo?.activityText || "Kuromi-Coins 🎀";
-  const activitytext2 =
-    botInfo?.activityText2 ||
-    DEFAULT_DYNAMIC_ACTIVITY;
   const activityType = resolveActivityType(
     botInfo?.activityType
   );
@@ -94,7 +156,7 @@ module.exports = async (bot) => {
   const guildId = botInfo?.guildId || GUILD_ID;
 
   bot.activityRotation = {
-    texts: [activitytext, activitytext2].filter(Boolean),
+    texts: activityTexts,
     type: activityType,
     streamingUrl: botInfo?.streamingUrl || '',
     index: 0
