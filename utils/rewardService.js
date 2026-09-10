@@ -362,8 +362,7 @@ async function sendVoiceRewardNotification({
       `${user}, tu as passé **${formatDuration(earnedIntervalMs)} valides** en vocal.\n\n` +
       rewardDetails +
       `\n-# Poche : ${formatAmount(account.coins)} coins\n\n` +
-      `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
-      '-# Si tu restes éligible, le timestamp se met à jour automatiquement côté Discord.'
+      `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}`
     )
     .setTimestamp();
 
