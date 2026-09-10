@@ -140,10 +140,13 @@ async function animateSpin(
   const step =
     SLOT_CONFIG.animationStepMs;
 
-  for (
-    let cycle = 0;
-    cycle < 2;
-    cycle++
+  const spinStartedAt =
+    Date.now();
+
+  while (
+    Date.now() -
+      spinStartedAt <
+    SLOT_CONFIG.spinDurationMs
   ) {
     await gameMessage.edit({
       components: [
