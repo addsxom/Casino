@@ -72,13 +72,19 @@ module.exports = async (
 
   if (!changes.length) return;
 
+  const hasRoleChange =
+    addedRoles.size ||
+    removedRoles.size;
+
   await sendStaffLog(
     newMember.guild,
     'server-logs',
     buildDiscordLog({
       title: '👤 Membre modifié',
       description:
-        `${newMember.user}\n${changes.join('\n')}`,
+        hasRoleChange
+          ? changes.join('\n')
+          : `${newMember.user}\n${changes.join('\n')}`,
       color: 0x5865f2
     })
   );
