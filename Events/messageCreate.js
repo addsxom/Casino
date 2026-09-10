@@ -12,6 +12,70 @@ const {
 const { sendStaffLog, buildCoinMovementLog } = require("../utils/staffLogs.js");
 const { cacheMessage } = require("../utils/messageCache.js");
 const { replyEmbedPayload } = require("../utils/replyEmbed.js");
+const {
+  getConfiguredChannelId
+} = require("../utils/configService.js");
+
+const MISC_COMMAND_CATEGORIES = new Set([
+  'General',
+  'Gestion coins',
+  'Recup'
+]);
+
+async function enforceMiscCommandChannel(
+  message,
+  command
+) {
+  if (
+    !message.guild ||
+    !MISC_COMMAND_CATEGORIES.has(
+      command?.category
+    )
+  ) {
+    return true;
+  }
+
+  const miscChannelId =
+    getConfiguredChannelId(
+      'misccmd',
+      message.guild.id
+    );
+
+  if (
+    !miscChannelId ||
+    message.channel.id ===
+      miscChannelId
+  ) {
+    return true;
+  }
+
+  await message
+    .delete()
+    .catch(() => {});
+
+  const warning =
+    await message.channel
+      .send(
+        replyEmbedPayload(
+          `Utilise cette commande dans <#${miscChannelId}> pour éviter de polluer les autres salons.`,
+          {
+            type: 'warning',
+            title: '📌 Salon des commandes'
+          }
+        )
+      )
+      .catch(() => null);
+
+  if (warning) {
+    setTimeout(() => {
+      warning
+        .delete()
+        .catch(() => {});
+    }, 5000);
+  }
+
+  return false;
+}
 
 module.exports = async (bot, message) => {
   cacheMessage(message);
@@ -75,6 +139,16 @@ module.exports = async (bot, message) => {
 
       if (command) {
         try {
+          const allowedHere =
+            await enforceMiscCommandChannel(
+              message,
+              command
+            );
+
+          if (!allowedHere) {
+            return;
+          }
+
           await command.execute(
             message,
             args,
