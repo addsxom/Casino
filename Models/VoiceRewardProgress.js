@@ -21,6 +21,10 @@ const voiceRewardProgressSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
+  mutedRewards: {
+    type: Number,
+    default: 0
+  },
   previousSelfMute: {
     type: Boolean,
     default: false
