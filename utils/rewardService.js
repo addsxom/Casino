@@ -51,7 +51,7 @@ function buildVoiceStatusEmbed({
   nextRewardAt
 }) {
   const embed = new EmbedBuilder()
-    .setColor(0x6b6de6)
+    .setColor(0xfee75c)
     .setTimestamp();
 
   if (status === 'waiting_humans') {
@@ -65,6 +65,7 @@ function buildVoiceStatusEmbed({
 
   if (status === 'headphones_only') {
     return embed
+      .setColor(0xed4245)
       .setTitle('🎧 Récompense vocale en pause')
       .setDescription(
         `${user}, ton casque est coupé alors que ton micro est actif.\n\n` +
@@ -74,6 +75,7 @@ function buildVoiceStatusEmbed({
 
   if (status === 'mute_reward_limit') {
     return embed
+      .setColor(0xed4245)
       .setTitle('🔇 Récompense vocale en pause')
       .setDescription(
         `${user}, tu as déjà reçu **${VOICE_MUTE_GRACE_REWARDS} récompenses** avec le micro coupé.\n\n` +
@@ -85,6 +87,7 @@ function buildVoiceStatusEmbed({
 
   if (status === 'left') {
     return embed
+      .setColor(0xed4245)
       .setTitle('👋 Session vocale terminée')
       .setDescription(
         `${user}, tu as quitté le vocal.\n\n` +
@@ -93,7 +96,7 @@ function buildVoiceStatusEmbed({
   }
 
   return embed
-    .setColor(0x57f287)
+    .setColor(0xfee75c)
     .setTitle('🎙️ Compteur vocal actif')
     .setDescription(
       `${user}, ton compteur de récompense vocale est actif.\n\n` +
@@ -138,11 +141,12 @@ function buildAfkStatusEmbed({
   nextRewardAt
 }) {
   const embed = new EmbedBuilder()
-    .setColor(0x6b6de6)
+    .setColor(0xfee75c)
     .setTimestamp();
 
   if (status === 'left') {
     return embed
+      .setColor(0xed4245)
       .setTitle('🛌 Session AFK terminée')
       .setDescription(
         `${user}, tu as quitté **AFK Farm**.\n\n` +
@@ -151,7 +155,7 @@ function buildAfkStatusEmbed({
   }
 
   return embed
-    .setColor(0x57f287)
+    .setColor(0xfee75c)
     .setTitle('🛌 Compteur AFK actif')
     .setDescription(
       `${user}, ton compteur **AFK Farm** est actif.\n\n` +
@@ -305,7 +309,7 @@ async function sendMessageRewardNotification({
   if (!channel) return false;
 
   const embed = new EmbedBuilder()
-    .setColor(0x6b6de6)
+    .setColor(0x57f287)
     .setTitle('💬 Palier de messages atteint !')
     .setDescription(
       `${user}, tu as atteint **${formatAmount(reward.threshold)} messages** !\n\n` +
