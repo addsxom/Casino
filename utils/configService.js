@@ -103,6 +103,42 @@ const CHANNEL_CONFIGS = {
     type: 'text',
     scope: 'guild'
   },
+  ticketsupport: {
+    label: 'Catégorie tickets • Concierge Support',
+    path: ['channels', 'ticketCategories', 'support'],
+    type: 'any',
+    scope: 'guild',
+    aliases: [
+      'ticket-support',
+      'tickets-support',
+      'concierge',
+      'concierge-support'
+    ]
+  },
+  ticketreports: {
+    label: 'Catégorie tickets • Player Reports',
+    path: ['channels', 'ticketCategories', 'reports'],
+    type: 'any',
+    scope: 'guild',
+    aliases: [
+      'ticket-reports',
+      'tickets-reports',
+      'reports',
+      'player-reports'
+    ]
+  },
+  ticketrequests: {
+    label: 'Catégorie tickets • Other Requests',
+    path: ['channels', 'ticketCategories', 'requests'],
+    type: 'any',
+    scope: 'guild',
+    aliases: [
+      'ticket-requests',
+      'tickets-requests',
+      'requests',
+      'other-requests'
+    ]
+  },
   warn: {
     label: 'Logs warn',
     path: ['channels', 'staffLogs', 'warn', 'id'],

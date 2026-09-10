@@ -4,19 +4,22 @@ const TICKET_TYPES = {
   general: {
     label: 'Aide générale',
     emoji: '❓',
-    categoryName: '🎫・Support général',
+    categoryConfigKey: 'ticketsupport',
+    categoryName: '🎫──CONCIERGE・SUPPORT──🎫',
     channelPrefix: 'support'
   },
   report: {
     label: 'Signalement',
     emoji: '🚨',
-    categoryName: '🚨・Signalements',
+    categoryConfigKey: 'ticketreports',
+    categoryName: '🚨──PLAYER・REPORTS──🚨',
     channelPrefix: 'signalement'
   },
   other: {
     label: 'Autre demande',
     emoji: '📩',
-    categoryName: '📩・Autres demandes',
+    categoryConfigKey: 'ticketrequests',
+    categoryName: '📩──OTHER・REQUESTS──📩',
     channelPrefix: 'ticket'
   }
 };

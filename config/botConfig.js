@@ -20,6 +20,12 @@ module.exports = {
       crash: '1546311653564620900'
     },
 
+    ticketCategories: {
+      support: '1547655829438603364',
+      reports: '1547655928885551265',
+      requests: '1547655994543308883'
+    },
+
     staffLogs: {
       warn: {
         id: '1546311653933580418',

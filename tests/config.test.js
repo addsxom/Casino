@@ -15,6 +15,9 @@ test('important config aliases resolve correctly', () => {
   assert.equal(resolveConfigKey('slot'), 'slots');
   assert.equal(resolveConfigKey('crash'), 'crash');
   assert.equal(resolveConfigKey('ticket-logs'), 'ticketlogs');
+  assert.equal(resolveConfigKey('concierge-support'), 'ticketsupport');
+  assert.equal(resolveConfigKey('player-reports'), 'ticketreports');
+  assert.equal(resolveConfigKey('other-requests'), 'ticketrequests');
   assert.equal(resolveConfigKey('reward-voc'), 'rewards');
   assert.equal(resolveConfigKey('misc-cmd'), 'misccmd');
   assert.equal(resolveConfigKey('economy-logs'), 'economylogs');
@@ -63,6 +66,21 @@ test('default channel ids are used without an override', () => {
   assert.equal(
     getConfiguredChannelId('ticketlogs', 'unconfigured-guild'),
     config.channels.staffLogs.ticket.id
+  );
+
+  assert.equal(
+    getConfiguredChannelId('ticketsupport', 'unconfigured-guild'),
+    '1547655829438603364'
+  );
+
+  assert.equal(
+    getConfiguredChannelId('ticketreports', 'unconfigured-guild'),
+    '1547655928885551265'
+  );
+
+  assert.equal(
+    getConfiguredChannelId('ticketrequests', 'unconfigured-guild'),
+    '1547655994543308883'
   );
 
   assert.equal(

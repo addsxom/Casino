@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
+  TICKET_TYPES,
   getTicketOwnerId,
   getTicketTypeKey,
   isTicketChannel
@@ -47,5 +48,20 @@ test('normal channels are not treated as tickets', () => {
   assert.equal(
     isTicketChannel(channel),
     false
+  );
+});
+
+test('ticket types use configurable category ids', () => {
+  assert.equal(
+    TICKET_TYPES.general.categoryConfigKey,
+    'ticketsupport'
+  );
+  assert.equal(
+    TICKET_TYPES.report.categoryConfigKey,
+    'ticketreports'
+  );
+  assert.equal(
+    TICKET_TYPES.other.categoryConfigKey,
+    'ticketrequests'
   );
 });

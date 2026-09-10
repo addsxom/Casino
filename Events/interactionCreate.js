@@ -15,6 +15,9 @@ const {
   isTicketChannel,
   makeTicketChannelName
 } = require('../utils/ticketSystem.js');
+const {
+  getConfiguredChannelId
+} = require('../utils/configService.js');
 
 const { replyEmbedPayload } = require('../utils/replyEmbed.js');
 
@@ -90,6 +93,32 @@ function staffPermissionOverwrites(guild) {
 }
 
 async function getOrCreateCategory(guild, bot, type) {
+  const configuredCategoryId =
+    type.categoryConfigKey
+      ? getConfiguredChannelId(
+          type.categoryConfigKey,
+          guild.id
+        )
+      : null;
+
+  if (configuredCategoryId) {
+    const configuredCategory =
+      guild.channels.cache.get(
+        configuredCategoryId
+      ) ||
+      await guild.channels
+        .fetch(configuredCategoryId)
+        .catch(() => null);
+
+    if (
+      configuredCategory?.type ===
+        ChannelType.GuildCategory &&
+      configuredCategory.guild?.id === guild.id
+    ) {
+      return configuredCategory;
+    }
+  }
+
   let category = guild.channels.cache.find(
     channel =>
       channel.type === ChannelType.GuildCategory &&
