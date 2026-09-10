@@ -28,9 +28,16 @@ module.exports = {
   async execute(message) {
     if (!message.guild) return;
 
+    const ticketChannel = ticketChannel;
+    const ticketChannelId = ticketChannel?.id;
+
+    if (!ticketChannel || !ticketChannelId) {
+      return;
+    }
+
     if (
       !isTicketChannel(
-        message.channel
+        ticketChannel
       )
     ) {
       return message.reply(
@@ -58,7 +65,7 @@ module.exports = {
 
     if (
       !tryLockTicketClosure(
-        message.channel.id
+        ticketChannel.id
       )
     ) {
       return message.reply(
@@ -86,7 +93,7 @@ module.exports = {
     try {
       const result =
         await deliverTicketTranscript({
-          channel: message.channel,
+          channel: ticketChannel,
           closedBy: message.author
         });
 
@@ -111,7 +118,7 @@ module.exports = {
       await sleep(2000);
 
       await deleteTicketChannel(
-        message.channel,
+        ticketChannel,
         message.author
       );
     } catch (error) {
@@ -121,7 +128,7 @@ module.exports = {
       );
 
       releaseTicketClosure(
-        message.channel.id
+        ticketChannelId
       );
 
       return statusMessage.edit(
@@ -136,7 +143,7 @@ module.exports = {
     }
 
     releaseTicketClosure(
-      message.channel.id
+      ticketChannelId
     );
   }
 };
