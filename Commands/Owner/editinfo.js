@@ -448,12 +448,6 @@ function buildMainContainer(
     process.env.PREFIX ||
     '+';
 
-  const guildName =
-    bot.guilds.cache.get(
-      botInfo.guildId
-    )?.name ||
-    'Ce serveur';
-
   const text1 =
     botInfo.activityText
       ? renderActivityText(
@@ -514,12 +508,7 @@ function buildMainContainer(
     .addTextDisplayComponents(
       new TextDisplayBuilder()
         .setContent(
-          '# Paramètres du bot\n\n' +
-          '**' +
-          guildName +
-          '** — Choisissez une catégorie ci-dessous.\n\n' +
-          '• **Bot global** · Nom, photo, bannière et présence sur tous les serveurs.\n' +
-          '• **Activité du bot** · Textes affichés et type d’activité.'
+          '# Paramètres du bot'
         )
     )
     .addSeparatorComponents(
@@ -528,7 +517,6 @@ function buildMainContainer(
     .addTextDisplayComponents(
       new TextDisplayBuilder()
         .setContent(
-          '## Bot global — Tous les serveurs\n\n' +
           '🤖 **Nom** · ' +
           bot.user.username +
           '\n' +
@@ -560,8 +548,7 @@ function buildMainContainer(
           '2️⃣ **Texte 2** · ' +
           text2 +
           '\n\n' +
-          '-# Variables dynamiques : `{prefix}` et `{users}`\n' +
-          '-# Exemple : `{prefix}help for {users} users !`'
+          '-# Variables dynamiques : `{prefix}` et `{users}`'
         )
     )
     .addActionRowComponents(
