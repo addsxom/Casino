@@ -13,8 +13,8 @@ const VOICE_REWARD_COINS =
   config.rewards.voice.rewardCoins;
 const VOICE_ACTIVITY_BONUS_PERCENT =
   config.rewards.voice.activityBonusPercent;
-const VOICE_MUTE_GRACE_MS =
-  config.rewards.voice.muteGraceMs;
+const VOICE_MUTE_GRACE_REWARDS =
+  config.rewards.voice.muteGraceRewards;
 const AFK_REWARD_MIN_MS =
   config.rewards.afk.rewardMinMs;
 const AFK_REWARD_MAX_MS =
@@ -72,12 +72,14 @@ function buildVoiceStatusEmbed({
       );
   }
 
-  if (status === 'mute_timeout') {
+  if (status === 'mute_reward_limit') {
     return embed
       .setTitle('🔇 Récompense vocale en pause')
       .setDescription(
-        `${user}, ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**.\n\n` +
-        '⏸️ Ton compteur est en pause. Réactive ton micro pour redevenir éligible.'
+        `${user}, tu as déjà reçu **${VOICE_MUTE_GRACE_REWARDS} récompenses** avec le micro coupé.\n\n` +
+        '⏸️ Tu n’es plus éligible dans cet état. Réactive ton micro pour repartir à **0/' +
+        VOICE_MUTE_GRACE_REWARDS +
+        '**.'
       );
   }
 
@@ -378,7 +380,7 @@ module.exports = {
   VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
   VOICE_ACTIVITY_BONUS_PERCENT,
-  VOICE_MUTE_GRACE_MS,
+  VOICE_MUTE_GRACE_REWARDS,
   AFK_REWARD_MIN_MS,
   AFK_REWARD_MAX_MS,
   AFK_REWARD_COINS,
