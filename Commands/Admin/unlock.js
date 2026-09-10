@@ -10,12 +10,29 @@ const {
   sendChannelLockLog
 } = require('../../utils/channelLock.js');
 
-async function temporaryReply(message, payload) {
+async function temporaryReply(
+  message,
+  payload,
+  afterDelete = null
+) {
   const response = await message.reply(payload);
 
-  setTimeout(() => {
-    response.delete().catch(() => {});
-    message.delete().catch(() => {});
+  setTimeout(async () => {
+    await Promise.allSettled([
+      response.delete(),
+      message.delete()
+    ]);
+
+    if (typeof afterDelete === 'function') {
+      try {
+        await afterDelete();
+      } catch (error) {
+        console.error(
+          'Erreur message d’état +unlock :',
+          error
+        );
+      }
+    }
   }, 2000);
 
   return response;
@@ -23,6 +40,7 @@ async function temporaryReply(message, payload) {
 
 module.exports = {
   name: 'unlock',
+  hidden: true,
   description:
     'Déverrouille un salon et réautorise les membres à écrire.',
   usage: 'unlock [#salon/ID]',
@@ -96,7 +114,13 @@ module.exports = {
             type: 'success',
             title: '🔓 Salon déverrouillé'
           }
-        )
+        ),
+        async () => {
+          await channel.send(
+            '🔓 **Salon réactivé**\n' +
+            'Le salon est de nouveau ouvert. Les membres peuvent à nouveau envoyer des messages.'
+          );
+        }
       );
     } catch (error) {
       console.error(
