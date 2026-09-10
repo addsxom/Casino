@@ -324,7 +324,7 @@ function buildRuntimeActivity(
   );
 }
 
-function buildMainButtons(botInfo) {
+function buildGlobalButtons(botInfo) {
   const status =
     botInfo.status ||
     'online';
@@ -345,87 +345,90 @@ function buildMainButtons(botInfo) {
     ACTIVITY_META.LISTENING
       .emoji;
 
-  const row1 =
-    new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_name'
-          )
-          .setLabel('Nom')
-          .setEmoji('✏️')
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_activity'
-          )
-          .setLabel('Activité')
-          .setEmoji(
-            activityEmoji
-          )
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_status'
-          )
-          .setLabel('Statut')
-          .setEmoji(
-            statusEmoji
-          )
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_avatar'
-          )
-          .setLabel('Avatar')
-          .setEmoji('🖼️')
-          .setStyle(
-            ButtonStyle.Secondary
-          )
-      );
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_name'
+        )
+        .setLabel('Nom')
+        .setEmoji('✏️')
+        .setStyle(
+          ButtonStyle.Primary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_avatar'
+        )
+        .setLabel(
+          'Photo de profil'
+        )
+        .setEmoji('🖼️')
+        .setStyle(
+          ButtonStyle.Primary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_status'
+        )
+        .setLabel('Statut')
+        .setEmoji(
+          statusEmoji
+        )
+        .setStyle(
+          ButtonStyle.Primary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_activity'
+        )
+        .setLabel('Activité')
+        .setEmoji(
+          activityEmoji
+        )
+        .setStyle(
+          ButtonStyle.Primary
+        )
+    );
+}
 
-  const row2 =
-    new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_text1'
-          )
-          .setLabel('Texte 1')
-          .setEmoji('1️⃣')
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_text2'
-          )
-          .setLabel('Texte 2')
-          .setEmoji('2️⃣')
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_close'
-          )
-          .setLabel('Fermer')
-          .setEmoji('✖️')
-          .setStyle(
-            ButtonStyle.Danger
-          )
-      );
+function buildActivityTextButtons() {
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_text1'
+        )
+        .setLabel('Texte 1')
+        .setEmoji('1️⃣')
+        .setStyle(
+          ButtonStyle.Secondary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_text2'
+        )
+        .setLabel('Texte 2')
+        .setEmoji('2️⃣')
+        .setStyle(
+          ButtonStyle.Secondary
+        )
+    );
+}
 
-  return [
-    row1,
-    row2
-  ];
+function buildCloseButton() {
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_close'
+        )
+        .setLabel('Fermer')
+        .setEmoji('✖️')
+        .setStyle(
+          ButtonStyle.Danger
+        )
+    );
 }
 
 function buildMainContainer(
@@ -435,6 +438,12 @@ function buildMainContainer(
   const prefix =
     process.env.PREFIX ||
     '+';
+
+  const guildName =
+    bot.guilds.cache.get(
+      botInfo.guildId
+    )?.name ||
+    'Ce serveur';
 
   const text1 =
     botInfo.activityText
@@ -459,11 +468,21 @@ function buildMainContainer(
       botInfo.activityType
     );
 
+  const activityMeta =
+    ACTIVITY_META[
+      activityType
+    ] ||
+    ACTIVITY_META.LISTENING;
+
   const status =
     botInfo.status ||
     bot.user.presence
       ?.status ||
     'online';
+
+  const statusMeta =
+    STATUS_META[status] ||
+    STATUS_META.online;
 
   let twitchLine = '';
 
@@ -479,80 +498,69 @@ function buildMainContainer(
       );
   }
 
-  const container =
-    new ContainerBuilder()
-      .setAccentColor(
-        0x6b6de6
-      )
-      .addTextDisplayComponents(
-        new TextDisplayBuilder()
-          .setContent(
-            '# ⚙️ Edit Bot\n' +
-            '🤖 **Nom** · ' +
-            bot.user.username +
-            '\n' +
-            (
-              STATUS_META[status]
-                ?.emoji ||
-              STATUS_META.online
-                .emoji
-            ) +
-            ' **Statut** · ' +
-            (
-              STATUS_META[status]
-                ?.label ||
-              STATUS_META.online
-                .label
-            ) +
-            '\n' +
-            (
-              ACTIVITY_META[
-                activityType
-              ]?.emoji ||
-              ACTIVITY_META
-                .LISTENING.emoji
-            ) +
-            ' **Activité** · ' +
-            (
-              ACTIVITY_META[
-                activityType
-              ]?.label ||
-              ACTIVITY_META
-                .LISTENING.label
-            ) +
-            twitchLine
-          )
-      )
-      .addSeparatorComponents(
-        separator()
-      )
-      .addTextDisplayComponents(
-        new TextDisplayBuilder()
-          .setContent(
-            '1️⃣ **Texte 1** · ' +
-            text1 +
-            '\n' +
-            '2️⃣ **Texte 2** · ' +
-            text2
-          )
-      )
-      .addSeparatorComponents(
-        separator()
-      );
-
-  for (
-    const row of
-    buildMainButtons(
-      botInfo
+  return new ContainerBuilder()
+    .setAccentColor(
+      0x6b6de6
     )
-  ) {
-    container
-      .addActionRowComponents(
-        row
-      );
-  }
-
-  return container;
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# Paramètres du bot\n\n' +
+          '**' +
+          guildName +
+          '** — Choisissez une catégorie ci-dessous.\n\n' +
+          '• **Bot global** · Identité Discord et présence sur tous les serveurs.\n' +
+          '• **Activité du bot** · Textes affichés et type d’activité.'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '## Bot global — Tous les serveurs\n\n' +
+          '🤖 **Nom** · ' +
+          bot.user.username +
+          '\n' +
+          statusMeta.emoji +
+          ' **Statut** · ' +
+          statusMeta.label +
+          '\n' +
+          activityMeta.emoji +
+          ' **Activité** · ' +
+          activityMeta.label +
+          twitchLine
+        )
+    )
+    .addActionRowComponents(
+      buildGlobalButtons(
+        botInfo
+      )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '## Activité du bot\n\n' +
+          '1️⃣ **Texte 1** · ' +
+          text1 +
+          '\n' +
+          '2️⃣ **Texte 2** · ' +
+          text2
+        )
+    )
+    .addActionRowComponents(
+      buildActivityTextButtons()
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addActionRowComponents(
+      buildCloseButton()
+    );
 }
 
 function buildActivityContainer(
