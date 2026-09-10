@@ -189,24 +189,22 @@ function formatChannelLine(
       );
     }
 
-    const preview =
-      items.slice(0, 3)
-        .map(item =>
+    const channelLines =
+      items.map(item => {
+        const channelText =
           item.connected &&
           item.channel
-            ? item.channel.name
-            : item.id
-        )
-        .join(', ');
+            ? `${item.channel}`
+            : `\`${item.id}\``;
 
-    const more =
-      items.length > 3
-        ? ` +${items.length - 3}`
-        : '';
+        return (
+          `-# ${channelText} • multi${scopeText}`
+        );
+      });
 
     return (
       `${icon} **${entry.key}** → **${items.length} vocal${items.length > 1 ? 'aux' : ''}**\n` +
-      `-# ${preview}${more} • multi${scopeText}`
+      channelLines.join('\n')
     );
   }
 
