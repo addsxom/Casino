@@ -18,6 +18,9 @@ const SPECIAL_COMMAND_USAGES = {
     'configlist <clé> <ID>',
     'configlist voicefarm add/remove/set/clear <ID...>'
   ],
+  lock: [
+    'lock/unlock [#salon/ID]'
+  ],
   slot: [
     'slot <mise>',
     'slotall'
