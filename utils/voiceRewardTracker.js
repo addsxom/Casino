@@ -335,6 +335,30 @@ async function updateStatus(
     });
 }
 
+async function deleteVoiceStatusMessage(
+  progress
+) {
+  const statusMessage =
+    progress.statusMessage;
+
+  progress.statusMessage = null;
+
+  if (!statusMessage) {
+    return;
+  }
+
+  await statusMessage
+    .delete()
+    .catch(error => {
+      console.error(
+        'Erreur suppression statut récompense vocale :',
+        error?.code ||
+          error?.message ||
+          error
+      );
+    });
+}
+
 async function loadProgress(
   guild,
   member,
@@ -629,6 +653,10 @@ async function tick(bot) {
           progress.rewardDueAt =
             rewardResult.nextRewardAt;
 
+          await deleteVoiceStatusMessage(
+            progress
+          );
+
           if (selfMuted) {
             progress.mutedRewards =
               Math.min(
@@ -669,11 +697,10 @@ async function tick(bot) {
               null
             );
           } else {
-            await updateStatus(
-              progress,
-              'eligible',
-              progress.rewardDueAt
-            );
+            progress.status =
+              'eligible';
+            progress.statusRewardDueAt =
+              progress.rewardDueAt;
           }
         } catch (error) {
           progress.validMs = previousValidMs;
