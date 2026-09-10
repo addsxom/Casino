@@ -28,7 +28,7 @@ module.exports = {
   async execute(message) {
     if (!message.guild) return;
 
-    const ticketChannel = ticketChannel;
+    const ticketChannel = message.channel;
     const ticketChannelId = ticketChannel?.id;
 
     if (!ticketChannel || !ticketChannelId) {
@@ -65,7 +65,7 @@ module.exports = {
 
     if (
       !tryLockTicketClosure(
-        ticketChannel.id
+        ticketChannelId
       )
     ) {
       return message.reply(
