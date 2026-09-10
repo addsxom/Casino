@@ -8,7 +8,7 @@ module.exports = async (_bot, oldChannel, newChannel) => {
   const changes = [];
 
   if (oldChannel.name !== newChannel.name) {
-    changes.push(`**Nom :** ${oldChannel.name} → ${newChannel.name}`);
+    changes.push(`**Nom :** ${oldChannel.name} → ${newChannel}`);
   }
 
   if (oldChannel.parentId !== newChannel.parentId) {
@@ -31,7 +31,9 @@ module.exports = async (_bot, oldChannel, newChannel) => {
     buildDiscordLog({
       title: '⚙️ Salon modifié',
       description:
-        `${newChannel}\n` +
+        (oldChannel.name !== newChannel.name
+          ? ''
+          : `${newChannel}\n`) +
         `${changes.join('\n')}\n` +
         `-# Modifié par ${executor || 'Inconnu'}`,
       color: 0x5865f2
