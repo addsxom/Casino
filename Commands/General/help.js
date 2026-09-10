@@ -41,7 +41,6 @@ const CATEGORY_META = {
   Owner: { name: 'Owner', emoji: '👑' }
 };
 
-
 function getCategoryMeta(category) {
   return CATEGORY_META[category] || {
     name: category,
@@ -131,7 +130,10 @@ module.exports = {
     }
 
     const commands = [...message.client.commands.values()]
-      .filter(command => command?.name)
+      .filter(command =>
+        command?.name &&
+        command.name !== 'kuromibots'
+      )
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
     const commandsByCategory = new Map();
