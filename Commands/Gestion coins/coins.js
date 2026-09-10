@@ -93,11 +93,46 @@ module.exports = {
     const guildId = message.guild.id;
 
     try {
-      let targetUser = message.mentions.users.first() || message.author;
+      let targetUser =
+        message.mentions.users.first() ||
+        message.author;
 
-      if (args.length > 0) {
-        const userId = args[0].replace(/[<@!>]/g, '');
-        targetUser = await message.client.users.fetch(userId, false);
+      if (
+        args.length > 0 &&
+        !message.mentions.users.first()
+      ) {
+        const userId =
+          String(args[0] || '')
+            .replace(/[<@!>]/g, '');
+
+        if (!/^\d{17,20}$/.test(userId)) {
+          return message.reply(
+            replyEmbedPayload(
+              'Utilisateur invalide.\n\nUtilisation : **+coins** ou **+coins @membre**',
+              {
+                type: 'error',
+                title: '🪙 Utilisateur introuvable'
+              }
+            )
+          );
+        }
+
+        targetUser =
+          await message.client.users
+            .fetch(userId)
+            .catch(() => null);
+
+        if (!targetUser) {
+          return message.reply(
+            replyEmbedPayload(
+              'Impossible de trouver cet utilisateur Discord.',
+              {
+                type: 'error',
+                title: '🪙 Utilisateur introuvable'
+              }
+            )
+          );
+        }
       }
 
       let userCoins = await ensureAccount(
