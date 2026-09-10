@@ -17,6 +17,10 @@ const botInfoSchema = new mongoose.Schema({
     type: String,
     default: "{prefix}help for {users} users!"
   },
+  streamingUrl: {
+    type: String,
+    default: ""
+  },
   status: {
     type: String,
     default: "dnd"
