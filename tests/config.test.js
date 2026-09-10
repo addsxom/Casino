@@ -79,7 +79,7 @@ test('reward safety settings stay centralized', () => {
   assert.equal(config.rewards.voice.minimumHumans, 2);
   assert.equal(config.rewards.voice.rewardMinMs, 15 * 60 * 1000);
   assert.equal(config.rewards.voice.rewardMaxMs, 20 * 60 * 1000);
-  assert.equal(config.rewards.voice.muteGraceMs, 40 * 60 * 1000);
+  assert.equal(config.rewards.voice.muteGraceRewards, 2);
   assert.equal(config.rewards.voice.activityBonusPercent, 50);
   assert.equal(config.rewards.afk.rewardMinMs, 30 * 60 * 1000);
   assert.equal(config.rewards.afk.rewardMaxMs, 40 * 60 * 1000);
