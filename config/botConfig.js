@@ -92,7 +92,7 @@ module.exports = {
       winChance: 0.485,
       megaPotMinBet: 1000,
       sevenOnWinChance: 0.02,
-      animationStepMs: 450,
+      animationStepMs: 120,
       resultDisplayMs: 1800,
       sessionIdleMs: 2 * 60 * 1000
     },
