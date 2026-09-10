@@ -12,14 +12,12 @@ const {
 const {
   requireBotOwner
 } = require('../../utils/ownerPermissions.js');
-
 const {
   getChannelConfigList,
   resolveConfigKey,
   setChannelConfig,
   setChannelConfigList
 } = require('../../utils/configService.js');
-
 const {
   updateMemberCount
 } = require('../../utils/updateMemberCount.js');
@@ -29,7 +27,6 @@ const {
 
 const CONFIG_CATEGORY_META = [
   {
-    key: 'general',
     name: 'Général',
     emoji: '⚙️',
     entries: [
@@ -41,7 +38,6 @@ const CONFIG_CATEGORY_META = [
     ]
   },
   {
-    key: 'rewards',
     name: 'Récompenses',
     emoji: '🎁',
     entries: [
@@ -51,7 +47,6 @@ const CONFIG_CATEGORY_META = [
     ]
   },
   {
-    key: 'games',
     name: 'Jeux',
     emoji: '🎰',
     entries: [
@@ -61,7 +56,6 @@ const CONFIG_CATEGORY_META = [
     ]
   },
   {
-    key: 'logs',
     name: 'Logs',
     emoji: '📜',
     entries: [
@@ -79,25 +73,20 @@ const CONFIG_CATEGORY_META = [
 ];
 
 function extractChannelIds(args) {
-  const raw = args.join(' ');
-
   return [
     ...new Set(
-      raw.match(/\d{17,20}/g) || []
+      args
+        .join(' ')
+        .match(/\d{17,20}/g) || []
     )
   ];
 }
 
-function channelTypeMatches(
-  entry,
-  channel
-) {
+function channelTypeMatches(entry, channel) {
   if (!channel) return false;
 
   if (entry.type === 'voice') {
-    return (
-      channel.isVoiceBased?.() === true
-    );
+    return channel.isVoiceBased?.() === true;
   }
 
   if (entry.type === 'text') {
@@ -151,18 +140,12 @@ async function resolveChannelById(
   return {
     id,
     connected:
-      channelTypeMatches(
-        entry,
-        channel
-      ),
+      channelTypeMatches(entry, channel),
     channel
   };
 }
 
-async function getEntryStatus(
-  message,
-  entry
-) {
+async function getEntryStatus(message, entry) {
   if (entry.multiple) {
     const items = await Promise.all(
       (entry.ids || []).map(id =>
@@ -184,12 +167,11 @@ async function getEntryStatus(
     };
   }
 
-  const item =
-    await resolveChannelById(
-      message,
-      entry,
-      entry.id
-    );
+  const item = await resolveChannelById(
+    message,
+    entry,
+    entry.id
+  );
 
   return {
     ...item,
@@ -202,22 +184,15 @@ function getLiveChannelLabel(item) {
     !item?.connected ||
     !item.channel
   ) {
-    return (
-      `\`${item?.id || 'Aucun ID'}\``
-    );
+    return `\`${item?.id || 'Aucun ID'}\``;
   }
 
-  return (
-    `${item.channel} • \`${item.id}\``
-  );
+  return `${item.channel} • \`${item.id}\``;
 }
 
-function formatChannelLine(
-  entry,
-  status
-) {
+function formatChannelLine(entry, status) {
   const icon =
-    status.connected
+    status?.connected
       ? '✅'
       : '❌';
 
@@ -227,8 +202,7 @@ function formatChannelLine(
       : '';
 
   if (entry.multiple) {
-    const items =
-      status.items || [];
+    const items = status?.items || [];
 
     if (!items.length) {
       return (
@@ -237,18 +211,14 @@ function formatChannelLine(
       );
     }
 
-    const channelLines =
-      items.map(item => {
-        const channelText =
-          item.connected &&
-          item.channel
-            ? `${item.channel}`
-            : `\`${item.id}\``;
+    const channelLines = items.map(item => {
+      const channelText =
+        item.connected && item.channel
+          ? `${item.channel}`
+          : `\`${item.id}\``;
 
-        return (
-          `-# ${channelText} • multi${scopeText}`
-        );
-      });
+      return `-# ${channelText} • multi${scopeText}`;
+    });
 
     return (
       `${icon} **${entry.key}** → **${items.length} vocal${items.length > 1 ? 'aux' : ''}**\n` +
@@ -267,34 +237,31 @@ function buildConfigPages(
   entries,
   statuses
 ) {
-  const statusByKey =
-    new Map(
-      entries.map((entry, index) => [
-        entry.key,
-        statuses[index]
-      ])
-    );
+  const statusByKey = new Map(
+    entries.map((entry, index) => [
+      entry.key,
+      statuses[index]
+    ])
+  );
 
-  const entryByKey =
-    new Map(
-      entries.map(entry => [
-        entry.key,
-        entry
-      ])
-    );
+  const entryByKey = new Map(
+    entries.map(entry => [
+      entry.key,
+      entry
+    ])
+  );
 
   const assignedKeys = new Set();
   const categories = [];
 
   for (const meta of CONFIG_CATEGORY_META) {
-    const categoryEntries =
-      meta.entries
-        .map(key => {
-          const entry = entryByKey.get(key);
-          if (entry) assignedKeys.add(key);
-          return entry;
-        })
-        .filter(Boolean);
+    const categoryEntries = meta.entries
+      .map(key => {
+        const entry = entryByKey.get(key);
+        if (entry) assignedKeys.add(key);
+        return entry;
+      })
+      .filter(Boolean);
 
     if (categoryEntries.length) {
       categories.push({
@@ -304,14 +271,12 @@ function buildConfigPages(
     }
   }
 
-  const otherEntries =
-    entries.filter(entry =>
-      !assignedKeys.has(entry.key)
-    );
+  const otherEntries = entries.filter(
+    entry => !assignedKeys.has(entry.key)
+  );
 
   if (otherEntries.length) {
     categories.push({
-      key: 'other',
       name: 'Autres',
       emoji: '📁',
       entries: otherEntries
@@ -325,13 +290,13 @@ function buildConfigPages(
           ?.connected
       ).length;
 
-    const lines =
-      category.entries.map(entry =>
+    const lines = category.entries.map(
+      entry =>
         formatChannelLine(
           entry,
           statusByKey.get(entry.key)
         )
-      );
+    );
 
     return new EmbedBuilder()
       .setColor(
@@ -360,98 +325,55 @@ function buildConfigPages(
   });
 }
 
-function buildNavigationRow(
-  page,
-  totalPages
-) {
+function buildMainControls(page, totalPages) {
   return new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId(
-          'configlist_previous'
-        )
+        .setCustomId('configlist_previous')
         .setEmoji('◀️')
-        .setStyle(
-          ButtonStyle.Secondary
-        ),
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId(
-          'configlist_page'
-        )
-        .setLabel(
-          `${page + 1} / ${totalPages}`
-        )
-        .setStyle(
-          ButtonStyle.Secondary
-        )
+        .setCustomId('configlist_page')
+        .setLabel(`${page + 1} / ${totalPages}`)
+        .setStyle(ButtonStyle.Secondary)
         .setDisabled(true),
       new ButtonBuilder()
-        .setCustomId(
-          'configlist_next'
-        )
+        .setCustomId('configlist_next')
         .setEmoji('▶️')
-        .setStyle(
-          ButtonStyle.Secondary
-        )
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId('configlist_details')
+        .setLabel('Détails')
+        .setEmoji('📖')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('configlist_close')
+        .setLabel('Fermer')
+        .setEmoji('✖️')
+        .setStyle(ButtonStyle.Danger)
     );
 }
 
-function buildActionRow() {
+function buildDetailsControls() {
   return new ActionRowBuilder()
     .addComponents(
       new ButtonBuilder()
-        .setCustomId(
-          'configlist_details'
-        )
-        .setLabel('Détails')
-        .setEmoji('📖')
-        .setStyle(
-          ButtonStyle.Primary
-        ),
+        .setCustomId('configlist_back')
+        .setLabel('Retour')
+        .setEmoji('⬅️')
+        .setStyle(ButtonStyle.Secondary),
       new ButtonBuilder()
-        .setCustomId(
-          'configlist_close'
-        )
+        .setCustomId('configlist_close')
         .setLabel('Fermer')
         .setEmoji('✖️')
-        .setStyle(
-          ButtonStyle.Danger
-        )
+        .setStyle(ButtonStyle.Danger)
     );
-}
-
-function buildDetailsButtons() {
-  return [
-    new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId(
-            'configlist_back'
-          )
-          .setLabel('Retour')
-          .setEmoji('⬅️')
-          .setStyle(
-            ButtonStyle.Secondary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'configlist_close'
-          )
-          .setLabel('Fermer')
-          .setEmoji('✖️')
-          .setStyle(
-            ButtonStyle.Danger
-          )
-      )
-  ];
 }
 
 function buildConfigDetailsEmbed() {
   return new EmbedBuilder()
     .setColor(0x6b6de6)
-    .setTitle(
-      '📖 Détails de la configuration'
-    )
+    .setTitle('📖 Détails de la configuration')
     .setDescription(
       '**Modifier un salon simple**\n' +
       '`+configlist rewards <ID>` — salon des récompenses\n' +
@@ -500,10 +422,9 @@ function attachConfiglistButtons(
   let showingDetails = false;
 
   const collector =
-    sentMessage
-      .createMessageComponentCollector({
-        time: 10 * 60 * 1000
-      });
+    sentMessage.createMessageComponentCollector({
+      time: 10 * 60 * 1000
+    });
 
   collector.on(
     'collect',
@@ -517,8 +438,7 @@ function attachConfiglistButtons(
             'Ces boutons ne vous appartiennent pas.',
             { type: 'error' }
           ),
-          flags:
-            MessageFlags.Ephemeral
+          flags: MessageFlags.Ephemeral
         }).catch(() => {});
       }
 
@@ -531,11 +451,9 @@ function attachConfiglistButtons(
         await interaction
           .deferUpdate()
           .catch(() => {});
-
         await message
           .delete()
           .catch(() => {});
-
         await sentMessage
           .delete()
           .catch(() => {});
@@ -553,8 +471,9 @@ function attachConfiglistButtons(
           embeds: [
             buildConfigDetailsEmbed()
           ],
-          components:
-            buildDetailsButtons()
+          components: [
+            buildDetailsControls()
+          ]
         }).catch(() => {});
       }
 
@@ -565,15 +484,12 @@ function attachConfiglistButtons(
         showingDetails = false;
 
         return interaction.update({
-          embeds: [
-            pages[currentPage]
-          ],
+          embeds: [pages[currentPage]],
           components: [
-            buildNavigationRow(
+            buildMainControls(
               currentPage,
               pages.length
-            ),
-            buildActionRow()
+            )
           ]
         }).catch(() => {});
       }
@@ -597,8 +513,7 @@ function attachConfiglistButtons(
         'configlist_next'
       ) {
         currentPage =
-          currentPage ===
-            pages.length - 1
+          currentPage === pages.length - 1
             ? 0
             : currentPage + 1;
       } else {
@@ -608,15 +523,12 @@ function attachConfiglistButtons(
       }
 
       return interaction.update({
-        embeds: [
-          pages[currentPage]
-        ],
+        embeds: [pages[currentPage]],
         components: [
-          buildNavigationRow(
+          buildMainControls(
             currentPage,
             pages.length
-          ),
-          buildActionRow()
+          )
         ]
       }).catch(() => {});
     }
@@ -652,8 +564,7 @@ async function applyImmediateSideEffect(
       channelId: channel.id,
       guildId: channel.guild.id,
       adapterCreator:
-        channel.guild
-          .voiceAdapterCreator
+        channel.guild.voiceAdapterCreator
     });
 
     return;
@@ -702,36 +613,30 @@ async function replyMultiStatus(
 ) {
   const items = status.items || [];
 
-  const lines =
-    items.length
-      ? items.map(
-          (item, index) =>
-            `${item.connected ? '✅' : '❌'} **${index + 1}.** ${getLiveChannelLabel(item)}`
-        )
-      : [
-          '❌ Aucun vocal configuré.'
-        ];
+  const lines = items.length
+    ? items.map(
+        (item, index) =>
+          `${item.connected ? '✅' : '❌'} **${index + 1}.** ${getLiveChannelLabel(item)}`
+      )
+    : ['❌ Aucun vocal configuré.'];
 
-  const embed =
-    new EmbedBuilder()
-      .setColor(
-        status.connected
-          ? 0x57f287
-          : 0x6b6de6
-      )
-      .setTitle(
-        `🎙️ ${entry.label}`
-      )
-      .setDescription(
-        lines.join('\n') +
-        '\n\n' +
-        buildMultiHelp(entry.key)
-      )
-      .setFooter({
-        text:
-          'Les noms sont lus en direct depuis Discord • l’ID reste la référence'
-      })
-      .setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor(
+      status.connected
+        ? 0x57f287
+        : 0x6b6de6
+    )
+    .setTitle(`🎙️ ${entry.label}`)
+    .setDescription(
+      lines.join('\n') +
+      '\n\n' +
+      buildMultiHelp(entry.key)
+    )
+    .setFooter({
+      text:
+        'Les noms sont lus en direct depuis Discord • l’ID reste la référence'
+    })
+    .setTimestamp();
 
   return message.reply({
     embeds: [embed]
@@ -753,10 +658,9 @@ async function validateChannels(
     )
   );
 
-  const invalid =
-    results.filter(result =>
-      !result.connected
-    );
+  const invalid = results.filter(
+    result => !result.connected
+  );
 
   return {
     ok: invalid.length === 0,
@@ -780,34 +684,27 @@ module.exports = {
       return;
     }
 
-    const guildId =
-      message.guild.id;
-
-    const keyInput =
-      args[0];
+    const guildId = message.guild.id;
+    const keyInput = args[0];
 
     if (!keyInput) {
       const entries =
-        getChannelConfigList(
-          guildId
-        );
+        getChannelConfigList(guildId);
 
-      const statuses =
-        await Promise.all(
-          entries.map(entry =>
-            getEntryStatus(
-              message,
-              entry
-            )
+      const statuses = await Promise.all(
+        entries.map(entry =>
+          getEntryStatus(
+            message,
+            entry
           )
-        );
+        )
+      );
 
-      const pages =
-        buildConfigPages(
-          message,
-          entries,
-          statuses
-        );
+      const pages = buildConfigPages(
+        message,
+        entries,
+        statuses
+      );
 
       if (!pages.length) {
         return message.reply(
@@ -822,11 +719,10 @@ module.exports = {
         await message.reply({
           embeds: [pages[0]],
           components: [
-            buildNavigationRow(
+            buildMainControls(
               0,
               pages.length
-            ),
-            buildActionRow()
+            )
           ]
         });
 
@@ -839,10 +735,9 @@ module.exports = {
       return sentMessage;
     }
 
-    const key =
-      resolveConfigKey(
-        keyInput
-      );
+    const key = resolveConfigKey(
+      keyInput
+    );
 
     if (!key) {
       return message.reply(
@@ -854,14 +749,11 @@ module.exports = {
     }
 
     const entries =
-      getChannelConfigList(
-        guildId
-      );
+      getChannelConfigList(guildId);
 
-    const current =
-      entries.find(entry =>
-        entry.key === key
-      );
+    const current = entries.find(
+      entry => entry.key === key
+    );
 
     if (!current) {
       return message.reply(
@@ -873,10 +765,9 @@ module.exports = {
     }
 
     if (current.multiple) {
-      const actionRaw =
-        String(
-          args[1] || ''
-        ).toLowerCase();
+      const actionRaw = String(
+        args[1] || ''
+      ).toLowerCase();
 
       if (!actionRaw) {
         const status =
@@ -892,13 +783,12 @@ module.exports = {
         );
       }
 
-      const knownActions =
-        new Set([
-          'add',
-          'remove',
-          'set',
-          'clear'
-        ]);
+      const knownActions = new Set([
+        'add',
+        'remove',
+        'set',
+        'clear'
+      ]);
 
       const action =
         knownActions.has(actionRaw)
@@ -910,8 +800,9 @@ module.exports = {
           ? args.slice(2)
           : args.slice(1);
 
-      const ids =
-        extractChannelIds(idArgs);
+      const ids = extractChannelIds(
+        idArgs
+      );
 
       if (action === 'clear') {
         const result =
@@ -976,7 +867,7 @@ module.exports = {
         }
       }
 
-      let nextIds = [];
+      let nextIds;
 
       if (action === 'add') {
         nextIds = [
@@ -985,17 +876,13 @@ module.exports = {
             ...ids
           ])
         ];
-      } else if (
-        action === 'remove'
-      ) {
-        const removeSet =
-          new Set(ids);
+      } else if (action === 'remove') {
+        const removeSet = new Set(ids);
 
-        nextIds =
-          (current.ids || [])
-            .filter(id =>
-              !removeSet.has(id)
-            );
+        nextIds = (current.ids || [])
+          .filter(id =>
+            !removeSet.has(id)
+          );
       } else {
         nextIds = ids;
       }
@@ -1017,11 +904,10 @@ module.exports = {
       }
 
       const updated =
-        getChannelConfigList(
-          guildId
-        ).find(entry =>
-          entry.key === key
-        );
+        getChannelConfigList(guildId)
+          .find(entry =>
+            entry.key === key
+          );
 
       const status =
         await getEntryStatus(
@@ -1036,27 +922,26 @@ module.exports = {
             ? 'retiré(s)'
             : 'remplacée';
 
-      const embed =
-        new EmbedBuilder()
-          .setColor(0x57f287)
-          .setTitle(
-            '✅ Configuration mise à jour'
-          )
-          .setDescription(
-            `**${current.label}** • ${actionLabel}\n` +
-            `**${result.ids.length} vocal${result.ids.length > 1 ? 'aux' : ''} configuré${result.ids.length > 1 ? 's' : ''}**\n\n` +
-            (
-              status.items.length
-                ? status.items
-                    .map(item =>
-                      `${item.connected ? '✅' : '❌'} ${getLiveChannelLabel(item)}`
-                    )
-                    .join('\n')
-                : 'Aucun vocal configuré.'
-            ) +
-            '\n\n-# Sauvegardé uniquement pour ce serveur.'
-          )
-          .setTimestamp();
+      const embed = new EmbedBuilder()
+        .setColor(0x57f287)
+        .setTitle(
+          '✅ Configuration mise à jour'
+        )
+        .setDescription(
+          `**${current.label}** • ${actionLabel}\n` +
+          `**${result.ids.length} vocal${result.ids.length > 1 ? 'aux' : ''} configuré${result.ids.length > 1 ? 's' : ''}**\n\n` +
+          (
+            status.items.length
+              ? status.items
+                  .map(item =>
+                    `${item.connected ? '✅' : '❌'} ${getLiveChannelLabel(item)}`
+                  )
+                  .join('\n')
+              : 'Aucun vocal configuré.'
+          ) +
+          '\n\n-# Sauvegardé uniquement pour ce serveur.'
+        )
+        .setTimestamp();
 
       return message.reply({
         embeds: [embed]
@@ -1084,12 +969,10 @@ module.exports = {
           `${current.label}\n\n` +
           `Utilise : \`+configlist ${key} <ID>\``,
           {
-            type:
-              status.connected
-                ? 'success'
-                : 'warning',
-            title:
-              '⚙️ Configuration'
+            type: status.connected
+              ? 'success'
+              : 'warning',
+            title: '⚙️ Configuration'
           }
         )
       );
@@ -1155,15 +1038,13 @@ module.exports = {
     }
 
     const channel =
-      validation.results[0]
-        .channel;
+      validation.results[0].channel;
 
-    const result =
-      await setChannelConfig(
-        guildId,
-        key,
-        channelId
-      );
+    const result = await setChannelConfig(
+      guildId,
+      key,
+      channelId
+    );
 
     if (!result.ok) {
       return message.reply(
@@ -1185,29 +1066,27 @@ module.exports = {
         ? '\n-# Les prochaines notifications de récompenses utiliseront immédiatement ce salon.'
         : '';
 
-    const embed =
-      new EmbedBuilder()
-        .setColor(0x57f287)
-        .setTitle(
-          '✅ Configuration mise à jour'
-        )
-        .setDescription(
-          `**${result.entry.label}**\n` +
-          `${getLiveChannelLabel({
-            connected: true,
-            channel,
-            id: channelId
-          })}\n\n` +
-          (
-            result.entry.scope ===
-              'global'
-              ? '-# Configuration globale du bot.'
-              : '-# Configuration sauvegardée uniquement pour ce serveur.'
-          ) +
-          immediateText +
-          '\n-# Le nom affiché sera toujours relu directement depuis Discord.'
-        )
-        .setTimestamp();
+    const embed = new EmbedBuilder()
+      .setColor(0x57f287)
+      .setTitle(
+        '✅ Configuration mise à jour'
+      )
+      .setDescription(
+        `**${result.entry.label}**\n` +
+        `${getLiveChannelLabel({
+          connected: true,
+          channel,
+          id: channelId
+        })}\n\n` +
+        (
+          result.entry.scope === 'global'
+            ? '-# Configuration globale du bot.'
+            : '-# Configuration sauvegardée uniquement pour ce serveur.'
+        ) +
+        immediateText +
+        '\n-# Le nom affiché sera toujours relu directement depuis Discord.'
+      )
+      .setTimestamp();
 
     return message.reply({
       embeds: [embed]
