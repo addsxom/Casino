@@ -1,14 +1,30 @@
 const {
   ActivityType,
   ActionRowBuilder,
-  StringSelectMenuBuilder,
-  EmbedBuilder
+  ButtonBuilder,
+  ButtonStyle,
+  ContainerBuilder,
+  TextDisplayBuilder,
+  SeparatorBuilder,
+  ModalBuilder,
+  TextInputBuilder,
+  TextInputStyle,
+  MessageFlags
 } = require('discord.js');
 
 const mongoose = require('mongoose');
-const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
-const BotInfo = require('../../Models/BotInfo');
-const Owner = require('../../Models/Owner.js');
+
+const BotInfo =
+  require('../../Models/BotInfo');
+
+const {
+  isBotOwner
+} = require('../../utils/ownerPermissions.js');
+
+const {
+  replyEmbedPayload
+} = require('../../utils/replyEmbed.js');
+
 const {
   DEFAULT_DYNAMIC_ACTIVITY,
   normalizeActivityTemplate,
@@ -23,321 +39,1215 @@ const ACTIVITY_TYPES = {
   COMPETING: ActivityType.Competing
 };
 
-const VALID_STATUSES = ['online', 'idle', 'dnd', 'invisible'];
+const VALID_STATUSES = [
+  'online',
+  'idle',
+  'dnd',
+  'invisible'
+];
 
-async function isBotOwner(userId) {
-  if (userId === process.env.BUYER) return true;
-  return Boolean(await Owner.exists({ userId }));
+function separator() {
+  return new SeparatorBuilder()
+    .setDivider(true);
 }
 
-function restoreClientToken(client, token) {
+function restoreClientToken(
+  client,
+  token
+) {
   if (!token) return;
+
   client.token = token;
   client.rest.setToken(token);
 }
 
-function resolveActivityType(value) {
-  if (typeof value === 'number') return value;
-
-  const key = String(value || 'LISTENING').toUpperCase();
-  return ACTIVITY_TYPES[key] ?? ActivityType.Listening;
-}
-
-function getActivityTypeName(value) {
-  if (typeof value === 'string') {
-    const key = value.toUpperCase();
-    if (ACTIVITY_TYPES[key] !== undefined) return key;
+function resolveActivityType(
+  value
+) {
+  if (
+    typeof value === 'number'
+  ) {
+    return value;
   }
 
-  const entry = Object.entries(ACTIVITY_TYPES)
-    .find(([, type]) => type === value);
+  const key =
+    String(
+      value || 'LISTENING'
+    ).toUpperCase();
 
-  return entry?.[0] || 'LISTENING';
+  return (
+    ACTIVITY_TYPES[key] ??
+    ActivityType.Listening
+  );
+}
+
+function getActivityTypeName(
+  value
+) {
+  if (
+    typeof value === 'string'
+  ) {
+    const key =
+      value.toUpperCase();
+
+    if (
+      ACTIVITY_TYPES[key] !==
+      undefined
+    ) {
+      return key;
+    }
+  }
+
+  const entry =
+    Object.entries(
+      ACTIVITY_TYPES
+    ).find(
+      ([, type]) =>
+        type === value
+    );
+
+  return (
+    entry?.[0] ||
+    'LISTENING'
+  );
+}
+
+function getActivityOptions(
+  type,
+  streamingUrl
+) {
+  const options = { type };
+
+  if (
+    type ===
+      ActivityType.Streaming &&
+    streamingUrl
+  ) {
+    options.url =
+      streamingUrl;
+  }
+
+  return options;
 }
 
 function currentActivityText(bot) {
-  return bot.user.presence?.activities?.[0]?.name || bot.user.username;
+  return (
+    bot.user.presence
+      ?.activities?.[0]
+      ?.name ||
+    bot.user.username
+  );
 }
 
-function buildRuntimeActivity(bot, botInfo) {
-  const text1 = normalizeActivityTemplate(
-    botInfo.activityText
+function normalizeTwitchUrl(
+  value
+) {
+  let raw =
+    String(value || '')
+      .trim();
+
+  if (!raw) {
+    throw new Error(
+      'EMPTY_VALUE'
+    );
+  }
+
+  if (
+    !/^https?:\/\//i.test(raw)
+  ) {
+    raw =
+      'https://' + raw;
+  }
+
+  let parsed;
+
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error(
+      'INVALID_TWITCH_URL'
+    );
+  }
+
+  const hostname =
+    parsed.hostname
+      .toLowerCase()
+      .replace(/^www\./, '');
+
+  const parts =
+    parsed.pathname
+      .split('/')
+      .filter(Boolean);
+
+  const channel =
+    parts[0] || '';
+
+  if (
+    hostname !==
+      'twitch.tv' ||
+    !channel ||
+    !/^[a-zA-Z0-9_]+$/.test(
+      channel
+    )
+  ) {
+    throw new Error(
+      'INVALID_TWITCH_URL'
+    );
+  }
+
+  return (
+    'https://www.twitch.tv/' +
+    channel
   );
-  const text2 = normalizeActivityTemplate(
-    botInfo.activityText2
-  );
+}
+
+function buildRuntimeActivity(
+  bot,
+  botInfo
+) {
+  const text1 =
+    normalizeActivityTemplate(
+      botInfo.activityText
+    );
+
+  const text2 =
+    normalizeActivityTemplate(
+      botInfo.activityText2
+    );
+
+  const type =
+    resolveActivityType(
+      botInfo.activityType
+    );
 
   bot.activityRotation = {
-    texts: [text1, text2].filter(Boolean),
-    type: resolveActivityType(botInfo.activityType),
+    texts: [
+      text1,
+      text2
+    ].filter(Boolean),
+    type,
+    streamingUrl:
+      botInfo.streamingUrl ||
+      '',
     index: 0
   };
 
-  const firstText = bot.activityRotation.texts[0];
+  const firstText =
+    bot.activityRotation
+      .texts[0];
 
-  if (firstText) {
-    bot.user.setActivity(
-      renderActivityText(
-        firstText,
-        bot,
-        process.env.PREFIX || '+'
-      ),
-      {
-        type: bot.activityRotation.type
-      }
-    );
+  if (!firstText) {
+    return;
   }
-}
 
-function createInfoEmbed(botInfo, bot) {
-  const prefix = process.env.PREFIX || '+';
-  const text1 = botInfo.activityText
-    ? renderActivityText(botInfo.activityText, bot, prefix)
-    : 'Non défini';
-  const text2 = botInfo.activityText2
-    ? renderActivityText(botInfo.activityText2, bot, prefix)
-    : 'Non défini';
-  const activityType = getActivityTypeName(botInfo.activityType);
-  const status = botInfo.status || bot.user.presence?.status || 'online';
-
-  return new EmbedBuilder()
-    .setTitle(`Informations de ${bot.user.username}`)
-    .setThumbnail(bot.user.displayAvatarURL({ dynamic: true }))
-    .setColor(0x6b6de6)
-    .addFields(
-      {
-        name: 'Nom du bot',
-        value: `\`${bot.user.username}\``,
-        inline: false
-      },
-      {
-        name: 'Type d’activité',
-        value: `\`${activityType}\``,
-        inline: true
-      },
-      {
-        name: 'Statut',
-        value: `\`${status}\``,
-        inline: true
-      },
-      {
-        name: 'Texte 1',
-        value: `\`${text1}\``,
-        inline: false
-      },
-      {
-        name: 'Texte 2',
-        value: `\`${text2}\``,
-        inline: false
-      }
+  bot.user.setActivity(
+    renderActivityText(
+      firstText,
+      bot,
+      process.env.PREFIX ||
+        '+'
+    ),
+    getActivityOptions(
+      type,
+      bot.activityRotation
+        .streamingUrl
     )
-    .setFooter({
-      text: `${bot.user.username} • Configuration`,
-      iconURL: bot.user.displayAvatarURL({ dynamic: true })
-    });
-}
-
-function buildMenu() {
-  return new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId('editInfo')
-      .setPlaceholder('Choisissez ce que vous voulez modifier')
-      .addOptions(
-        {
-          label: 'Nom du bot',
-          value: 'botName',
-          description: 'Modifier le nom actuel du bot'
-        },
-        {
-          label: 'Type d’activité',
-          value: 'activityType',
-          description: 'Playing, Listening, Watching...'
-        },
-        {
-          label: 'Texte 1',
-          value: 'activityText',
-          description: 'Modifier le premier texte d’activité'
-        },
-        {
-          label: 'Texte 2',
-          value: 'activityText2',
-          description: 'Modifier le second texte d’activité'
-        },
-        {
-          label: 'Avatar',
-          value: 'avatar',
-          description: 'Modifier la photo de profil du bot'
-        },
-        {
-          label: 'Statut',
-          value: 'status',
-          description: 'online, idle, dnd ou invisible'
-        }
-      )
   );
 }
 
-function promptFor(field) {
-  switch (field) {
-    case 'botName':
-      return 'Envoie le nouveau **nom du bot**.';
-    case 'activityType':
-      return 'Envoie le nouveau **type d’activité** : `PLAYING`, `STREAMING`, `LISTENING`, `WATCHING` ou `COMPETING`.';
-    case 'activityText':
-      return (
-        'Envoie le nouveau **Texte 1**.\n' +
-        '-# Variables disponibles : `{prefix}` et `{users}`'
+function buildMainButtons() {
+  const row1 =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_name'
+          )
+          .setLabel('Nom')
+          .setEmoji('✏️')
+          .setStyle(
+            ButtonStyle.Primary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity'
+          )
+          .setLabel('Activité')
+          .setEmoji('🎮')
+          .setStyle(
+            ButtonStyle.Primary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_text1'
+          )
+          .setLabel('Texte 1')
+          .setEmoji('1️⃣')
+          .setStyle(
+            ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_text2'
+          )
+          .setLabel('Texte 2')
+          .setEmoji('2️⃣')
+          .setStyle(
+            ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_avatar'
+          )
+          .setLabel('Avatar')
+          .setEmoji('🖼️')
+          .setStyle(
+            ButtonStyle.Secondary
+          )
       );
-    case 'activityText2':
-      return (
-        'Envoie le nouveau **Texte 2**.\n' +
-        '-# Variables disponibles : `{prefix}` et `{users}`'
+
+  const row2 =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_status'
+          )
+          .setLabel('Statut')
+          .setEmoji('🟢')
+          .setStyle(
+            ButtonStyle.Primary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_close'
+          )
+          .setLabel('Fermer')
+          .setEmoji('✖️')
+          .setStyle(
+            ButtonStyle.Danger
+          )
       );
-    case 'avatar':
-      return 'Envoie la nouvelle **URL de l’avatar**.';
-    case 'status':
-      return 'Envoie le nouveau **statut** : `online`, `idle`, `dnd` ou `invisible`.';
-    default:
-      return 'Envoie la nouvelle valeur.';
-  }
+
+  return [
+    row1,
+    row2
+  ];
 }
 
-async function applyChange(bot, botInfo, field, value) {
-  const cleanValue = String(value || '').trim();
+function buildMainContainer(
+  botInfo,
+  bot
+) {
+  const prefix =
+    process.env.PREFIX ||
+    '+';
+
+  const text1 =
+    botInfo.activityText
+      ? renderActivityText(
+          botInfo.activityText,
+          bot,
+          prefix
+        )
+      : 'Non défini';
+
+  const text2 =
+    botInfo.activityText2
+      ? renderActivityText(
+          botInfo.activityText2,
+          bot,
+          prefix
+        )
+      : 'Non défini';
+
+  const activityType =
+    getActivityTypeName(
+      botInfo.activityType
+    );
+
+  const status =
+    botInfo.status ||
+    bot.user.presence
+      ?.status ||
+    'online';
+
+  let streamingLine = '';
+
+  if (
+    activityType ===
+    'STREAMING'
+  ) {
+    streamingLine =
+      '\n📺 **Twitch :** ' +
+      (
+        botInfo.streamingUrl ||
+        'Non défini'
+      );
+  }
+
+  const container =
+    new ContainerBuilder()
+      .setAccentColor(
+        0x6b6de6
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '# ⚙️ Configuration du bot'
+          )
+      )
+      .addSeparatorComponents(
+        separator()
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '🤖 **Nom :** ' +
+              bot.user.username +
+              '\n' +
+              '🎮 **Activité :** ' +
+              activityType +
+              '\n' +
+              '🟢 **Statut :** ' +
+              status +
+              streamingLine
+          )
+      )
+      .addSeparatorComponents(
+        separator()
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '**Texte 1 :** ' +
+              text1 +
+              '\n' +
+              '**Texte 2 :** ' +
+              text2
+          )
+      )
+      .addSeparatorComponents(
+        separator()
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '-# Choisissez directement ce que vous voulez modifier :'
+          )
+      );
+
+  for (
+    const row of
+    buildMainButtons()
+  ) {
+    container
+      .addActionRowComponents(
+        row
+      );
+  }
+
+  return container;
+}
+
+function buildActivityContainer(
+  botInfo
+) {
+  const current =
+    getActivityTypeName(
+      botInfo.activityType
+    );
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity_PLAYING'
+          )
+          .setLabel('Playing')
+          .setEmoji('🎮')
+          .setStyle(
+            current === 'PLAYING'
+              ? ButtonStyle.Success
+              : ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity_STREAMING'
+          )
+          .setLabel('Streaming')
+          .setEmoji('📺')
+          .setStyle(
+            current === 'STREAMING'
+              ? ButtonStyle.Success
+              : ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity_LISTENING'
+          )
+          .setLabel('Listening')
+          .setEmoji('🎧')
+          .setStyle(
+            current === 'LISTENING'
+              ? ButtonStyle.Success
+              : ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity_WATCHING'
+          )
+          .setLabel('Watching')
+          .setEmoji('👀')
+          .setStyle(
+            current === 'WATCHING'
+              ? ButtonStyle.Success
+              : ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_activity_COMPETING'
+          )
+          .setLabel('Competing')
+          .setEmoji('🏆')
+          .setStyle(
+            current === 'COMPETING'
+              ? ButtonStyle.Success
+              : ButtonStyle.Secondary
+          )
+      );
+
+  const backRow =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_back'
+          )
+          .setLabel('Retour')
+          .setEmoji('↩️')
+          .setStyle(
+            ButtonStyle.Primary
+          )
+      );
+
+  return new ContainerBuilder()
+    .setAccentColor(
+      0x6b6de6
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# 🎮 Type d’activité'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '**Actuel :** ' +
+            current +
+            '\n\n' +
+            'Choisissez directement le nouveau type.\n' +
+            '-# Streaming demandera obligatoirement un lien Twitch.'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addActionRowComponents(
+      row,
+      backRow
+    );
+}
+
+function buildStatusContainer(
+  botInfo
+) {
+  const current =
+    botInfo.status ||
+    'online';
+
+  const makeButton = (
+    status,
+    label,
+    emoji
+  ) =>
+    new ButtonBuilder()
+      .setCustomId(
+        'editbot_status_' +
+        status
+      )
+      .setLabel(label)
+      .setEmoji(emoji)
+      .setStyle(
+        current === status
+          ? ButtonStyle.Success
+          : ButtonStyle.Secondary
+      );
+
+  const row =
+    new ActionRowBuilder()
+      .addComponents(
+        makeButton(
+          'online',
+          'Online',
+          '🟢'
+        ),
+        makeButton(
+          'idle',
+          'Idle',
+          '🌙'
+        ),
+        makeButton(
+          'dnd',
+          'Ne pas déranger',
+          '⛔'
+        ),
+        makeButton(
+          'invisible',
+          'Invisible',
+          '⚫'
+        )
+      );
+
+  const backRow =
+    new ActionRowBuilder()
+      .addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_back'
+          )
+          .setLabel('Retour')
+          .setEmoji('↩️')
+          .setStyle(
+            ButtonStyle.Primary
+          )
+      );
+
+  return new ContainerBuilder()
+    .setAccentColor(
+      0x6b6de6
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# 🟢 Statut du bot'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '**Actuel :** ' +
+          current +
+          '\n\nChoisissez le nouveau statut :'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addActionRowComponents(
+      row,
+      backRow
+    );
+}
+
+function buildClosedContainer() {
+  return new ContainerBuilder()
+    .setAccentColor(
+      0x95a5a6
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# ⚙️ Configuration fermée'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          'Le panneau de modification du bot a été fermé.'
+        )
+    );
+}
+
+function buildExpiredContainer() {
+  return new ContainerBuilder()
+    .setAccentColor(
+      0x95a5a6
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          '# ⌛ Configuration expirée'
+        )
+    )
+    .addSeparatorComponents(
+      separator()
+    )
+    .addTextDisplayComponents(
+      new TextDisplayBuilder()
+        .setContent(
+          'Relancez **+editbot** pour modifier de nouveau le bot.'
+        )
+    );
+}
+
+function modalConfigFor(
+  field,
+  botInfo,
+  bot
+) {
+  if (
+    field === 'name'
+  ) {
+    return {
+      title:
+        'Modifier le nom',
+      label:
+        'Nouveau nom du bot',
+      placeholder:
+        bot.user.username,
+      value:
+        bot.user.username,
+      maxLength: 32,
+      style:
+        TextInputStyle.Short
+    };
+  }
+
+  if (
+    field === 'text1'
+  ) {
+    return {
+      title:
+        'Modifier le Texte 1',
+      label:
+        'Texte d’activité 1',
+      placeholder:
+        '{prefix}help • {users} membres',
+      value:
+        botInfo.activityText ||
+        '',
+      maxLength: 128,
+      style:
+        TextInputStyle.Short
+    };
+  }
+
+  if (
+    field === 'text2'
+  ) {
+    return {
+      title:
+        'Modifier le Texte 2',
+      label:
+        'Texte d’activité 2',
+      placeholder:
+        '{prefix}help • {users} membres',
+      value:
+        botInfo.activityText2 ||
+        '',
+      maxLength: 128,
+      style:
+        TextInputStyle.Short
+    };
+  }
+
+  if (
+    field === 'avatar'
+  ) {
+    return {
+      title:
+        'Modifier l’avatar',
+      label:
+        'URL de la nouvelle image',
+      placeholder:
+        'https://...',
+      value: '',
+      maxLength: 1000,
+      style:
+        TextInputStyle.Short
+    };
+  }
+
+  return null;
+}
+
+async function showValueModal({
+  interaction,
+  field,
+  botInfo,
+  bot
+}) {
+  const config =
+    modalConfigFor(
+      field,
+      botInfo,
+      bot
+    );
+
+  if (!config) {
+    return null;
+  }
+
+  const modalId =
+    'editbot_modal_' +
+    field +
+    '_' +
+    interaction.id;
+
+  const input =
+    new TextInputBuilder()
+      .setCustomId(
+        'value'
+      )
+      .setLabel(
+        config.label
+      )
+      .setStyle(
+        config.style
+      )
+      .setRequired(true)
+      .setMaxLength(
+        config.maxLength
+      );
+
+  if (
+    config.placeholder
+  ) {
+    input.setPlaceholder(
+      config.placeholder
+    );
+  }
+
+  if (config.value) {
+    input.setValue(
+      String(
+        config.value
+      ).slice(
+        0,
+        config.maxLength
+      )
+    );
+  }
+
+  const modal =
+    new ModalBuilder()
+      .setCustomId(
+        modalId
+      )
+      .setTitle(
+        config.title
+      )
+      .addComponents(
+        new ActionRowBuilder()
+          .addComponents(
+            input
+          )
+      );
+
+  await interaction
+    .showModal(modal);
+
+  return interaction
+    .awaitModalSubmit({
+      filter:
+        modalInteraction =>
+          modalInteraction
+            .customId ===
+            modalId &&
+          modalInteraction
+            .user.id ===
+            interaction.user.id,
+      time: 60000
+    })
+    .catch(() => null);
+}
+
+async function showStreamingModal({
+  interaction,
+  botInfo
+}) {
+  const modalId =
+    'editbot_streaming_' +
+    interaction.id;
+
+  const input =
+    new TextInputBuilder()
+      .setCustomId(
+        'twitch_url'
+      )
+      .setLabel(
+        'Lien Twitch'
+      )
+      .setPlaceholder(
+        'https://www.twitch.tv/votrechaine'
+      )
+      .setStyle(
+        TextInputStyle.Short
+      )
+      .setRequired(true)
+      .setMaxLength(200);
+
+  if (
+    botInfo.streamingUrl
+  ) {
+    input.setValue(
+      String(
+        botInfo.streamingUrl
+      ).slice(0, 200)
+    );
+  }
+
+  const modal =
+    new ModalBuilder()
+      .setCustomId(
+        modalId
+      )
+      .setTitle(
+        'Configurer le Streaming'
+      )
+      .addComponents(
+        new ActionRowBuilder()
+          .addComponents(
+            input
+          )
+      );
+
+  await interaction
+    .showModal(modal);
+
+  return interaction
+    .awaitModalSubmit({
+      filter:
+        modalInteraction =>
+          modalInteraction
+            .customId ===
+            modalId &&
+          modalInteraction
+            .user.id ===
+            interaction.user.id,
+      time: 60000
+    })
+    .catch(() => null);
+}
+
+async function applyValueChange(
+  bot,
+  botInfo,
+  field,
+  value
+) {
+  const cleanValue =
+    String(value || '')
+      .trim();
 
   if (!cleanValue) {
-    throw new Error('EMPTY_VALUE');
+    throw new Error(
+      'EMPTY_VALUE'
+    );
   }
 
-  if (field === 'botName') {
-    const clientToken = bot.token || process.env.TOKEN;
+  if (
+    field === 'name'
+  ) {
+    const clientToken =
+      bot.token ||
+      process.env.TOKEN;
+
     let changeError = null;
 
     try {
-      await bot.user.setUsername(cleanValue);
+      await bot.user
+        .setUsername(
+          cleanValue
+        );
     } catch (error) {
       changeError = error;
     } finally {
-      restoreClientToken(bot, clientToken);
+      restoreClientToken(
+        bot,
+        clientToken
+      );
     }
 
-    if (changeError) throw changeError;
-
-    botInfo.botName = bot.user.username;
-  }
-
-  if (field === 'activityType') {
-    const key = cleanValue.toUpperCase();
-
-    if (ACTIVITY_TYPES[key] === undefined) {
-      throw new Error('INVALID_ACTIVITY_TYPE');
+    if (changeError) {
+      throw changeError;
     }
 
-    botInfo.activityType = key;
+    botInfo.botName =
+      bot.user.username;
   }
 
-  if (field === 'activityText') {
+  if (
+    field === 'text1'
+  ) {
     botInfo.activityText =
-      normalizeActivityTemplate(cleanValue);
+      normalizeActivityTemplate(
+        cleanValue
+      );
   }
 
-  if (field === 'activityText2') {
+  if (
+    field === 'text2'
+  ) {
     botInfo.activityText2 =
-      normalizeActivityTemplate(cleanValue);
+      normalizeActivityTemplate(
+        cleanValue
+      );
   }
 
-  if (field === 'avatar') {
-    const clientToken = bot.token || process.env.TOKEN;
+  if (
+    field === 'avatar'
+  ) {
+    const clientToken =
+      bot.token ||
+      process.env.TOKEN;
+
     let changeError = null;
 
     try {
-      await bot.user.setAvatar(cleanValue);
+      await bot.user
+        .setAvatar(
+          cleanValue
+        );
     } catch (error) {
       changeError = error;
     } finally {
-      restoreClientToken(bot, clientToken);
+      restoreClientToken(
+        bot,
+        clientToken
+      );
     }
 
-    if (changeError) throw changeError;
-  }
-
-  if (field === 'status') {
-    const status = cleanValue.toLowerCase();
-
-    if (!VALID_STATUSES.includes(status)) {
-      throw new Error('INVALID_STATUS');
+    if (changeError) {
+      throw changeError;
     }
-
-    botInfo.status = status;
-    bot.user.setStatus(status);
   }
 
   await botInfo.save();
 
   if (
-    field === 'activityType' ||
-    field === 'activityText' ||
-    field === 'activityText2'
+    field === 'text1' ||
+    field === 'text2'
   ) {
-    buildRuntimeActivity(bot, botInfo);
+    buildRuntimeActivity(
+      bot,
+      botInfo
+    );
   }
+}
+
+async function applyActivityType(
+  bot,
+  botInfo,
+  key,
+  streamingUrl = null
+) {
+  if (
+    ACTIVITY_TYPES[key] ===
+    undefined
+  ) {
+    throw new Error(
+      'INVALID_ACTIVITY_TYPE'
+    );
+  }
+
+  if (
+    key === 'STREAMING'
+  ) {
+    botInfo.streamingUrl =
+      normalizeTwitchUrl(
+        streamingUrl
+      );
+  }
+
+  botInfo.activityType =
+    key;
+
+  await botInfo.save();
+
+  buildRuntimeActivity(
+    bot,
+    botInfo
+  );
+}
+
+async function applyStatus(
+  bot,
+  botInfo,
+  status
+) {
+  if (
+    !VALID_STATUSES.includes(
+      status
+    )
+  ) {
+    throw new Error(
+      'INVALID_STATUS'
+    );
+  }
+
+  botInfo.status =
+    status;
+
+  await botInfo.save();
+
+  bot.user.setStatus(
+    status
+  );
+}
+
+function getErrorText(
+  error
+) {
+  if (
+    error?.message ===
+    'EMPTY_VALUE'
+  ) {
+    return 'La valeur ne peut pas être vide.';
+  }
+
+  if (
+    error?.message ===
+    'INVALID_TWITCH_URL'
+  ) {
+    return (
+      'Lien Twitch invalide. Utilisez par exemple : ' +
+      '**https://www.twitch.tv/votrechaine**'
+    );
+  }
+
+  if (
+    error?.message ===
+    'INVALID_ACTIVITY_TYPE'
+  ) {
+    return 'Ce type d’activité est invalide.';
+  }
+
+  if (
+    error?.message ===
+    'INVALID_STATUS'
+  ) {
+    return 'Ce statut est invalide.';
+  }
+
+  return 'Impossible d’appliquer cette modification.';
 }
 
 module.exports = {
   name: 'editbot',
-  description: 'Modifier les informations du bot.',
+  description:
+    'Modifier les informations du bot avec une interface Component V2.',
 
   async execute(message) {
-    if (!message.guild) return;
-
-    if (!(await isBotOwner(message.author.id))) {
+    if (!message.guild) {
       return;
     }
 
-    if (mongoose.connection.readyState !== 1) {
+    if (
+      !(await isBotOwner(
+        message.author.id
+      ))
+    ) {
+      return;
+    }
+
+    if (
+      mongoose.connection
+        .readyState !== 1
+    ) {
       return message.reply(
         replyEmbedPayload(
           'La connexion à la base de données n’est pas établie.',
-          { type: 'error' }
+          {
+            type: 'error'
+          }
         )
       );
     }
 
     try {
-      let botInfo = await BotInfo.findOne({
-        guildId: message.guild.id
-      });
+      let botInfo =
+        await BotInfo.findOne({
+          guildId:
+            message.guild.id
+        });
 
       if (!botInfo) {
-        botInfo = await BotInfo.create({
-          guildId: message.guild.id,
-          botName: message.client.user.username,
-          activityType: 'LISTENING',
-          activityText: currentActivityText(message.client),
-          activityText2: DEFAULT_DYNAMIC_ACTIVITY,
-          status: message.client.user.presence?.status || 'online'
-        });
+        botInfo =
+          await BotInfo.create({
+            guildId:
+              message.guild.id,
+            botName:
+              message.client
+                .user.username,
+            activityType:
+              'LISTENING',
+            activityText:
+              currentActivityText(
+                message.client
+              ),
+            activityText2:
+              DEFAULT_DYNAMIC_ACTIVITY,
+            streamingUrl: '',
+            status:
+              message.client
+                .user.presence
+                ?.status ||
+              'online'
+          });
       }
 
-      let shouldSave = false;
+      let shouldSave =
+        false;
 
-      if (botInfo.botName !== message.client.user.username) {
-        botInfo.botName = message.client.user.username;
+      if (
+        botInfo.botName !==
+        message.client
+          .user.username
+      ) {
+        botInfo.botName =
+          message.client
+            .user.username;
         shouldSave = true;
       }
 
       const normalizedText1 =
-        normalizeActivityTemplate(botInfo.activityText);
-      const normalizedText2 =
-        normalizeActivityTemplate(botInfo.activityText2);
+        normalizeActivityTemplate(
+          botInfo.activityText
+        );
 
-      if (normalizedText1 !== botInfo.activityText) {
-        botInfo.activityText = normalizedText1;
+      const normalizedText2 =
+        normalizeActivityTemplate(
+          botInfo.activityText2
+        );
+
+      if (
+        normalizedText1 !==
+        botInfo.activityText
+      ) {
+        botInfo.activityText =
+          normalizedText1;
         shouldSave = true;
       }
 
-      if (normalizedText2 !== botInfo.activityText2) {
-        botInfo.activityText2 = normalizedText2;
+      if (
+        normalizedText2 !==
+        botInfo.activityText2
+      ) {
+        botInfo.activityText2 =
+          normalizedText2;
         shouldSave = true;
       }
 
@@ -345,115 +1255,376 @@ module.exports = {
         await botInfo.save();
       }
 
-      const panel = await message.reply({
-        embeds: [createInfoEmbed(botInfo, message.client)],
-        components: [buildMenu()]
-      });
-
-      const collector = panel.createMessageComponentCollector({
-        filter: interaction =>
-          interaction.customId === 'editInfo' &&
-          interaction.user.id === message.author.id,
-        time: 300000
-      });
-
-      collector.on('collect', async interaction => {
-        await interaction.deferUpdate();
-
-        const field = interaction.values[0];
-
-        const question = await message.channel.send(
-          replyEmbedPayload(
-            promptFor(field),
-            {
-              type: 'info',
-              title: '✏️ Modification du bot'
-            }
-          )
-        );
-
-        const collected = await message.channel.awaitMessages({
-          filter: response =>
-            response.author.id === message.author.id,
-          max: 1,
-          time: 60000
+      const panel =
+        await message.reply({
+          flags:
+            MessageFlags
+              .IsComponentsV2,
+          components: [
+            buildMainContainer(
+              botInfo,
+              message.client
+            )
+          ]
         });
 
-        const response = collected.first();
-
-        if (!response) {
-          return question.edit(
-            replyEmbedPayload(
-              'Temps écoulé. Relance la sélection dans le menu.',
-              {
-                type: 'warning',
-                title: '⌛ Temps écoulé'
-              }
-            )
-          );
-        }
-
-        const value = response.content;
-
-        await response.delete().catch(() => {});
-        await question.delete().catch(() => {});
-
-        try {
-          await applyChange(
-            message.client,
-            botInfo,
-            field,
-            value
-          );
-
-          botInfo = await BotInfo.findOne({
-            guildId: message.guild.id
+      const collector =
+        panel
+          .createMessageComponentCollector({
+            time: 5 * 60 * 1000
           });
 
-          await panel.edit({
-            embeds: [createInfoEmbed(botInfo, message.client)],
-            components: [buildMenu()]
-          });
-        } catch (error) {
-          let errorText = '❌・Impossible d’appliquer cette modification.';
+      const refreshMain =
+        async () => {
+          botInfo =
+            await BotInfo.findOne({
+              guildId:
+                message.guild.id
+            });
 
-          if (error.message === 'INVALID_ACTIVITY_TYPE') {
-            errorText =
-              '❌・Type invalide. Utilise PLAYING, STREAMING, LISTENING, WATCHING ou COMPETING.';
-          } else if (error.message === 'INVALID_STATUS') {
-            errorText =
-              '❌・Statut invalide. Utilise online, idle, dnd ou invisible.';
-          } else if (error.message === 'EMPTY_VALUE') {
-            errorText = '❌・La valeur ne peut pas être vide.';
-          } else {
-            console.error('Erreur +editbot :', error);
+          if (!botInfo) {
+            return;
           }
 
-          const errorMessage = await message.channel.send(
-            replyEmbedPayload(
-              errorText.replace(/^❌・/, ''),
-              { type: 'error' }
-            )
-          );
+          await panel.edit({
+            components: [
+              buildMainContainer(
+                botInfo,
+                message.client
+              )
+            ]
+          });
+        };
 
-          setTimeout(() => {
-            errorMessage.delete().catch(() => {});
-          }, 5000);
+      collector.on(
+        'collect',
+        async interaction => {
+          if (
+            !interaction.customId
+              .startsWith(
+                'editbot_'
+              )
+          ) {
+            return;
+          }
+
+          if (
+            interaction.user.id !==
+            message.author.id
+          ) {
+            return interaction
+              .reply({
+                ...replyEmbedPayload(
+                  'Ce panneau ne vous appartient pas.',
+                  {
+                    type: 'error'
+                  }
+                ),
+                flags:
+                  MessageFlags
+                    .Ephemeral
+              })
+              .catch(() => {});
+          }
+
+          try {
+            if (
+              interaction.customId ===
+              'editbot_close'
+            ) {
+              await interaction
+                .update({
+                  components: [
+                    buildClosedContainer()
+                  ]
+                });
+
+              collector.stop(
+                'closed'
+              );
+
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_back'
+            ) {
+              await interaction
+                .update({
+                  components: [
+                    buildMainContainer(
+                      botInfo,
+                      message.client
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_activity'
+            ) {
+              await interaction
+                .update({
+                  components: [
+                    buildActivityContainer(
+                      botInfo
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_status'
+            ) {
+              await interaction
+                .update({
+                  components: [
+                    buildStatusContainer(
+                      botInfo
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              interaction.customId
+                .startsWith(
+                  'editbot_status_'
+                )
+            ) {
+              const status =
+                interaction.customId
+                  .replace(
+                    'editbot_status_',
+                    ''
+                  );
+
+              await interaction
+                .deferUpdate();
+
+              await applyStatus(
+                message.client,
+                botInfo,
+                status
+              );
+
+              await refreshMain();
+              return;
+            }
+
+            if (
+              interaction.customId
+                .startsWith(
+                  'editbot_activity_'
+                )
+            ) {
+              const type =
+                interaction.customId
+                  .replace(
+                    'editbot_activity_',
+                    ''
+                  );
+
+              if (
+                type ===
+                'STREAMING'
+              ) {
+                const modalInteraction =
+                  await showStreamingModal({
+                    interaction,
+                    botInfo
+                  });
+
+                if (
+                  !modalInteraction
+                ) {
+                  return;
+                }
+
+                await modalInteraction
+                  .deferUpdate();
+
+                const twitchUrl =
+                  modalInteraction
+                    .fields
+                    .getTextInputValue(
+                      'twitch_url'
+                    );
+
+                await applyActivityType(
+                  message.client,
+                  botInfo,
+                  'STREAMING',
+                  twitchUrl
+                );
+
+                await refreshMain();
+                return;
+              }
+
+              await interaction
+                .deferUpdate();
+
+              await applyActivityType(
+                message.client,
+                botInfo,
+                type
+              );
+
+              await refreshMain();
+              return;
+            }
+
+            const fieldMap = {
+              editbot_name:
+                'name',
+              editbot_text1:
+                'text1',
+              editbot_text2:
+                'text2',
+              editbot_avatar:
+                'avatar'
+            };
+
+            const field =
+              fieldMap[
+                interaction.customId
+              ];
+
+            if (!field) {
+              return interaction
+                .deferUpdate()
+                .catch(() => {});
+            }
+
+            const modalInteraction =
+              await showValueModal({
+                interaction,
+                field,
+                botInfo,
+                bot:
+                  message.client
+              });
+
+            if (
+              !modalInteraction
+            ) {
+              return;
+            }
+
+            await modalInteraction
+              .deferUpdate();
+
+            const value =
+              modalInteraction
+                .fields
+                .getTextInputValue(
+                  'value'
+                );
+
+            await applyValueChange(
+              message.client,
+              botInfo,
+              field,
+              value
+            );
+
+            await refreshMain();
+          } catch (error) {
+            console.error(
+              'Erreur +editbot :',
+              error
+            );
+
+            const errorText =
+              getErrorText(
+                error
+              );
+
+            if (
+              interaction.deferred ||
+              interaction.replied
+            ) {
+              await interaction
+                .followUp({
+                  ...replyEmbedPayload(
+                    errorText,
+                    {
+                      type: 'error',
+                      title:
+                        '❌ Modification impossible'
+                    }
+                  ),
+                  flags:
+                    MessageFlags
+                      .Ephemeral
+                })
+                .catch(() => {});
+
+              return;
+            }
+
+            await interaction
+              .reply({
+                ...replyEmbedPayload(
+                  errorText,
+                  {
+                    type: 'error',
+                    title:
+                      '❌ Modification impossible'
+                  }
+                ),
+                flags:
+                  MessageFlags
+                    .Ephemeral
+              })
+              .catch(() => {});
+          }
         }
-      });
+      );
 
-      collector.on('end', async () => {
-        await panel.edit({
-          components: []
-        }).catch(() => {});
-      });
+      collector.on(
+        'end',
+        async (
+          _collected,
+          reason
+        ) => {
+          if (
+            reason === 'closed'
+          ) {
+            return;
+          }
+
+          await panel.edit({
+            components: [
+              buildExpiredContainer()
+            ]
+          }).catch(() => {});
+        }
+      );
+
+      return panel;
     } catch (error) {
-      console.error('Erreur +editbot :', error);
+      console.error(
+        'Erreur +editbot :',
+        error
+      );
 
       return message.reply(
         replyEmbedPayload(
           'Une erreur s’est produite lors de la modification des informations du bot.',
-          { type: 'error' }
+          {
+            type: 'error'
+          }
         )
       );
     }
