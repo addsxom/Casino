@@ -116,8 +116,13 @@ module.exports = {
         ),
         async () => {
           await channel.send(
-            '🔒 **Salon temporairement désactivé**\n' +
-            'Les membres ne peuvent plus envoyer de messages pour le moment. Seul le staff peut écrire jusqu’à la réouverture.'
+            replyEmbedPayload(
+              'Les membres ne peuvent plus envoyer de messages pour le moment. Seul le staff peut écrire jusqu’à la réouverture.',
+              {
+                type: 'warning',
+                title: '🔒 Salon temporairement désactivé'
+              }
+            )
           );
         }
       );
