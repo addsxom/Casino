@@ -10,11 +10,7 @@ const {
   sendChannelLockLog
 } = require('../../utils/channelLock.js');
 
-async function temporaryReply(
-  message,
-  payload,
-  afterDelete = null
-) {
+async function temporaryReply(message, payload) {
   const response = await message.reply(payload);
 
   setTimeout(async () => {
@@ -22,17 +18,6 @@ async function temporaryReply(
       response.delete(),
       message.delete()
     ]);
-
-    if (typeof afterDelete === 'function') {
-      try {
-        await afterDelete();
-      } catch (error) {
-        console.error(
-          'Erreur message d’état +lock :',
-          error
-        );
-      }
-    }
   }, 2000);
 
   return response;
@@ -105,26 +90,16 @@ module.exports = {
         locked: true
       });
 
-      return temporaryReply(
-        message,
+      await message.delete().catch(() => {});
+
+      return channel.send(
         replyEmbedPayload(
-          `${channel} est maintenant verrouillé.\n\nLes membres ne peuvent plus écrire, mais le staff conserve l’accès à l’écriture.`,
+          'Les membres ne peuvent plus envoyer de messages pour le moment. Seul le staff peut écrire jusqu’à la réouverture.',
           {
-            type: 'success',
-            title: '🔒 Salon verrouillé'
+            type: 'warning',
+            title: '🔒 Salon temporairement désactivé'
           }
-        ),
-        async () => {
-          await channel.send(
-            replyEmbedPayload(
-              'Les membres ne peuvent plus envoyer de messages pour le moment. Seul le staff peut écrire jusqu’à la réouverture.',
-              {
-                type: 'warning',
-                title: '🔒 Salon temporairement désactivé'
-              }
-            )
-          );
-        }
+        )
       );
     } catch (error) {
       console.error(
