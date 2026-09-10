@@ -1,3 +1,4 @@
+const { ChannelType } = require('discord.js');
 const Owner = require('../../Models/Owner.js');
 const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const {
@@ -96,12 +97,86 @@ async function clearMessages(channel, requestedAmount = null) {
   return deleted;
 }
 
+
+async function clearCategory(message, categoryId) {
+  const category =
+    message.guild.channels.cache.get(
+      categoryId
+    ) ||
+    await message.guild.channels
+      .fetch(categoryId)
+      .catch(() => null);
+
+  if (
+    !category ||
+    category.type !==
+      ChannelType.GuildCategory
+  ) {
+    return {
+      ok: false,
+      reason: 'invalid_category'
+    };
+  }
+
+  const channels =
+    message.guild.channels.cache
+      .filter(channel =>
+        channel.parentId ===
+          category.id &&
+        channel.isTextBased?.() ===
+          true &&
+        Boolean(channel.messages)
+      )
+      .sort((a, b) =>
+        (a.rawPosition || 0) -
+        (b.rawPosition || 0)
+      );
+
+  let deleted = 0;
+  let clearedChannels = 0;
+  const failedChannels = [];
+
+  for (const channel of channels.values()) {
+    try {
+      const channelDeleted =
+        await clearMessages(
+          channel,
+          null
+        );
+
+      deleted += channelDeleted;
+      clearedChannels++;
+    } catch (error) {
+      console.error(
+        `Erreur +clearctg dans ${channel.id} :`,
+        error?.code ||
+          error?.message ||
+          error
+      );
+
+      failedChannels.push(
+        channel
+      );
+    }
+  }
+
+  return {
+    ok: true,
+    category,
+    totalChannels: channels.size,
+    clearedChannels,
+    deleted,
+    failedChannels
+  };
+}
+
 module.exports = {
   name: 'clear',
-  description: 'Supprime des messages du salon.',
-  usage: 'clear [nombre]',
+  aliases: ['clearctg'],
+  description: 'Supprime des messages du salon ou de tous les salons d’une catégorie.',
+  usage: 'clear [nombre] | clearctg <ID catégorie>',
 
-  async execute(message, args) {
+  async execute(message, args, options = {}) {
     if (!message.guild) return;
 
     if (!(await isBotOwner(message.author.id))) {
@@ -109,6 +184,105 @@ module.exports = {
     }
 
     const channel = message.channel;
+
+    if (
+      options.invokedName ===
+        'clearctg'
+    ) {
+      const categoryId =
+        String(
+          args[0] || ''
+        ).trim();
+
+      if (
+        !/^\d{17,20}$/.test(
+          categoryId
+        )
+      ) {
+        return message.reply(
+          replyEmbedPayload(
+            'Utilisation : **+clearctg <ID de la catégorie>**',
+            { type: 'error' }
+          )
+        );
+      }
+
+      await message
+        .delete()
+        .catch(() => {});
+
+      const result =
+        await clearCategory(
+          message,
+          categoryId
+        );
+
+      if (!result.ok) {
+        const errorMessage =
+          await channel.send(
+            replyEmbedPayload(
+              'Cet ID ne correspond pas à une catégorie accessible de ce serveur.',
+              { type: 'error' }
+            )
+          ).catch(() => null);
+
+        if (errorMessage) {
+          setTimeout(() => {
+            errorMessage
+              .delete()
+              .catch(() => {});
+          }, 5000);
+        }
+
+        return;
+      }
+
+      const failedText =
+        result.failedChannels.length
+          ? `\n⚠️ **Échec :** ${result.failedChannels.length} salon${result.failedChannels.length > 1 ? 's' : ''}`
+          : '';
+
+      await sendStaffLog(
+        message.guild,
+        'moderation-logs',
+        buildDiscordLog({
+          title: '🧹 Clear catégorie',
+          description:
+            `${message.author} a vidé **${result.clearedChannels}/${result.totalChannels} salon${result.totalChannels > 1 ? 's' : ''}** de la catégorie **${result.category.name}**.\n` +
+            `**${result.deleted} message${result.deleted > 1 ? 's' : ''}** supprimé${result.deleted > 1 ? 's' : ''}.\n` +
+            `-# Commande : +clearctg ${result.category.id}`,
+          color: 0x5865f2
+        })
+      );
+
+      const confirmation =
+        await channel.send(
+          replyEmbedPayload(
+            `**Catégorie :** ${result.category.name}\n` +
+            `🧹 **${result.clearedChannels}/${result.totalChannels} salons** nettoyés\n` +
+            `🗑️ **${result.deleted} messages** supprimés` +
+            failedText,
+            {
+              type:
+                result.failedChannels.length
+                  ? 'warning'
+                  : 'success',
+              title:
+                '🧹 Catégorie nettoyée'
+            }
+          )
+        ).catch(() => null);
+
+      if (confirmation) {
+        setTimeout(() => {
+          confirmation
+            .delete()
+            .catch(() => {});
+        }, 5000);
+      }
+
+      return;
+    }
 
     if (
       !channel?.isTextBased?.() ||
