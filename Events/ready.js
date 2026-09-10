@@ -38,6 +38,19 @@ function resolveActivityType(value) {
   ] ?? ActivityType.Listening;
 }
 
+function getActivityOptions(type, streamingUrl) {
+  const options = { type };
+
+  if (
+    type === ActivityType.Streaming &&
+    streamingUrl
+  ) {
+    options.url = streamingUrl;
+  }
+
+  return options;
+}
+
 module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
   mongoose.set("autoIndex", false);
@@ -83,6 +96,7 @@ module.exports = async (bot) => {
   bot.activityRotation = {
     texts: [activitytext, activitytext2].filter(Boolean),
     type: activityType,
+    streamingUrl: botInfo?.streamingUrl || '',
     index: 0
   };
 
@@ -91,9 +105,10 @@ module.exports = async (bot) => {
   if (firstActivity) {
     bot.user.setActivity(
       renderActivityText(firstActivity, bot, prefix),
-      {
-        type: bot.activityRotation.type
-      }
+      getActivityOptions(
+        bot.activityRotation.type,
+        bot.activityRotation.streamingUrl
+      )
     );
   }
 
@@ -111,7 +126,10 @@ module.exports = async (bot) => {
         bot,
         prefix
       ),
-      { type: rotation.type }
+      getActivityOptions(
+        rotation.type,
+        rotation.streamingUrl
+      )
     );
   }, 5000);
 
