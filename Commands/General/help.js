@@ -8,16 +8,6 @@ const {
 
 const ServerPrefix = require('../../Models/ServerPrefix');
 const helpFeatures = require('../../utils/helpFeatures.js');
-const {
-  getConfiguredChannelId
-} = require('../../utils/configService.js');
-
-const MISC_HELP_CATEGORIES = new Set([
-  'General',
-  'Recup',
-  'Gestion coins'
-]);
-
 const SPECIAL_COMMAND_USAGES = {
   clear: [
     'clear [nombre]',
@@ -101,76 +91,6 @@ function getCommandUsages(
   ];
 
   return [...new Set(names)];
-}
-
-function getCategoryNotice(
-  category,
-  message
-) {
-  if (
-    MISC_HELP_CATEGORIES.has(
-      category
-    )
-  ) {
-    const miscChannelId =
-      getConfiguredChannelId(
-        'misccmd',
-        message.guild?.id
-      );
-
-    return miscChannelId
-      ? `📍 Ces commandes s’utilisent dans <#${miscChannelId}>.`
-      : null;
-  }
-
-  if (category === 'Admin') {
-    return '🛡️ Commandes réservées au staff / administrateurs selon la commande.';
-  }
-
-  if (category === 'Owner') {
-    return '👑 Commandes de gestion réservées aux owners du bot.';
-  }
-
-  return null;
-}
-
-function getCommandLocation(
-  command,
-  message
-) {
-  if (!message.guild) {
-    return null;
-  }
-
-  if (command.name === 'slot') {
-    const id =
-      getConfiguredChannelId(
-        'slots',
-        message.guild.id
-      );
-
-    return id
-      ? `📍 <#${id}>`
-      : null;
-  }
-
-  if (command.name === 'mines') {
-    const id =
-      getConfiguredChannelId(
-        'mines',
-        message.guild.id
-      );
-
-    return id
-      ? `📍 <#${id}>`
-      : null;
-  }
-
-  if (command.name === 'close') {
-    return '🎫 Ticket uniquement • Modérateur';
-  }
-
-  return null;
 }
 
 function buildNavigationRow(page, totalPages) {
@@ -264,40 +184,16 @@ module.exports = {
               )
               .join(' / ');
 
-          const location =
-            getCommandLocation(
-              command,
-              message
-            );
-
           return (
             `**${usages}**\n` +
-            `${command.description || 'Aucune description.'}` +
-            (
-              location
-                ? `\n-# ${location}`
-                : ''
-            )
+            `${command.description || 'Aucune description.'}`
           );
         })
         .join('\n\n');
 
-      const categoryNotice =
-        getCategoryNotice(
-          category,
-          message
-        );
-
       const categoryDescription =
-        (
-          categoryNotice
-            ? `-# ${categoryNotice}\n\n`
-            : ''
-        ) +
-        (
-          commandText ||
-          'Aucune commande dans cette catégorie.'
-        );
+        commandText ||
+        'Aucune commande dans cette catégorie.';
 
       embeds.push(
         new EmbedBuilder()
