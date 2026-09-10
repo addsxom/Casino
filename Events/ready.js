@@ -135,6 +135,12 @@ async function migrateActivityTexts(botInfo) {
 }
 
 module.exports = async (bot) => {
+  if (bot.__kuromiReadyInitialized) {
+    return;
+  }
+
+  bot.__kuromiReadyInitialized = true;
+
   mongoose.set("strictQuery", false);
   mongoose.set("autoIndex", false);
 

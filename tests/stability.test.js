@@ -20,6 +20,21 @@ function source(relativePath) {
 }
 
 test(
+  'startup initialization is guarded against duplicate ready events',
+  () => {
+    const ready =
+      source(
+        'Events/ready.js'
+      );
+
+    assert.match(
+      ready,
+      /__kuromiReadyInitialized/
+    );
+  }
+);
+
+test(
   'critical channel routing stays configured',
   () => {
     const config =
