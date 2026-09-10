@@ -272,8 +272,8 @@ async function sendAfkRewardNotification({
     .setTitle('🛌 Récompense AFK Farm')
     .setDescription(
       `${user}, tu as passé **${formatDuration(earnedIntervalMs)}** dans **AFK Farm**.\n\n` +
-      `🪙 **+${formatAmount(coins)} coins** dans ta poche.\n` +
-      `-# Poche : ${formatAmount(account.coins)} coins\n\n` +
+      `🏦 **+${formatAmount(coins)} coins** dans ta banque.\n` +
+      `-# Banque : ${formatAmount(account.bank)} coins\n\n` +
       `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}\n` +
       '-# Aucun état micro/casque ne bloque les récompenses AFK.'
     )
