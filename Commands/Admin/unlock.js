@@ -117,8 +117,13 @@ module.exports = {
         ),
         async () => {
           await channel.send(
-            '🔓 **Salon réactivé**\n' +
-            'Le salon est de nouveau ouvert. Les membres peuvent à nouveau envoyer des messages.'
+            replyEmbedPayload(
+              'Le salon est de nouveau ouvert. Les membres peuvent à nouveau envoyer des messages.',
+              {
+                type: 'success',
+                title: '🔓 Salon réactivé'
+              }
+            )
           );
         }
       );
