@@ -10,6 +10,17 @@ const {
   sendChannelLockLog
 } = require('../../utils/channelLock.js');
 
+async function temporaryReply(message, payload) {
+  const response = await message.reply(payload);
+
+  setTimeout(() => {
+    response.delete().catch(() => {});
+    message.delete().catch(() => {});
+  }, 2000);
+
+  return response;
+}
+
 module.exports = {
   name: 'lock',
   description:
@@ -20,7 +31,8 @@ module.exports = {
     if (!message.guild) return;
 
     if (!isStaff(message.member)) {
-      return message.reply(
+      return temporaryReply(
+        message,
         replyEmbedPayload(
           'Seuls les membres du staff peuvent verrouiller un salon.',
           {
@@ -38,7 +50,8 @@ module.exports = {
       );
 
     if (!channel) {
-      return message.reply(
+      return temporaryReply(
+        message,
         replyEmbedPayload(
           'Salon introuvable. Utilise `+lock` dans le salon concerné ou `+lock #salon`.',
           {
@@ -50,7 +63,8 @@ module.exports = {
     }
 
     if (!isLockableChannel(channel)) {
-      return message.reply(
+      return temporaryReply(
+        message,
         replyEmbedPayload(
           'Cette commande fonctionne uniquement sur un salon textuel classique ou d’annonces.',
           {
@@ -74,7 +88,8 @@ module.exports = {
         locked: true
       });
 
-      return message.reply(
+      return temporaryReply(
+        message,
         replyEmbedPayload(
           `${channel} est maintenant verrouillé.\n\nLes membres ne peuvent plus écrire, mais le staff conserve l’accès à l’écriture.`,
           {
@@ -89,7 +104,8 @@ module.exports = {
         error
       );
 
-      return message.reply(
+      return temporaryReply(
+        message,
         replyEmbedPayload(
           'Impossible de verrouiller ce salon. Vérifie que le bot possède les permissions nécessaires pour modifier les permissions du salon.',
           {
