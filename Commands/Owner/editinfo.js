@@ -46,6 +46,75 @@ const VALID_STATUSES = [
   'invisible'
 ];
 
+const STATUS_META = {
+  online: {
+    label: 'Online',
+    emoji: '🟢'
+  },
+  idle: {
+    label: 'Idle',
+    emoji: '🌙'
+  },
+  dnd: {
+    label: 'DND',
+    emoji: '🔴'
+  },
+  invisible: {
+    label: 'Invisible',
+    emoji: '⚫'
+  }
+};
+
+const ACTIVITY_META = {
+  PLAYING: {
+    label: 'Playing',
+    emoji: '🎮'
+  },
+  STREAMING: {
+    label: 'Streaming',
+    emoji: '🟣'
+  },
+  LISTENING: {
+    label: 'Listening',
+    emoji: '🎧'
+  },
+  WATCHING: {
+    label: 'Watching',
+    emoji: '👀'
+  },
+  COMPETING: {
+    label: 'Competing',
+    emoji: '🏆'
+  }
+};
+
+function getStatusDisplay(status) {
+  const meta =
+    STATUS_META[status] ||
+    STATUS_META.online;
+
+  return (
+    meta.emoji +
+    ' ' +
+    meta.label
+  );
+}
+
+function getActivityDisplay(type) {
+  const key =
+    getActivityTypeName(type);
+
+  const meta =
+    ACTIVITY_META[key] ||
+    ACTIVITY_META.LISTENING;
+
+  return (
+    meta.emoji +
+    ' ' +
+    meta.label
+  );
+}
+
 function separator() {
   return new SeparatorBuilder()
     .setDivider(true);
@@ -266,7 +335,7 @@ function buildMainButtons() {
           .setLabel('Nom')
           .setEmoji('✏️')
           .setStyle(
-            ButtonStyle.Primary
+            ButtonStyle.Secondary
           ),
         new ButtonBuilder()
           .setCustomId(
@@ -275,23 +344,14 @@ function buildMainButtons() {
           .setLabel('Activité')
           .setEmoji('🎮')
           .setStyle(
-            ButtonStyle.Primary
-          ),
-        new ButtonBuilder()
-          .setCustomId(
-            'editbot_text1'
-          )
-          .setLabel('Texte 1')
-          .setEmoji('1️⃣')
-          .setStyle(
             ButtonStyle.Secondary
           ),
         new ButtonBuilder()
           .setCustomId(
-            'editbot_text2'
+            'editbot_status'
           )
-          .setLabel('Texte 2')
-          .setEmoji('2️⃣')
+          .setLabel('Statut')
+          .setEmoji('🟢')
           .setStyle(
             ButtonStyle.Secondary
           ),
@@ -311,12 +371,21 @@ function buildMainButtons() {
       .addComponents(
         new ButtonBuilder()
           .setCustomId(
-            'editbot_status'
+            'editbot_text1'
           )
-          .setLabel('Statut')
-          .setEmoji('🟢')
+          .setLabel('Texte 1')
+          .setEmoji('1️⃣')
           .setStyle(
-            ButtonStyle.Primary
+            ButtonStyle.Secondary
+          ),
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_text2'
+          )
+          .setLabel('Texte 2')
+          .setEmoji('2️⃣')
+          .setStyle(
+            ButtonStyle.Secondary
           ),
         new ButtonBuilder()
           .setCustomId(
@@ -372,14 +441,14 @@ function buildMainContainer(
       ?.status ||
     'online';
 
-  let streamingLine = '';
+  let twitchLine = '';
 
   if (
     activityType ===
     'STREAMING'
   ) {
-    streamingLine =
-      '\n📺 **Twitch :** ' +
+    twitchLine =
+      '\n🔗 **Twitch** · ' +
       (
         botInfo.streamingUrl ||
         'Non défini'
@@ -394,7 +463,19 @@ function buildMainContainer(
       .addTextDisplayComponents(
         new TextDisplayBuilder()
           .setContent(
-            '# ⚙️ Configuration du bot'
+            '# ⚙️ Edit Bot\n' +
+            '🤖 **Nom** · ' +
+            bot.user.username +
+            '\n' +
+            getStatusDisplay(
+              status
+            ) +
+            ' **Statut**\n' +
+            getActivityDisplay(
+              activityType
+            ) +
+            ' **Activité**' +
+            twitchLine
           )
       )
       .addSeparatorComponents(
@@ -403,38 +484,15 @@ function buildMainContainer(
       .addTextDisplayComponents(
         new TextDisplayBuilder()
           .setContent(
-            '🤖 **Nom :** ' +
-              bot.user.username +
-              '\n' +
-              '🎮 **Activité :** ' +
-              activityType +
-              '\n' +
-              '🟢 **Statut :** ' +
-              status +
-              streamingLine
+            '1️⃣ **Texte 1** · ' +
+            text1 +
+            '\n' +
+            '2️⃣ **Texte 2** · ' +
+            text2
           )
       )
       .addSeparatorComponents(
         separator()
-      )
-      .addTextDisplayComponents(
-        new TextDisplayBuilder()
-          .setContent(
-            '**Texte 1 :** ' +
-              text1 +
-              '\n' +
-              '**Texte 2 :** ' +
-              text2
-          )
-      )
-      .addSeparatorComponents(
-        separator()
-      )
-      .addTextDisplayComponents(
-        new TextDisplayBuilder()
-          .setContent(
-            '-# Choisissez directement ce que vous voulez modifier :'
-          )
       );
 
   for (
@@ -477,7 +535,7 @@ function buildActivityContainer(
             'editbot_activity_STREAMING'
           )
           .setLabel('Streaming')
-          .setEmoji('📺')
+          .setEmoji('🟣')
           .setStyle(
             current === 'STREAMING'
               ? ButtonStyle.Success
@@ -549,10 +607,11 @@ function buildActivityContainer(
       new TextDisplayBuilder()
         .setContent(
           '**Actuel :** ' +
-            current +
+            getActivityDisplay(
+              current
+            ) +
             '\n\n' +
-            'Choisissez directement le nouveau type.\n' +
-            '-# Streaming demandera obligatoirement un lien Twitch.'
+            '-# Streaming demande un lien Twitch.'
         )
     )
     .addSeparatorComponents(
@@ -604,8 +663,8 @@ function buildStatusContainer(
         ),
         makeButton(
           'dnd',
-          'Ne pas déranger',
-          '⛔'
+          'DND',
+          '🔴'
         ),
         makeButton(
           'invisible',
@@ -645,8 +704,9 @@ function buildStatusContainer(
       new TextDisplayBuilder()
         .setContent(
           '**Actuel :** ' +
-          current +
-          '\n\nChoisissez le nouveau statut :'
+          getStatusDisplay(
+            current
+          )
         )
     )
     .addSeparatorComponents(
