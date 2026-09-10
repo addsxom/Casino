@@ -9,6 +9,7 @@ module.exports = {
     welcome: '1546311653388189718',
     memberCount: '1546311653388189716',
     rewards: '1547030803303637072',
+    miscCommands: '1546311653564620895',
     afkFarm: '1547368687579955290',
     voiceFarm: [],
     botGuildEvents: '1132784655817519225',
