@@ -17,6 +17,14 @@ const afkRewardProgressSchema =
     targetMs: {
       type: Number,
       required: true
+    },
+    statusMessageId: {
+      type: String,
+      default: null
+    },
+    suppressEligibleStatus: {
+      type: Boolean,
+      default: false
     }
   }, {
     timestamps: true

@@ -1,5 +1,7 @@
 const AfkRewardProgress =
   require('../Models/AfkRewardProgress.js');
+const config =
+  require('../config/botConfig.js');
 
 const {
   AFK_REWARD_MIN_MS,
@@ -7,7 +9,8 @@ const {
   AFK_REWARD_COINS,
   formatDuration,
   sendAfkRewardNotification,
-  sendOrUpdateAfkStatus
+  sendOrUpdateAfkStatus,
+  deleteRewardStatusMessage
 } = require('./rewardService.js');
 
 const {
@@ -27,6 +30,11 @@ const afkProgress = new Map();
 
 let trackerInterval = null;
 let trackerTickRunning = false;
+let lastProgressPersistAt = 0;
+
+const PROGRESS_PERSIST_INTERVAL_MS =
+  config.system.progressPersistIntervalMs ||
+  15 * 1000;
 
 function getKey(guildId, userId) {
   return `${guildId}:${userId}`;
@@ -105,6 +113,12 @@ async function loadProgress(
     status: null,
     statusRewardDueAt: null,
     statusMessage: null,
+    statusMessageId:
+      saved?.statusMessageId ||
+      null,
+    suppressEligibleStatus:
+      saved?.suppressEligibleStatus ===
+      true,
     restoredFromDatabase: Boolean(saved)
   };
 }
@@ -124,7 +138,13 @@ async function persistProgressBatch(entries) {
             validMs:
               Math.floor(progress.validMs),
             targetMs:
-              Math.floor(progress.targetMs)
+              Math.floor(progress.targetMs),
+            statusMessageId:
+              progress.statusMessageId ||
+              null,
+            suppressEligibleStatus:
+              progress.suppressEligibleStatus ===
+              true
           },
           $setOnInsert: {
             userId: progress.user.id,
@@ -146,6 +166,10 @@ async function updateStatus(
   status,
   nextRewardAt = null
 ) {
+  if (status !== 'eligible') {
+    progress.suppressEligibleStatus = false;
+  }
+
   const forceUpdate =
     progress.status !== status ||
     (
@@ -154,13 +178,22 @@ async function updateStatus(
         nextRewardAt
     );
 
-  if (!forceUpdate) return;
-
   progress.status = status;
   progress.statusRewardDueAt =
     status === 'eligible'
       ? nextRewardAt
       : null;
+
+  if (
+    status === 'eligible' &&
+    progress.suppressEligibleStatus &&
+    !progress.statusMessage &&
+    !progress.statusMessageId
+  ) {
+    return forceUpdate;
+  }
+
+  if (!forceUpdate) return false;
 
   progress.statusMessage =
     await sendOrUpdateAfkStatus({
@@ -168,7 +201,9 @@ async function updateStatus(
       user: progress.user,
       status,
       nextRewardAt,
-      message: progress.statusMessage
+      message: progress.statusMessage,
+      messageId:
+        progress.statusMessageId
     }).catch(error => {
       console.error(
         'Erreur statut récompense AFK :',
@@ -177,6 +212,27 @@ async function updateStatus(
 
       return progress.statusMessage;
     });
+
+  progress.statusMessageId =
+    progress.statusMessage?.id ||
+    null;
+
+  return true;
+}
+
+async function deleteAfkStatusMessage(
+  progress
+) {
+  await deleteRewardStatusMessage({
+    guild: progress.guild,
+    message:
+      progress.statusMessage,
+    messageId:
+      progress.statusMessageId
+  }).catch(() => false);
+
+  progress.statusMessage = null;
+  progress.statusMessageId = null;
 }
 
 async function rewardMember(
@@ -234,7 +290,9 @@ async function rewardMember(
 async function cleanupInactiveProgress(bot) {
   const saved =
     await AfkRewardProgress.find({})
-      .select('_id userId guildId')
+      .select(
+        '_id userId guildId statusMessageId'
+      )
       .lean();
 
   if (!saved.length) return;
@@ -282,6 +340,33 @@ async function cleanupInactiveProgress(bot) {
     .map(entry => entry._id);
 
   if (staleIds.length) {
+    const staleEntries =
+      saved.filter(entry =>
+        staleIds.some(
+          id =>
+            String(id) ===
+            String(entry._id)
+        )
+      );
+
+    for (const entry of staleEntries) {
+      const guild =
+        bot.guilds.cache.get(
+          entry.guildId
+        );
+
+      if (
+        guild &&
+        entry.statusMessageId
+      ) {
+        await deleteRewardStatusMessage({
+          guild,
+          messageId:
+            entry.statusMessageId
+        }).catch(() => false);
+      }
+    }
+
     await AfkRewardProgress.deleteMany({
       _id: { $in: staleIds }
     });
@@ -292,6 +377,19 @@ async function tick(bot) {
   const now = Date.now();
   const activeKeys = new Set();
   const toPersist = [];
+  const immediatePersist =
+    new Map();
+
+  const persistImmediately =
+    progress => {
+      immediatePersist.set(
+        getKey(
+          progress.guild.id,
+          progress.user.id
+        ),
+        progress
+      );
+    };
 
   for (
     const guild
@@ -360,11 +458,18 @@ async function tick(bot) {
           now + remainingMs;
       }
 
-      await updateStatus(
-        progress,
-        'eligible',
-        progress.rewardDueAt
-      );
+      const statusChanged =
+        await updateStatus(
+          progress,
+          'eligible',
+          progress.rewardDueAt
+        );
+
+      if (statusChanged) {
+        persistImmediately(
+          progress
+        );
+      }
 
       if (
         progress.validMs >=
@@ -403,10 +508,19 @@ async function tick(bot) {
           progress.rewardDueAt =
             result.nextRewardAt;
 
-          await updateStatus(
-            progress,
-            'eligible',
-            progress.rewardDueAt
+          await deleteAfkStatusMessage(
+            progress
+          );
+
+          progress.suppressEligibleStatus =
+            true;
+          progress.status =
+            'eligible';
+          progress.statusRewardDueAt =
+            progress.rewardDueAt;
+
+          persistImmediately(
+            progress
           );
         } catch (error) {
           progress.validMs =
@@ -425,7 +539,26 @@ async function tick(bot) {
     }
   }
 
-  await persistProgressBatch(toPersist);
+  const periodicPersistDue =
+    now - lastProgressPersistAt >=
+    PROGRESS_PERSIST_INTERVAL_MS;
+
+  const persistEntries =
+    periodicPersistDue
+      ? toPersist
+      : [
+          ...immediatePersist.values()
+        ];
+
+  if (persistEntries.length) {
+    await persistProgressBatch(
+      persistEntries
+    );
+  }
+
+  if (periodicPersistDue) {
+    lastProgressPersistAt = now;
+  }
 
   for (
     const [key, progress]
@@ -468,6 +601,7 @@ async function startAfkRewardTracker(bot) {
   }
 
   afkProgress.clear();
+  lastProgressPersistAt = 0;
 
   await cleanupInactiveProgress(bot);
 

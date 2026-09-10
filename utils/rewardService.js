@@ -105,12 +105,58 @@ function buildVoiceStatusEmbed({
     );
 }
 
+async function resolveRewardStatusMessage(
+  channel,
+  message,
+  messageId
+) {
+  if (message?.editable) {
+    return message;
+  }
+
+  if (!messageId) {
+    return null;
+  }
+
+  return channel.messages
+    .fetch(messageId)
+    .catch(() => null);
+}
+
+async function deleteRewardStatusMessage({
+  guild,
+  message = null,
+  messageId = null
+}) {
+  const channel =
+    await getRewardChannel(guild);
+
+  if (!channel) return false;
+
+  const existing =
+    await resolveRewardStatusMessage(
+      channel,
+      message,
+      messageId
+    );
+
+  if (!existing) {
+    return false;
+  }
+
+  return existing
+    .delete()
+    .then(() => true)
+    .catch(() => false);
+}
+
 async function sendOrUpdateVoiceStatus({
   guild,
   user,
   status,
   nextRewardAt = null,
-  message = null
+  message = null,
+  messageId = null
 }) {
   const channel = await getRewardChannel(guild);
   if (!channel) return null;
@@ -121,8 +167,15 @@ async function sendOrUpdateVoiceStatus({
     nextRewardAt
   });
 
-  if (message?.editable) {
-    const edited = await message.edit({
+  const existing =
+    await resolveRewardStatusMessage(
+      channel,
+      message,
+      messageId
+    );
+
+  if (existing?.editable) {
+    const edited = await existing.edit({
       content: null,
       embeds: [embed]
     }).catch(() => null);
@@ -169,7 +222,8 @@ async function sendOrUpdateAfkStatus({
   user,
   status,
   nextRewardAt = null,
-  message = null
+  message = null,
+  messageId = null
 }) {
   const channel = await getRewardChannel(guild);
   if (!channel) return null;
@@ -180,8 +234,15 @@ async function sendOrUpdateAfkStatus({
     nextRewardAt
   });
 
-  if (message?.editable) {
-    const edited = await message.edit({
+  const existing =
+    await resolveRewardStatusMessage(
+      channel,
+      message,
+      messageId
+    );
+
+  if (existing?.editable) {
+    const edited = await existing.edit({
       content: `${user}`,
       embeds: [embed]
     }).catch(() => null);
@@ -394,6 +455,7 @@ module.exports = {
   sendMessageRewardNotification,
   sendVoiceRewardNotification,
   sendOrUpdateVoiceStatus,
+  deleteRewardStatusMessage,
   sendAfkRewardNotification,
   sendOrUpdateAfkStatus
 };

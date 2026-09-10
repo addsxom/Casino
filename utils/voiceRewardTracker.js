@@ -13,7 +13,8 @@ const {
   VOICE_MUTE_GRACE_REWARDS,
   formatDuration,
   sendVoiceRewardNotification,
-  sendOrUpdateVoiceStatus
+  sendOrUpdateVoiceStatus,
+  deleteRewardStatusMessage
 } = require('./rewardService.js');
 const {
   creditBalance
@@ -27,6 +28,11 @@ const { replyEmbedPayload } = require('./replyEmbed.js');
 const voiceProgress = new Map();
 let trackerInterval = null;
 let trackerTickRunning = false;
+let lastProgressPersistAt = 0;
+
+const PROGRESS_PERSIST_INTERVAL_MS =
+  config.system.progressPersistIntervalMs ||
+  15 * 1000;
 
 function getKey(guildId, userId) {
   return `${guildId}:${userId}`;
@@ -120,6 +126,7 @@ function resetRewardProgress(progress) {
   progress.validMs = 0;
   progress.targetMs = getRandomVoiceInterval();
   progress.rewardDueAt = null;
+  progress.suppressEligibleStatus = false;
 }
 
 function getMuteEligibility(
@@ -304,6 +311,10 @@ async function updateStatus(
   status,
   nextRewardAt = null
 ) {
+  if (status !== 'eligible') {
+    progress.suppressEligibleStatus = false;
+  }
+
   const forceUpdate =
     progress.status !== status ||
     (
@@ -311,13 +322,22 @@ async function updateStatus(
       progress.statusRewardDueAt !== nextRewardAt
     );
 
-  if (!forceUpdate) return;
-
   progress.status = status;
   progress.statusRewardDueAt =
     status === 'eligible'
       ? nextRewardAt
       : null;
+
+  if (
+    status === 'eligible' &&
+    progress.suppressEligibleStatus &&
+    !progress.statusMessage &&
+    !progress.statusMessageId
+  ) {
+    return forceUpdate;
+  }
+
+  if (!forceUpdate) return false;
 
   progress.statusMessage =
     await sendOrUpdateVoiceStatus({
@@ -325,7 +345,9 @@ async function updateStatus(
       user: progress.user,
       status,
       nextRewardAt,
-      message: progress.statusMessage
+      message: progress.statusMessage,
+      messageId:
+        progress.statusMessageId
     }).catch(error => {
       console.error(
         'Erreur statut récompense vocale :',
@@ -333,30 +355,27 @@ async function updateStatus(
       );
       return progress.statusMessage;
     });
+
+  progress.statusMessageId =
+    progress.statusMessage?.id ||
+    null;
+
+  return true;
 }
 
 async function deleteVoiceStatusMessage(
   progress
 ) {
-  const statusMessage =
-    progress.statusMessage;
+  await deleteRewardStatusMessage({
+    guild: progress.guild,
+    message:
+      progress.statusMessage,
+    messageId:
+      progress.statusMessageId
+  }).catch(() => false);
 
   progress.statusMessage = null;
-
-  if (!statusMessage) {
-    return;
-  }
-
-  await statusMessage
-    .delete()
-    .catch(error => {
-      console.error(
-        'Erreur suppression statut récompense vocale :',
-        error?.code ||
-          error?.message ||
-          error
-      );
-    });
+  progress.statusMessageId = null;
 }
 
 async function loadProgress(
@@ -420,6 +439,12 @@ async function loadProgress(
     status: null,
     statusRewardDueAt: null,
     statusMessage: null,
+    statusMessageId:
+      saved?.statusMessageId ||
+      null,
+    suppressEligibleStatus:
+      saved?.suppressEligibleStatus ===
+      true,
     restoredFromDatabase: Boolean(saved)
   };
 }
@@ -442,7 +467,13 @@ async function persistProgressBatch(entries) {
               progress.mutedRewards
             ),
           previousSelfMute:
-            progress.previousSelfMute === true
+            progress.previousSelfMute === true,
+          statusMessageId:
+            progress.statusMessageId ||
+            null,
+          suppressEligibleStatus:
+            progress.suppressEligibleStatus ===
+            true
         },
         $setOnInsert: {
           userId: progress.user.id,
@@ -459,10 +490,11 @@ async function persistProgressBatch(entries) {
   );
 }
 
-async function cleanupDisconnectedProgress(bot) {
+async function normalizeDisconnectedProgress(
+  bot
+) {
   const saved =
     await VoiceRewardProgress.find({})
-      .select('_id userId guildId')
       .lean();
 
   if (!saved.length) return;
@@ -493,18 +525,48 @@ async function cleanupDisconnectedProgress(bot) {
     }
   }
 
-  const staleIds = saved
-    .filter(entry =>
-      !connectedKeys.has(
-        getKey(entry.guildId, entry.userId)
+  for (const entry of saved) {
+    if (
+      connectedKeys.has(
+        getKey(
+          entry.guildId,
+          entry.userId
+        )
       )
-    )
-    .map(entry => entry._id);
+    ) {
+      continue;
+    }
 
-  if (staleIds.length) {
-    await VoiceRewardProgress.deleteMany({
-      _id: { $in: staleIds }
-    });
+    const guild =
+      bot.guilds.cache.get(
+        entry.guildId
+      );
+
+    if (
+      guild &&
+      entry.statusMessageId
+    ) {
+      await deleteRewardStatusMessage({
+        guild,
+        messageId:
+          entry.statusMessageId
+      }).catch(() => false);
+    }
+
+    await VoiceRewardProgress
+      .updateOne(
+        { _id: entry._id },
+        {
+          $set: {
+            validMs: 0,
+            targetMs:
+              getRandomVoiceInterval(),
+            statusMessageId: null,
+            suppressEligibleStatus:
+              false
+          }
+        }
+      );
   }
 }
 
@@ -512,6 +574,19 @@ async function tick(bot) {
   const now = Date.now();
   const connectedKeys = new Set();
   const toPersist = [];
+  const immediatePersist =
+    new Map();
+
+  const persistImmediately =
+    progress => {
+      immediatePersist.set(
+        getKey(
+          progress.guild.id,
+          progress.user.id
+        ),
+        progress
+      );
+    };
 
   for (const guild of bot.guilds.cache.values()) {
     for (const voiceState of guild.voiceStates.cache.values()) {
@@ -564,6 +639,9 @@ async function tick(bot) {
         resetRewardProgress(progress);
         resetMuteGrace(progress);
         elapsed = 0;
+        persistImmediately(
+          progress
+        );
       }
 
       progress.previousSelfMute = selfMuted;
@@ -611,11 +689,18 @@ async function tick(bot) {
         progress.rewardDueAt = null;
       }
 
-      await updateStatus(
-        progress,
-        status,
-        progress.rewardDueAt
-      );
+      const statusChanged =
+        await updateStatus(
+          progress,
+          status,
+          progress.rewardDueAt
+        );
+
+      if (statusChanged) {
+        persistImmediately(
+          progress
+        );
+      }
 
       if (
         eligible &&
@@ -656,6 +741,9 @@ async function tick(bot) {
           await deleteVoiceStatusMessage(
             progress
           );
+
+          progress.suppressEligibleStatus =
+            true;
 
           if (selfMuted) {
             progress.mutedRewards =
@@ -702,6 +790,10 @@ async function tick(bot) {
             progress.statusRewardDueAt =
               progress.rewardDueAt;
           }
+
+          persistImmediately(
+            progress
+          );
         } catch (error) {
           progress.validMs = previousValidMs;
 
@@ -718,7 +810,26 @@ async function tick(bot) {
     }
   }
 
-  await persistProgressBatch(toPersist);
+  const periodicPersistDue =
+    now - lastProgressPersistAt >=
+    PROGRESS_PERSIST_INTERVAL_MS;
+
+  const persistEntries =
+    periodicPersistDue
+      ? toPersist
+      : [
+          ...immediatePersist.values()
+        ];
+
+  if (persistEntries.length) {
+    await persistProgressBatch(
+      persistEntries
+    );
+  }
+
+  if (periodicPersistDue) {
+    lastProgressPersistAt = now;
+  }
 
   for (
     const [key, progress]
@@ -734,10 +845,19 @@ async function tick(bot) {
       null
     );
 
-    await VoiceRewardProgress.deleteOne({
-      userId: progress.user.id,
-      guildId: progress.guild.id
-    });
+    resetRewardProgress(
+      progress
+    );
+
+    progress.statusMessage = null;
+    progress.statusMessageId = null;
+    progress.status = null;
+    progress.statusRewardDueAt = null;
+    progress.lastCheckedAt = now;
+
+    await persistProgressBatch([
+      progress
+    ]);
 
     voiceProgress.delete(key);
   }
@@ -761,8 +881,9 @@ async function startVoiceRewardTracker(bot) {
   }
 
   voiceProgress.clear();
+  lastProgressPersistAt = 0;
 
-  await cleanupDisconnectedProgress(bot);
+  await normalizeDisconnectedProgress(bot);
 
   trackerInterval = setInterval(() => {
     runTick(bot).catch(error => {
