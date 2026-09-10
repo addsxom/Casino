@@ -159,14 +159,8 @@ function getLiveChannelLabel(item) {
     );
   }
 
-  const name =
-    String(
-      item.channel.name ||
-      'salon'
-    );
-
   return (
-    `**${name}** • ${item.channel} • \`${item.id}\``
+    `${item.channel} • \`${item.id}\``
   );
 }
 
