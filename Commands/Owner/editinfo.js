@@ -324,7 +324,27 @@ function buildRuntimeActivity(
   );
 }
 
-function buildMainButtons() {
+function buildMainButtons(botInfo) {
+  const status =
+    botInfo.status ||
+    'online';
+
+  const activity =
+    getActivityTypeName(
+      botInfo.activityType
+    );
+
+  const statusEmoji =
+    STATUS_META[status]
+      ?.emoji ||
+    STATUS_META.online.emoji;
+
+  const activityEmoji =
+    ACTIVITY_META[activity]
+      ?.emoji ||
+    ACTIVITY_META.LISTENING
+      .emoji;
+
   const row1 =
     new ActionRowBuilder()
       .addComponents(
@@ -342,7 +362,9 @@ function buildMainButtons() {
             'editbot_activity'
           )
           .setLabel('Activité')
-          .setEmoji('🎮')
+          .setEmoji(
+            activityEmoji
+          )
           .setStyle(
             ButtonStyle.Secondary
           ),
@@ -351,7 +373,9 @@ function buildMainButtons() {
             'editbot_status'
           )
           .setLabel('Statut')
-          .setEmoji('🟢')
+          .setEmoji(
+            statusEmoji
+          )
           .setStyle(
             ButtonStyle.Secondary
           ),
@@ -467,14 +491,35 @@ function buildMainContainer(
             '🤖 **Nom** · ' +
             bot.user.username +
             '\n' +
-            getStatusDisplay(
-              status
+            (
+              STATUS_META[status]
+                ?.emoji ||
+              STATUS_META.online
+                .emoji
             ) +
-            ' **Statut**\n' +
-            getActivityDisplay(
-              activityType
+            ' **Statut** · ' +
+            (
+              STATUS_META[status]
+                ?.label ||
+              STATUS_META.online
+                .label
             ) +
-            ' **Activité**' +
+            '\n' +
+            (
+              ACTIVITY_META[
+                activityType
+              ]?.emoji ||
+              ACTIVITY_META
+                .LISTENING.emoji
+            ) +
+            ' **Activité** · ' +
+            (
+              ACTIVITY_META[
+                activityType
+              ]?.label ||
+              ACTIVITY_META
+                .LISTENING.label
+            ) +
             twitchLine
           )
       )
@@ -497,7 +542,9 @@ function buildMainContainer(
 
   for (
     const row of
-    buildMainButtons()
+    buildMainButtons(
+      botInfo
+    )
   ) {
     container
       .addActionRowComponents(
