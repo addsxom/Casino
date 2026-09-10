@@ -23,11 +23,63 @@ const {
 const {
   updateMemberCount
 } = require('../../utils/updateMemberCount.js');
-const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
+const {
+  replyEmbedPayload
+} = require('../../utils/replyEmbed.js');
+
+const CONFIG_CATEGORY_META = [
+  {
+    key: 'general',
+    name: 'Général',
+    emoji: '⚙️',
+    entries: [
+      'botvoice',
+      'welcome',
+      'membercount',
+      'misccmd',
+      'botguildevents'
+    ]
+  },
+  {
+    key: 'rewards',
+    name: 'Récompenses',
+    emoji: '🎁',
+    entries: [
+      'rewards',
+      'voicefarm',
+      'afkfarm'
+    ]
+  },
+  {
+    key: 'games',
+    name: 'Jeux',
+    emoji: '🎰',
+    entries: [
+      'slots',
+      'mines',
+      'crash'
+    ]
+  },
+  {
+    key: 'logs',
+    name: 'Logs',
+    emoji: '📜',
+    entries: [
+      'warn',
+      'economylogs',
+      'banklogs',
+      'transactionlogs',
+      'messagelogs',
+      'serverlogs',
+      'voicelogs',
+      'moderationlogs',
+      'ticketlogs'
+    ]
+  }
+];
 
 function extractChannelIds(args) {
-  const raw =
-    args.join(' ');
+  const raw = args.join(' ');
 
   return [
     ...new Set(
@@ -72,9 +124,7 @@ async function resolveChannelById(
   }
 
   const channel =
-    message.client.channels.cache.get(
-      id
-    ) ||
+    message.client.channels.cache.get(id) ||
     await message.client.channels
       .fetch(id)
       .catch(() => null);
@@ -89,8 +139,7 @@ async function resolveChannelById(
 
   if (
     entry.scope !== 'global' &&
-    channel.guild?.id !==
-      message.guild.id
+    channel.guild?.id !== message.guild.id
   ) {
     return {
       id,
@@ -115,16 +164,15 @@ async function getEntryStatus(
   entry
 ) {
   if (entry.multiple) {
-    const items =
-      await Promise.all(
-        (entry.ids || []).map(id =>
-          resolveChannelById(
-            message,
-            entry,
-            id
-          )
+    const items = await Promise.all(
+      (entry.ids || []).map(id =>
+        resolveChannelById(
+          message,
+          entry,
+          id
         )
-      );
+      )
+    );
 
     return {
       connected:
@@ -214,23 +262,162 @@ function formatChannelLine(
   );
 }
 
+function buildConfigPages(
+  message,
+  entries,
+  statuses
+) {
+  const statusByKey =
+    new Map(
+      entries.map((entry, index) => [
+        entry.key,
+        statuses[index]
+      ])
+    );
 
-function buildMainConfigButtons() {
-  return [
-    new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('configlist_details')
-          .setLabel('Détails')
-          .setEmoji('📖')
-          .setStyle(ButtonStyle.Primary),
-        new ButtonBuilder()
-          .setCustomId('configlist_close')
-          .setLabel('Fermer')
-          .setEmoji('✖️')
-          .setStyle(ButtonStyle.Danger)
+  const entryByKey =
+    new Map(
+      entries.map(entry => [
+        entry.key,
+        entry
+      ])
+    );
+
+  const assignedKeys = new Set();
+  const categories = [];
+
+  for (const meta of CONFIG_CATEGORY_META) {
+    const categoryEntries =
+      meta.entries
+        .map(key => {
+          const entry = entryByKey.get(key);
+          if (entry) assignedKeys.add(key);
+          return entry;
+        })
+        .filter(Boolean);
+
+    if (categoryEntries.length) {
+      categories.push({
+        ...meta,
+        entries: categoryEntries
+      });
+    }
+  }
+
+  const otherEntries =
+    entries.filter(entry =>
+      !assignedKeys.has(entry.key)
+    );
+
+  if (otherEntries.length) {
+    categories.push({
+      key: 'other',
+      name: 'Autres',
+      emoji: '📁',
+      entries: otherEntries
+    });
+  }
+
+  return categories.map(category => {
+    const connectedCount =
+      category.entries.filter(entry =>
+        statusByKey.get(entry.key)
+          ?.connected
+      ).length;
+
+    const lines =
+      category.entries.map(entry =>
+        formatChannelLine(
+          entry,
+          statusByKey.get(entry.key)
+        )
+      );
+
+    return new EmbedBuilder()
+      .setColor(
+        connectedCount ===
+          category.entries.length
+          ? 0x57f287
+          : 0x6b6de6
       )
-  ];
+      .setTitle(
+        `${category.emoji} ${category.name}`
+      )
+      .setDescription(
+        `✅ **${connectedCount}/${category.entries.length} connectés**\n` +
+        `❌ **${category.entries.length - connectedCount} à configurer**\n\n` +
+        lines.join('\n\n')
+      )
+      .setFooter({
+        text:
+          `${category.entries.length} configuration${category.entries.length > 1 ? 's' : ''} • +configlist <clé> <ID>`,
+        iconURL:
+          message.client.user
+            .displayAvatarURL({
+              dynamic: true
+            })
+      });
+  });
+}
+
+function buildNavigationRow(
+  page,
+  totalPages
+) {
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'configlist_previous'
+        )
+        .setEmoji('◀️')
+        .setStyle(
+          ButtonStyle.Secondary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'configlist_page'
+        )
+        .setLabel(
+          `${page + 1} / ${totalPages}`
+        )
+        .setStyle(
+          ButtonStyle.Secondary
+        )
+        .setDisabled(true),
+      new ButtonBuilder()
+        .setCustomId(
+          'configlist_next'
+        )
+        .setEmoji('▶️')
+        .setStyle(
+          ButtonStyle.Secondary
+        )
+    );
+}
+
+function buildActionRow() {
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'configlist_details'
+        )
+        .setLabel('Détails')
+        .setEmoji('📖')
+        .setStyle(
+          ButtonStyle.Primary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'configlist_close'
+        )
+        .setLabel('Fermer')
+        .setEmoji('✖️')
+        .setStyle(
+          ButtonStyle.Danger
+        )
+    );
 }
 
 function buildDetailsButtons() {
@@ -238,15 +425,23 @@ function buildDetailsButtons() {
     new ActionRowBuilder()
       .addComponents(
         new ButtonBuilder()
-          .setCustomId('configlist_back')
+          .setCustomId(
+            'configlist_back'
+          )
           .setLabel('Retour')
           .setEmoji('⬅️')
-          .setStyle(ButtonStyle.Secondary),
+          .setStyle(
+            ButtonStyle.Secondary
+          ),
         new ButtonBuilder()
-          .setCustomId('configlist_close')
+          .setCustomId(
+            'configlist_close'
+          )
           .setLabel('Fermer')
           .setEmoji('✖️')
-          .setStyle(ButtonStyle.Danger)
+          .setStyle(
+            ButtonStyle.Danger
+          )
       )
   ];
 }
@@ -254,7 +449,9 @@ function buildDetailsButtons() {
 function buildConfigDetailsEmbed() {
   return new EmbedBuilder()
     .setColor(0x6b6de6)
-    .setTitle('📖 Détails de la configuration')
+    .setTitle(
+      '📖 Détails de la configuration'
+    )
     .setDescription(
       '**Modifier un salon simple**\n' +
       '`+configlist rewards <ID>` — salon des récompenses\n' +
@@ -264,12 +461,10 @@ function buildConfigDetailsEmbed() {
       '`+configlist crash <ID>` — salon Crash\n' +
       '`+configlist misccmd <ID>` — commandes diverses\n' +
       '`+configlist ticketlogs <ID>` — transcripts des tickets\n\n' +
-
       '**Voir une configuration précise**\n' +
       '`+configlist rewards`\n' +
       '`+configlist afkfarm`\n' +
       '`+configlist voicefarm`\n\n' +
-
       '**Vocaux Farm multiples**\n' +
       '`+configlist voicefarm add <ID> [ID...]`\n' +
       'Ajoute un ou plusieurs vocaux sans supprimer les anciens.\n\n' +
@@ -281,7 +476,6 @@ function buildConfigDetailsEmbed() {
       'Vide complètement la liste.\n\n' +
       '`+configlist voicefarm <ID> <ID> ...`\n' +
       'Raccourci pour remplacer directement toute la liste.\n\n' +
-
       '**Fonctionnement**\n' +
       '• L’**ID** est toujours la référence principale.\n' +
       '• Le **nom actuel** du salon est relu directement depuis Discord.\n' +
@@ -292,7 +486,7 @@ function buildConfigDetailsEmbed() {
     )
     .setFooter({
       text:
-        'Retour = configuration principale • Fermer = supprime les deux messages'
+        'Retour = catégorie précédente • Fermer = supprime les deux messages'
     })
     .setTimestamp();
 }
@@ -300,12 +494,16 @@ function buildConfigDetailsEmbed() {
 function attachConfiglistButtons(
   message,
   sentMessage,
-  mainEmbed
+  pages
 ) {
+  let currentPage = 0;
+  let showingDetails = false;
+
   const collector =
-    sentMessage.createMessageComponentCollector({
-      time: 10 * 60 * 1000
-    });
+    sentMessage
+      .createMessageComponentCollector({
+        time: 10 * 60 * 1000
+      });
 
   collector.on(
     'collect',
@@ -349,6 +547,8 @@ function attachConfiglistButtons(
         interaction.customId ===
         'configlist_details'
       ) {
+        showingDetails = true;
+
         return interaction.update({
           embeds: [
             buildConfigDetailsEmbed()
@@ -362,12 +562,63 @@ function attachConfiglistButtons(
         interaction.customId ===
         'configlist_back'
       ) {
+        showingDetails = false;
+
         return interaction.update({
-          embeds: [mainEmbed],
-          components:
-            buildMainConfigButtons()
+          embeds: [
+            pages[currentPage]
+          ],
+          components: [
+            buildNavigationRow(
+              currentPage,
+              pages.length
+            ),
+            buildActionRow()
+          ]
         }).catch(() => {});
       }
+
+      if (showingDetails) {
+        return interaction
+          .deferUpdate()
+          .catch(() => {});
+      }
+
+      if (
+        interaction.customId ===
+        'configlist_previous'
+      ) {
+        currentPage =
+          currentPage === 0
+            ? pages.length - 1
+            : currentPage - 1;
+      } else if (
+        interaction.customId ===
+        'configlist_next'
+      ) {
+        currentPage =
+          currentPage ===
+            pages.length - 1
+            ? 0
+            : currentPage + 1;
+      } else {
+        return interaction
+          .deferUpdate()
+          .catch(() => {});
+      }
+
+      return interaction.update({
+        embeds: [
+          pages[currentPage]
+        ],
+        components: [
+          buildNavigationRow(
+            currentPage,
+            pages.length
+          ),
+          buildActionRow()
+        ]
+      }).catch(() => {});
     }
   );
 
@@ -381,25 +632,8 @@ function attachConfiglistButtons(
         return;
       }
 
-      const disabledRow =
-        new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId(
-                'configlist_expired'
-              )
-              .setLabel(
-                'Interface expirée'
-              )
-              .setEmoji('⌛')
-              .setStyle(
-                ButtonStyle.Secondary
-              )
-              .setDisabled(true)
-          );
-
       await sentMessage.edit({
-        components: [disabledRow]
+        components: []
       }).catch(() => {});
     }
   );
@@ -452,7 +686,7 @@ async function applyImmediateSideEffect(
 
 function buildMultiHelp(key) {
   return (
-    `**Commandes :**\n` +
+    '**Commandes :**\n' +
     `\`+configlist ${key} add <ID> [ID...]\`\n` +
     `\`+configlist ${key} remove <ID> [ID...]\`\n` +
     `\`+configlist ${key} set <ID> [ID...]\`\n` +
@@ -466,8 +700,7 @@ async function replyMultiStatus(
   entry,
   status
 ) {
-  const items =
-    status.items || [];
+  const items = status.items || [];
 
   const lines =
     items.length
@@ -475,7 +708,9 @@ async function replyMultiStatus(
           (item, index) =>
             `${item.connected ? '✅' : '❌'} **${index + 1}.** ${getLiveChannelLabel(item)}`
         )
-      : ['❌ Aucun vocal configuré.'];
+      : [
+          '❌ Aucun vocal configuré.'
+        ];
 
   const embed =
     new EmbedBuilder()
@@ -490,9 +725,7 @@ async function replyMultiStatus(
       .setDescription(
         lines.join('\n') +
         '\n\n' +
-        buildMultiHelp(
-          entry.key
-        )
+        buildMultiHelp(entry.key)
       )
       .setFooter({
         text:
@@ -510,21 +743,19 @@ async function validateChannels(
   entry,
   ids
 ) {
-  const results =
-    await Promise.all(
-      ids.map(id =>
-        resolveChannelById(
-          message,
-          entry,
-          id
-        )
+  const results = await Promise.all(
+    ids.map(id =>
+      resolveChannelById(
+        message,
+        entry,
+        id
       )
-    );
+    )
+  );
 
   const invalid =
-    results.filter(
-      result =>
-        !result.connected
+    results.filter(result =>
+      !result.connected
     );
 
   return {
@@ -571,54 +802,38 @@ module.exports = {
           )
         );
 
-      const connectedCount =
-        statuses.filter(
-          status =>
-            status.connected
-        ).length;
-
-      const lines =
-        entries.map(
-          (entry, index) =>
-            formatChannelLine(
-              entry,
-              statuses[index]
-            )
+      const pages =
+        buildConfigPages(
+          message,
+          entries,
+          statuses
         );
 
-      const embed =
-        new EmbedBuilder()
-          .setColor(
-            connectedCount ===
-              entries.length
-              ? 0x57f287
-              : 0x6b6de6
+      if (!pages.length) {
+        return message.reply(
+          replyEmbedPayload(
+            'Aucune configuration de salon disponible.',
+            { type: 'warning' }
           )
-          .setTitle(
-            '⚙️ Configuration des salons'
-          )
-          .setDescription(
-            `✅ **${connectedCount}/${entries.length} connectés**\n` +
-            `❌ **${entries.length - connectedCount} à configurer**\n\n` +
-            lines.join('\n\n')
-          )
-          .setFooter({
-            text:
-              '+configlist <clé> <ID> • IDs prioritaires • noms Discord affichés en direct'
-          })
-          .setTimestamp();
+        );
+      }
 
       const sentMessage =
         await message.reply({
-          embeds: [embed],
-          components:
-            buildMainConfigButtons()
+          embeds: [pages[0]],
+          components: [
+            buildNavigationRow(
+              0,
+              pages.length
+            ),
+            buildActionRow()
+          ]
         });
 
       attachConfiglistButtons(
         message,
         sentMessage,
-        embed
+        pages
       );
 
       return sentMessage;
@@ -644,9 +859,8 @@ module.exports = {
       );
 
     const current =
-      entries.find(
-        entry =>
-          entry.key === key
+      entries.find(entry =>
+        entry.key === key
       );
 
     if (!current) {
@@ -697,13 +911,9 @@ module.exports = {
           : args.slice(1);
 
       const ids =
-        extractChannelIds(
-          idArgs
-        );
+        extractChannelIds(idArgs);
 
-      if (
-        action === 'clear'
-      ) {
+      if (action === 'clear') {
         const result =
           await setChannelConfigList(
             guildId,
@@ -725,7 +935,8 @@ module.exports = {
             `**${current.label}** vidé.\nTant que **voicefarm** est vide, le système vocal normal garde son comportement actuel.`,
             {
               type: 'success',
-              title: '⚙️ Configuration vidée'
+              title:
+                '⚙️ Configuration vidée'
             }
           )
         );
@@ -782,9 +993,8 @@ module.exports = {
 
         nextIds =
           (current.ids || [])
-            .filter(
-              id =>
-                !removeSet.has(id)
+            .filter(id =>
+              !removeSet.has(id)
             );
       } else {
         nextIds = ids;
@@ -809,9 +1019,8 @@ module.exports = {
       const updated =
         getChannelConfigList(
           guildId
-        ).find(
-          entry =>
-            entry.key === key
+        ).find(entry =>
+          entry.key === key
         );
 
       const status =
@@ -836,13 +1045,15 @@ module.exports = {
           .setDescription(
             `**${current.label}** • ${actionLabel}\n` +
             `**${result.ids.length} vocal${result.ids.length > 1 ? 'aux' : ''} configuré${result.ids.length > 1 ? 's' : ''}**\n\n` +
-            (status.items.length
-              ? status.items
-                  .map(item =>
-                    `${item.connected ? '✅' : '❌'} ${getLiveChannelLabel(item)}`
-                  )
-                  .join('\n')
-              : 'Aucun vocal configuré.') +
+            (
+              status.items.length
+                ? status.items
+                    .map(item =>
+                      `${item.connected ? '✅' : '❌'} ${getLiveChannelLabel(item)}`
+                    )
+                    .join('\n')
+                : 'Aucun vocal configuré.'
+            ) +
             '\n\n-# Sauvegardé uniquement pour ce serveur.'
           )
           .setTimestamp();
@@ -873,10 +1084,12 @@ module.exports = {
           `${current.label}\n\n` +
           `Utilise : \`+configlist ${key} <ID>\``,
           {
-            type: status.connected
-              ? 'success'
-              : 'warning',
-            title: '⚙️ Configuration'
+            type:
+              status.connected
+                ? 'success'
+                : 'warning',
+            title:
+              '⚙️ Configuration'
           }
         )
       );
@@ -914,9 +1127,7 @@ module.exports = {
           channel
         )
       ) {
-        if (
-          current.type === 'voice'
-        ) {
+        if (current.type === 'voice') {
           return message.reply(
             replyEmbedPayload(
               'Cette configuration attend un salon vocal.',
@@ -925,9 +1136,7 @@ module.exports = {
           );
         }
 
-        if (
-          current.type === 'text'
-        ) {
+        if (current.type === 'text') {
           return message.reply(
             replyEmbedPayload(
               'Cette configuration attend un salon textuel.',
