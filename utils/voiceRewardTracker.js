@@ -10,7 +10,7 @@ const {
   VOICE_REWARD_MAX_MS,
   VOICE_REWARD_COINS,
   VOICE_ACTIVITY_BONUS_PERCENT,
-  VOICE_MUTE_GRACE_MS,
+  VOICE_MUTE_GRACE_REWARDS,
   formatDuration,
   sendVoiceRewardNotification,
   sendOrUpdateVoiceStatus
@@ -112,7 +112,7 @@ function isVoiceFarmChannel(
 
 
 function resetMuteGrace(progress) {
-  progress.mutedMs = 0;
+  progress.mutedRewards = 0;
   progress.muteWarningSent = false;
 }
 
@@ -147,18 +147,26 @@ function getMuteEligibility(
     };
   }
 
-  if (progress.mutedMs >= VOICE_MUTE_GRACE_MS) {
+  if (
+    progress.mutedRewards >=
+    VOICE_MUTE_GRACE_REWARDS
+  ) {
     return {
       eligible: false,
-      reason: 'mute_timeout',
-      mutedForMs: progress.mutedMs
+      reason: 'mute_reward_limit',
+      mutedRewards:
+        progress.mutedRewards
     };
   }
 
   return {
     eligible: true,
     reason: 'mute_grace',
-    mutedForMs: progress.mutedMs
+    mutedRewards:
+      progress.mutedRewards,
+    rewardsRemaining:
+      VOICE_MUTE_GRACE_REWARDS -
+      progress.mutedRewards
   };
 }
 
@@ -177,13 +185,13 @@ function getEligibilityStatus({
   return 'eligible';
 }
 
-async function sendMuteTimeoutWarning(member) {
+async function sendMuteRewardLimitWarning(member) {
   await member.send(
     replyEmbedPayload(
-      `Ton micro est coupé depuis **${formatDuration(VOICE_MUTE_GRACE_MS)}**. ` +
-      'Pour éviter le farm AFK, ton temps ne compte plus pour les récompenses vocales.\n\n' +
+      `Tu as reçu **${VOICE_MUTE_GRACE_REWARDS} récompenses vocales** avec le micro coupé. ` +
+      'Tu n’es désormais plus éligible tant que ton micro reste coupé.\n\n' +
       '**Pour redevenir éligible :** réactive simplement ton micro. ' +
-      'Ton compteur de récompense repartira alors de **0** avec un nouveau délai aléatoire.',
+      `La limite repartira alors à **0/${VOICE_MUTE_GRACE_REWARDS}** et ton compteur de récompense repartira avec un nouveau délai aléatoire.`,
       {
         type: 'warning',
         title: '🎙️ Récompenses vocales en pause'
@@ -348,10 +356,18 @@ async function loadProgress(
     targetMs
   );
 
-  let mutedMs = normalizeProgressMs(
-    saved?.mutedMs,
-    VOICE_MUTE_GRACE_MS
-  );
+  let mutedRewards =
+    Math.min(
+      VOICE_MUTE_GRACE_REWARDS,
+      Math.max(
+        0,
+        Math.floor(
+          Number(
+            saved?.mutedRewards
+          ) || 0
+        )
+      )
+    );
 
   const currentSelfMute =
     voiceState.selfMute === true;
@@ -362,7 +378,7 @@ async function loadProgress(
   ) {
     validMs = 0;
     targetMs = getRandomVoiceInterval();
-    mutedMs = 0;
+    mutedRewards = 0;
   }
 
   return {
@@ -370,7 +386,7 @@ async function loadProgress(
     user: member.user,
     validMs,
     targetMs,
-    mutedMs,
+    mutedRewards,
     rewardDueAt: null,
     lastCheckedAt: now,
     processing: false,
@@ -397,7 +413,10 @@ async function persistProgressBatch(entries) {
         $set: {
           validMs: Math.floor(progress.validMs),
           targetMs: Math.floor(progress.targetMs),
-          mutedMs: Math.floor(progress.mutedMs),
+          mutedRewards:
+            Math.floor(
+              progress.mutedRewards
+            ),
           previousSelfMute:
             progress.previousSelfMute === true
         },
@@ -525,13 +544,6 @@ async function tick(bot) {
 
       progress.previousSelfMute = selfMuted;
 
-      if (selfMuted && elapsed > 0) {
-        progress.mutedMs = Math.min(
-          VOICE_MUTE_GRACE_MS,
-          progress.mutedMs + elapsed
-        );
-      }
-
       const muteEligibility =
         getMuteEligibility(
           voiceState,
@@ -539,11 +551,11 @@ async function tick(bot) {
         );
 
       if (
-        muteEligibility.reason === 'mute_timeout' &&
+        muteEligibility.reason === 'mute_reward_limit' &&
         !progress.muteWarningSent
       ) {
         progress.muteWarningSent = true;
-        await sendMuteTimeoutWarning(member);
+        await sendMuteRewardLimitWarning(member);
       }
 
       const enoughHumans =
@@ -617,11 +629,52 @@ async function tick(bot) {
           progress.rewardDueAt =
             rewardResult.nextRewardAt;
 
-          await updateStatus(
-            progress,
-            'eligible',
-            progress.rewardDueAt
-          );
+          if (selfMuted) {
+            progress.mutedRewards =
+              Math.min(
+                VOICE_MUTE_GRACE_REWARDS,
+                progress.mutedRewards + 1
+              );
+          }
+
+          const postRewardMuteEligibility =
+            getMuteEligibility(
+              voiceState,
+              progress
+            );
+
+          if (
+            !postRewardMuteEligibility
+              .eligible
+          ) {
+            progress.rewardDueAt = null;
+
+            if (
+              postRewardMuteEligibility
+                .reason ===
+                'mute_reward_limit' &&
+              !progress.muteWarningSent
+            ) {
+              progress.muteWarningSent = true;
+
+              await sendMuteRewardLimitWarning(
+                member
+              );
+            }
+
+            await updateStatus(
+              progress,
+              postRewardMuteEligibility
+                .reason,
+              null
+            );
+          } else {
+            await updateStatus(
+              progress,
+              'eligible',
+              progress.rewardDueAt
+            );
+          }
         } catch (error) {
           progress.validMs = previousValidMs;
 
@@ -696,7 +749,7 @@ async function startVoiceRewardTracker(bot) {
   await runTick(bot);
 
   console.log(
-    `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${formatDuration(VOICE_MUTE_GRACE_MS)} • progression MongoDB`
+    `Rewards • vocal actif : ${formatDuration(VOICE_REWARD_MIN_MS)}-${formatDuration(VOICE_REWARD_MAX_MS)} • mute max ${VOICE_MUTE_GRACE_REWARDS} récompenses • progression MongoDB`
   );
 }
 
