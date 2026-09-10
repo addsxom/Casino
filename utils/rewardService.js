@@ -350,7 +350,7 @@ async function sendVoiceRewardNotification({
     (Number(bonusCoins) || 0);
 
   let rewardDetails =
-    `🪙 **+${formatAmount(totalCoins)} coins** dans ta poche.`;
+    `🏦 **+${formatAmount(totalCoins)} coins** dans ta banque.`;
 
   if (bonusCoins > 0) {
     rewardDetails +=
@@ -365,7 +365,7 @@ async function sendVoiceRewardNotification({
     .setDescription(
       `${user}, tu as passé **${formatDuration(earnedIntervalMs)} valides** en vocal.\n\n` +
       rewardDetails +
-      `\n-# Poche : ${formatAmount(account.coins)} coins\n\n` +
+      `\n-# Banque : ${formatAmount(account.bank)} coins\n\n` +
       `🎲 **Prochaine récompense :** ${formatDiscordTimestamp(nextRewardAt)}`
     )
     .setTimestamp();
