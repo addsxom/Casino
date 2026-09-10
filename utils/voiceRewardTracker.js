@@ -250,7 +250,7 @@ async function rewardMember(
   const account = await creditBalance({
     userId: member.id,
     guildId: member.guild.id,
-    target: 'coins',
+    target: 'bank',
     amount: totalCoins
   });
 
