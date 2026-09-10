@@ -77,7 +77,7 @@ module.exports = {
       rewardMaxMs: 20 * 60 * 1000,
       rewardCoins: 1000,
       activityBonusPercent: 50,
-      muteGraceMs: 40 * 60 * 1000
+      muteGraceRewards: 2
     },
 
     afk: {
