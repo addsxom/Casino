@@ -369,6 +369,15 @@ function buildGlobalButtons(botInfo) {
         ),
       new ButtonBuilder()
         .setCustomId(
+          'editbot_banner'
+        )
+        .setLabel('Bannière')
+        .setEmoji('🌌')
+        .setStyle(
+          ButtonStyle.Primary
+        ),
+      new ButtonBuilder()
+        .setCustomId(
           'editbot_status'
         )
         .setLabel('Statut')
@@ -509,7 +518,7 @@ function buildMainContainer(
           '**' +
           guildName +
           '** — Choisissez une catégorie ci-dessous.\n\n' +
-          '• **Bot global** · Identité Discord et présence sur tous les serveurs.\n' +
+          '• **Bot global** · Nom, photo, bannière et présence sur tous les serveurs.\n' +
           '• **Activité du bot** · Textes affichés et type d’activité.'
         )
     )
@@ -549,7 +558,10 @@ function buildMainContainer(
           text1 +
           '\n' +
           '2️⃣ **Texte 2** · ' +
-          text2
+          text2 +
+          '\n\n' +
+          '-# Variables dynamiques : `{prefix}` et `{users}`\n' +
+          '-# Exemple : `{prefix}help for {users} users !`'
         )
     )
     .addActionRowComponents(
@@ -895,6 +907,23 @@ function modalConfigFor(
     };
   }
 
+  if (
+    field === 'banner'
+  ) {
+    return {
+      title:
+        'Modifier la bannière',
+      label:
+        'URL de la bannière',
+      placeholder:
+        'https://...',
+      value: '',
+      maxLength: 1000,
+      style:
+        TextInputStyle.Short
+    };
+  }
+
   return null;
 }
 
@@ -1134,6 +1163,34 @@ async function applyValueChange(
     try {
       await bot.user
         .setAvatar(
+          cleanValue
+        );
+    } catch (error) {
+      changeError = error;
+    } finally {
+      restoreClientToken(
+        bot,
+        clientToken
+      );
+    }
+
+    if (changeError) {
+      throw changeError;
+    }
+  }
+
+  if (
+    field === 'banner'
+  ) {
+    const clientToken =
+      bot.token ||
+      process.env.TOKEN;
+
+    let changeError = null;
+
+    try {
+      await bot.user
+        .setBanner(
           cleanValue
         );
     } catch (error) {
@@ -1607,7 +1664,9 @@ module.exports = {
               editbot_text2:
                 'text2',
               editbot_avatar:
-                'avatar'
+                'avatar',
+              editbot_banner:
+                'banner'
             };
 
             const field =
