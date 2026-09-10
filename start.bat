@@ -2,7 +2,7 @@
 title Kuromi Coins
 
 :restart
-call npx nodemon --exitcrash main.js
+call npx --yes nodemon --exitcrash main.js
 
 echo.
 echo Le bot s'est arrete. Redemarrage dans 3 secondes...

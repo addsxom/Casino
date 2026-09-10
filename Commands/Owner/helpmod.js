@@ -1,6 +1,9 @@
 const { EmbedBuilder } = require('discord.js');
 const Owner = require('../../Models/Owner.js');
 const { STAFF_LOG_CHANNELS } = require('../../utils/staffLogs.js');
+const {
+  getConfiguredChannelId
+} = require('../../utils/configService.js');
 
 async function isBotOwner(userId) {
   if (userId === process.env.BUYER) return true;
@@ -10,14 +13,26 @@ async function isBotOwner(userId) {
   );
 }
 
-function logChannelMention(key) {
-  const config = STAFF_LOG_CHANNELS[key];
+function logChannelMention(
+  guild,
+  key
+) {
+  const logConfig =
+    STAFF_LOG_CHANNELS[key];
 
-  if (!config) {
+  if (!logConfig) {
     return `**#${key}**`;
   }
 
-  return `<#${config.id}>`;
+  const channelId =
+    getConfiguredChannelId(
+      logConfig.configKey,
+      guild.id
+    );
+
+  return channelId
+    ? `<#${channelId}>`
+    : `**#${key} non configuré**`;
 }
 
 function buildHelpModEmbed(message) {
@@ -44,57 +59,64 @@ function buildHelpModEmbed(message) {
       {
         name: '⚠️ Warn',
         value:
-          `${logChannelMention('warn')}\n` +
+          `${logChannelMention(message.guild, 'warn')}\n` +
           'Historique du futur système de warnings.',
         inline: false
       },
       {
         name: '💰 Economy Logs',
         value:
-          `${logChannelMention('economy-logs')}\n` +
+          `${logChannelMention(message.guild, 'economy-logs')}\n` +
           'Gains et pertes liés aux jeux, daily, work, rob, récompenses de messages et actions admin sur les coins.',
         inline: false
       },
       {
         name: '🏦 Bank Logs',
         value:
-          `${logChannelMention('bank-logs')}\n` +
+          `${logChannelMention(message.guild, 'bank-logs')}\n` +
           'Dépôts et retraits entre la poche et la banque.',
         inline: false
       },
       {
         name: '💸 Transaction Logs',
         value:
-          `${logChannelMention('transaction-logs')}\n` +
+          `${logChannelMention(message.guild, 'transaction-logs')}\n` +
           'Paiements entre membres avec la source des fonds et les soldes avant/après.',
         inline: false
       },
       {
         name: '💬 Message Logs',
         value:
-          `${logChannelMention('message-logs')}\n` +
+          `${logChannelMention(message.guild, 'message-logs')}\n` +
           'Messages supprimés et modifiés, avec leur contenu lorsque celui-ci est disponible.',
         inline: false
       },
       {
         name: '⚙️ Server Logs',
         value:
-          `${logChannelMention('server-logs')}\n` +
+          `${logChannelMention(message.guild, 'server-logs')}\n` +
           'Arrivées, départs et modifications importantes du serveur : salons, rôles et membres.',
         inline: false
       },
       {
         name: '🔊 Voice Logs',
         value:
-          `${logChannelMention('voice-logs')}\n` +
+          `${logChannelMention(message.guild, 'voice-logs')}\n` +
           'Connexions, déconnexions et déplacements entre les salons vocaux.',
         inline: false
       },
       {
         name: '🛡️ Moderation Logs',
         value:
-          `${logChannelMention('moderation-logs')}\n` +
-          'Actions de modération comme **+clear**, puis les futures sanctions et actions staff.',
+          `${logChannelMention(message.guild, 'moderation-logs')}\n` +
+          'Actions de modération comme **+clear** et **+clearctg**, puis les futures sanctions et actions staff.',
+        inline: false
+      },
+      {
+        name: '🎫 Ticket Logs',
+        value:
+          `${logChannelMention(message.guild, 'ticket-logs')}\n` +
+          'Archive permanente des transcripts HTML lors de la fermeture des tickets.',
         inline: false
       }
     )

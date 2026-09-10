@@ -256,16 +256,6 @@ module.exports = {
       clearInterval(liveTimer);
       collector.stop('crashed');
 
-      await gameMessage.edit({
-        embeds: [
-          buildResultEmbed(
-            message,
-            game
-          )
-        ],
-        components: []
-      }).catch(() => {});
-
       try {
         const settlement =
           await settleGameSession({
@@ -280,6 +270,16 @@ module.exports = {
             userId,
             guildId
           );
+
+        await gameMessage.edit({
+          embeds: [
+            buildResultEmbed(
+              message,
+              game
+            )
+          ],
+          components: []
+        }).catch(() => {});
 
         if (latestCoins) {
           await sendStaffLog(

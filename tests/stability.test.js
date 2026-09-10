@@ -176,6 +176,31 @@ test(
 );
 
 test(
+  'staff guide resolves configured log channels',
+  () => {
+    const helpmod =
+      source(
+        'Commands/Owner/helpmod.js'
+      );
+
+    assert.match(
+      helpmod,
+      /getConfiguredChannelId/
+    );
+
+    assert.match(
+      helpmod,
+      /ticket-logs/
+    );
+
+    assert.doesNotMatch(
+      helpmod,
+      /logConfig\.id/
+    );
+  }
+);
+
+test(
   'category clear requires confirmation',
   () => {
     const clear =
