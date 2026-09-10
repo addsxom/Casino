@@ -132,7 +132,8 @@ module.exports = {
     const commands = [...message.client.commands.values()]
       .filter(command =>
         command?.name &&
-        command.name !== 'kuromibots'
+        command.name !== 'kuromibots' &&
+        command.hidden !== true
       )
       .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
 
