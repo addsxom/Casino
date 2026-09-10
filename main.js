@@ -43,7 +43,7 @@ require(`./anti-crash.js`)()
 bot.commands = new Discord.Collection();
 bot.aliases = new Discord.Collection();
 bot.snipe = new Discord.Collection();
-bot.color = "#6B6DE6",
+bot.color = "#6B6DE6";
 
 
 loadCommands(bot);
@@ -58,8 +58,23 @@ async function loginBot() {
             error?.code || error?.message || error
         );
 
-        // Timeout réseau / Cloudflare temporaire :
-        // on réessaie sans faire tomber le process.
+        const errorText =
+            String(error?.message || '');
+
+        const fatalLoginError =
+            error?.code === 'TokenInvalid' ||
+            error?.code === 4014 ||
+            /invalid token|disallowed intents/i.test(
+                errorText
+            );
+
+        if (fatalLoginError) {
+            process.exit(1);
+            return;
+        }
+
+        // Erreur réseau temporaire :
+        // nouvelle tentative sans créer plusieurs timers.
         setTimeout(() => {
             loginBot().catch(() => {});
         }, 5000);

@@ -138,10 +138,29 @@ module.exports = async (bot) => {
   mongoose.set("strictQuery", false);
   mongoose.set("autoIndex", false);
 
-  await mongoose.connect(process.env.MONGODB).then(() => {
-    console.log(colors.bold.magenta("Database • connection established"));
-    console.log(colors.bold.magenta("0===========================0"));
-  });
+  try {
+    await mongoose.connect(
+      process.env.MONGODB
+    );
+
+    console.log(
+      colors.bold.magenta(
+        'Database • connection established'
+      )
+    );
+    console.log(
+      colors.bold.magenta(
+        '0===========================0'
+      )
+    );
+  } catch (error) {
+    console.error(
+      'Database • connection failed:',
+      error?.message || error
+    );
+
+    throw error;
+  }
 
   await ensureDatabaseIntegrity();
   await applyStoredChannelOverrides();

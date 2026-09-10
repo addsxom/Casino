@@ -11,6 +11,11 @@ test('ticket transcript service loads with installed package', () => {
   );
 
   assert.equal(
+    typeof transcriptService.archiveTicketTranscript,
+    'function'
+  );
+
+  assert.equal(
     typeof transcriptService.deliverTicketTranscript,
     'function'
   );

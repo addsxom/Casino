@@ -97,7 +97,6 @@ module.exports = async (bot, message) => {
     }
 
     if (message.content === `<@${bot.user.id}>`) {
-      const diff = "``";
       message.channel.send(
         replyEmbedPayload(
           `Mon préfixe sur ce serveur est : \`${prefix}\``,

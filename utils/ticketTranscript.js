@@ -10,6 +10,10 @@ const {
   getTicketTypeKey
 } = require('./ticketSystem.js');
 
+const {
+  getConfiguredChannelId
+} = require('./configService.js');
+
 const closingTickets = new Set();
 
 function tryLockTicketClosure(channelId) {
@@ -63,6 +67,57 @@ async function createTicketTranscript(channel) {
   );
 }
 
+async function archiveTicketTranscript({
+  channel,
+  closedBy,
+  transcript,
+  ownerId,
+  typeKey,
+  closedAtUnix
+}) {
+  const archiveChannelId =
+    getConfiguredChannelId(
+      'ticketlogs',
+      channel.guild.id
+    );
+
+  if (!archiveChannelId) {
+    return false;
+  }
+
+  const archiveChannel =
+    channel.guild.channels.cache.get(
+      archiveChannelId
+    ) ||
+    await channel.guild.channels
+      .fetch(archiveChannelId)
+      .catch(() => null);
+
+  if (
+    !archiveChannel?.isTextBased?.()
+  ) {
+    return false;
+  }
+
+  await archiveChannel.send({
+    ...replyEmbedPayload(
+      `**Ticket :** #${channel.name}\n` +
+      `👤 **Créateur :** <@${ownerId}>\n` +
+      `👮 **Fermé par :** ${closedBy}\n` +
+      `📂 **Type :** ${typeKey || 'inconnu'}\n` +
+      `🕒 **Fermé le :** <t:${closedAtUnix}:F>\n` +
+      `-# Salon : ${channel.id}`,
+      {
+        type: 'info',
+        title: '📄 Transcript de ticket archivé'
+      }
+    ),
+    files: [transcript]
+  });
+
+  return true;
+}
+
 async function deliverTicketTranscript({
   channel,
   closedBy
@@ -84,13 +139,29 @@ async function deliverTicketTranscript({
       channel
     );
 
+  const closedAtUnix =
+    Math.floor(Date.now() / 1000);
+
+  const archived =
+    await archiveTicketTranscript({
+      channel,
+      closedBy,
+      transcript,
+      ownerId,
+      typeKey,
+      closedAtUnix
+    });
+
+  if (!archived) {
+    throw new Error(
+      'TICKET_ARCHIVE_FAILED'
+    );
+  }
+
   const owner =
     await channel.client.users
       .fetch(ownerId)
       .catch(() => null);
-
-  const closedAtUnix =
-    Math.floor(Date.now() / 1000);
 
   let dmSent = false;
 
@@ -141,7 +212,8 @@ async function deliverTicketTranscript({
   return {
     ownerId,
     typeKey,
-    dmSent
+    dmSent,
+    archived
   };
 }
 
@@ -158,6 +230,7 @@ module.exports = {
   tryLockTicketClosure,
   releaseTicketClosure,
   createTicketTranscript,
+  archiveTicketTranscript,
   deliverTicketTranscript,
   deleteTicketChannel
 };

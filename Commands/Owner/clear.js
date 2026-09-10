@@ -1,4 +1,10 @@
-const { ChannelType } = require('discord.js');
+const {
+  ChannelType,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  MessageFlags
+} = require('discord.js');
 const Owner = require('../../Models/Owner.js');
 const { replyEmbedPayload } = require('../../utils/replyEmbed.js');
 const {
@@ -170,6 +176,172 @@ async function clearCategory(message, categoryId) {
   };
 }
 
+function buildCategoryConfirmationRow(
+  disabled = false
+) {
+  return new ActionRowBuilder()
+    .addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'clearctg_confirm'
+        )
+        .setLabel('Confirmer')
+        .setEmoji('✅')
+        .setStyle(
+          ButtonStyle.Danger
+        )
+        .setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId(
+          'clearctg_cancel'
+        )
+        .setLabel('Annuler')
+        .setEmoji('✖️')
+        .setStyle(
+          ButtonStyle.Secondary
+        )
+        .setDisabled(disabled)
+    );
+}
+
+async function confirmCategoryClear(
+  message,
+  category
+) {
+  const textChannels =
+    message.guild.channels.cache
+      .filter(channel =>
+        channel.parentId ===
+          category.id &&
+        channel.isTextBased?.() ===
+          true &&
+        Boolean(channel.messages)
+      );
+
+  const confirmation =
+    await message.reply({
+      ...replyEmbedPayload(
+        `Tu vas supprimer **tous les messages** de **${textChannels.size} salon${textChannels.size > 1 ? 's' : ''}** dans la catégorie **${category.name}**.\n\n` +
+        '⚠️ Cette action est irréversible.',
+        {
+          type: 'warning',
+          title: '🧹 Confirmer le clear catégorie'
+        }
+      ),
+      components: [
+        buildCategoryConfirmationRow()
+      ]
+    });
+
+  const collector =
+    confirmation
+      .createMessageComponentCollector({
+        time: 60 * 1000
+      });
+
+  return new Promise(resolve => {
+    let finished = false;
+
+    const finish = async result => {
+      if (finished) return;
+      finished = true;
+
+      collector.stop(
+        result
+          ? 'confirmed'
+          : 'cancelled'
+      );
+
+      resolve(result);
+    };
+
+    collector.on(
+      'collect',
+      async interaction => {
+        if (
+          interaction.user.id !==
+          message.author.id
+        ) {
+          await interaction.reply({
+            ...replyEmbedPayload(
+              'Seule la personne qui a lancé la commande peut confirmer ce clear.',
+              { type: 'error' }
+            ),
+            flags:
+              MessageFlags.Ephemeral
+          }).catch(() => {});
+
+          return;
+        }
+
+        if (
+          interaction.customId ===
+          'clearctg_cancel'
+        ) {
+          await interaction
+            .update({
+              ...replyEmbedPayload(
+                'Aucun message n’a été supprimé.',
+                {
+                  type: 'info',
+                  title:
+                    '🧹 Clear catégorie annulé'
+                }
+              ),
+              components: []
+            })
+            .catch(() => {});
+
+          await finish(false);
+          return;
+        }
+
+        if (
+          interaction.customId ===
+          'clearctg_confirm'
+        ) {
+          await interaction
+            .deferUpdate()
+            .catch(() => {});
+
+          await confirmation
+            .delete()
+            .catch(() => {});
+
+          await finish(true);
+        }
+      }
+    );
+
+    collector.on(
+      'end',
+      async (_, reason) => {
+        if (finished) return;
+
+        if (reason === 'time') {
+          finished = true;
+
+          await confirmation
+            .edit({
+              ...replyEmbedPayload(
+                'La confirmation a expiré. Aucun message n’a été supprimé.',
+                {
+                  type: 'warning',
+                  title:
+                    '⌛ Confirmation expirée'
+                }
+              ),
+              components: []
+            })
+            .catch(() => {});
+
+          resolve(false);
+        }
+      }
+    );
+  });
+}
+
 module.exports = {
   name: 'clear',
   aliases: ['clearctg'],
@@ -207,6 +379,37 @@ module.exports = {
         );
       }
 
+      const category =
+        message.guild.channels.cache.get(
+          categoryId
+        ) ||
+        await message.guild.channels
+          .fetch(categoryId)
+          .catch(() => null);
+
+      if (
+        !category ||
+        category.type !==
+          ChannelType.GuildCategory
+      ) {
+        return message.reply(
+          replyEmbedPayload(
+            'Cet ID ne correspond pas à une catégorie accessible de ce serveur.',
+            { type: 'error' }
+          )
+        );
+      }
+
+      const confirmed =
+        await confirmCategoryClear(
+          message,
+          category
+        );
+
+      if (!confirmed) {
+        return;
+      }
+
       await message
         .delete()
         .catch(() => {});
@@ -218,22 +421,6 @@ module.exports = {
         );
 
       if (!result.ok) {
-        const errorMessage =
-          await channel.send(
-            replyEmbedPayload(
-              'Cet ID ne correspond pas à une catégorie accessible de ce serveur.',
-              { type: 'error' }
-            )
-          ).catch(() => null);
-
-        if (errorMessage) {
-          setTimeout(() => {
-            errorMessage
-              .delete()
-              .catch(() => {});
-          }, 5000);
-        }
-
         return;
       }
 
