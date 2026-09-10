@@ -8,11 +8,16 @@ const {
   buildCoinMovementLog
 } = require('../../utils/staffLogs.js');
 const {
-  debitBalance,
-  drainPocket,
-  creditBalance,
   getAccount
 } = require('../../utils/economyService.js');
+const {
+  reserveGameFunds,
+  settleGameSession,
+  refundGameSession
+} = require('../../utils/gameRecoveryService.js');
+const {
+  getConfiguredChannelId
+} = require('../../utils/configService.js');
 const {
   tryAcquireActiveGame,
   updateActiveGame,
@@ -41,6 +46,41 @@ module.exports = {
     const guildId = message.guild.id;
     const userId = message.author.id;
     const allIn = options.all === true;
+
+    const crashChannelId =
+      getConfiguredChannelId(
+        'crash',
+        guildId
+      );
+
+    if (
+      crashChannelId &&
+      message.channel.id !==
+        crashChannelId
+    ) {
+      const warning =
+        await message.reply(
+          replyEmbedPayload(
+            `Crash est uniquement disponible dans <#${crashChannelId}>.`,
+            {
+              type: 'error',
+              title: '🚀 Mauvais salon'
+            }
+          )
+        );
+
+      await message
+        .delete()
+        .catch(() => {});
+
+      setTimeout(() => {
+        warning
+          .delete()
+          .catch(() => {});
+      }, 5000);
+
+      return;
+    }
     let amount;
     let userCoins;
     let activeGameToken = null;
@@ -81,57 +121,59 @@ module.exports = {
 
     activeGameToken = activeGame.token;
 
-    if (allIn) {
-      const drained = await drainPocket(
-        userId,
-        guildId
-      );
+    let reservation;
 
-      if (!drained || drained.amount <= 0) {
-        releaseActiveGame({
+    try {
+      reservation =
+        await reserveGameFunds({
           userId,
           guildId,
-          token: activeGameToken
+          game: 'crash',
+          amount,
+          allIn
         });
-        activeGameToken = null;
-
-        return message.reply(
-          replyEmbedPayload(
-            'Vous n\'avez pas assez de coins pour cette mise.',
-            { type: 'error' }
-          )
-        );
-      }
-
-      amount = drained.amount;
-      userCoins = await getAccount(
-        userId,
-        guildId
-      );
-    } else {
-      userCoins = await debitBalance({
+    } catch (error) {
+      releaseActiveGame({
         userId,
         guildId,
-        source: 'coins',
-        amount
+        token: activeGameToken
       });
+      activeGameToken = null;
 
-      if (!userCoins) {
-        releaseActiveGame({
-          userId,
-          guildId,
-          token: activeGameToken
-        });
-        activeGameToken = null;
+      console.error(
+        'Crash reservation error:',
+        error
+      );
 
-        return message.reply(
-          replyEmbedPayload(
-            'Vous n\'avez pas assez de coins pour cette mise.',
-            { type: 'error' }
-          )
-        );
-      }
+      return message.reply(
+        replyEmbedPayload(
+          'Impossible de réserver la mise pour le Crash.',
+          { type: 'error' }
+        )
+      );
     }
+
+    if (!reservation) {
+      releaseActiveGame({
+        userId,
+        guildId,
+        token: activeGameToken
+      });
+      activeGameToken = null;
+
+      return message.reply(
+        replyEmbedPayload(
+          'Vous n\'avez pas assez de coins pour cette mise.',
+          { type: 'error' }
+        )
+      );
+    }
+
+    amount =
+      reservation.amount;
+
+    userCoins =
+      reservation.account;
 
     const game = {
       amount,
@@ -158,11 +200,9 @@ module.exports = {
         components: buildCashoutRow()
       });
     } catch (error) {
-      await creditBalance({
+      await refundGameSession({
         userId,
-        guildId,
-        target: 'coins',
-        amount
+        guildId
       });
 
       if (activeGameToken) {
@@ -227,10 +267,19 @@ module.exports = {
       }).catch(() => {});
 
       try {
-        const latestCoins = await getAccount(
-          userId,
-          guildId
-        );
+        const settlement =
+          await settleGameSession({
+            userId,
+            guildId,
+            payout: 0
+          });
+
+        const latestCoins =
+          settlement?.account ||
+          await getAccount(
+            userId,
+            guildId
+          );
 
         if (latestCoins) {
           await sendStaffLog(
@@ -381,24 +430,36 @@ module.exports = {
 
         collector.stop('cashed');
 
-        // Réponse Discord immédiate :
-        // aucun Canvas, fichier ou DB avant cet update.
-        await interaction.update({
-          embeds: [
-            buildResultEmbed(
-              message,
-              game
-            )
-          ],
-          components: []
-        });
+        await interaction
+          .deferUpdate()
+          .catch(() => {});
 
         try {
-          userCoins = await creditBalance({
-            userId,
-            guildId,
-            target: 'coins',
-            amount: game.payout
+          const settlement =
+            await settleGameSession({
+              userId,
+              guildId,
+              payout:
+                game.payout
+            });
+
+          userCoins =
+            settlement?.account;
+
+          if (!userCoins) {
+            throw new Error(
+              'CRASH_RECOVERY_SESSION_MISSING'
+            );
+          }
+
+          await gameMessage.edit({
+            embeds: [
+              buildResultEmbed(
+                message,
+                game
+              )
+            ],
+            components: []
           });
 
           if (userCoins) {

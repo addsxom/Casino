@@ -7,10 +7,12 @@ const MinesCooldown =
 
 const {
   debitBalance,
-  drainPocket,
-  creditBalance,
   getAccount
 } = require('../economyService.js');
+const {
+  reserveGameFunds,
+  settleGameSession
+} = require('../gameRecoveryService.js');
 
 const {
   sendStaffLog,
@@ -49,54 +51,55 @@ async function startMinesGameSession({
 }) {
   let userCoins;
 
-  if (allIn) {
-    const drained = await drainPocket(
-      userId,
-      guildId
-    );
+  let reservation;
 
-    if (!drained || drained.amount <= 0) {
-      releaseGameLock();
-
-      return gameMessage.edit({
-        components: [
-          buildStatusContainer(
-            '❌ Mise impossible',
-            'Vous n\'avez plus assez de coins pour démarrer cette partie.',
-            0xe91e63
-          )
-        ]
+  try {
+    reservation =
+      await reserveGameFunds({
+        userId,
+        guildId,
+        game: 'mines',
+        amount,
+        allIn
       });
-    }
+  } catch (error) {
+    releaseGameLock();
 
-    amount = drained.amount;
-
-    userCoins = await getAccount(
-      userId,
-      guildId
+    console.error(
+      'Mines reservation error:',
+      error
     );
-  } else {
-    userCoins = await debitBalance({
-      userId,
-      guildId,
-      source: 'coins',
-      amount
+
+    return gameMessage.edit({
+      components: [
+        buildStatusContainer(
+          '❌ Mise impossible',
+          'Impossible de réserver la mise pour cette partie.',
+          0xe91e63
+        )
+      ]
     });
-
-    if (!userCoins) {
-      releaseGameLock();
-
-      return gameMessage.edit({
-        components: [
-          buildStatusContainer(
-            '❌ Mise impossible',
-            'Vous n\'avez plus assez de coins pour démarrer cette partie.',
-            0xe91e63
-          )
-        ]
-      });
-    }
   }
+
+  if (!reservation) {
+    releaseGameLock();
+
+    return gameMessage.edit({
+      components: [
+        buildStatusContainer(
+          '❌ Mise impossible',
+          'Vous n\'avez plus assez de coins pour démarrer cette partie.',
+          0xe91e63
+        )
+      ]
+    });
+  }
+
+  amount =
+    reservation.amount;
+
+  userCoins =
+    reservation.account;
 
   const totalCells =
     mode.rows * mode.cols;
@@ -255,13 +258,22 @@ async function startMinesGameSession({
         );
 
         try {
-          userCoins =
-            await creditBalance({
+          const settlement =
+            await settleGameSession({
               userId,
               guildId,
-              target: 'coins',
-              amount: game.payout
+              payout:
+                game.payout
             });
+
+          userCoins =
+            settlement?.account;
+
+          if (!userCoins) {
+            throw new Error(
+              'MINES_RECOVERY_SESSION_MISSING'
+            );
+          }
         } finally {
           releaseGameLock();
         }
@@ -505,7 +517,15 @@ async function startMinesGameSession({
         game.status = 'lost';
         releaseGameLock();
 
+        const settlement =
+          await settleGameSession({
+            userId,
+            guildId,
+            payout: 0
+          });
+
         userCoins =
+          settlement?.account ||
           await getAccount(
             userId,
             guildId
@@ -593,13 +613,22 @@ async function startMinesGameSession({
         );
 
         try {
-          userCoins =
-            await creditBalance({
+          const settlement =
+            await settleGameSession({
               userId,
               guildId,
-              target: 'coins',
-              amount: game.payout
+              payout:
+                game.payout
             });
+
+          userCoins =
+            settlement?.account;
+
+          if (!userCoins) {
+            throw new Error(
+              'MINES_RECOVERY_SESSION_MISSING'
+            );
+          }
         } finally {
           releaseGameLock();
         }
@@ -665,13 +694,21 @@ async function startMinesGameSession({
           : game.amount;
 
       try {
-        userCoins =
-          await creditBalance({
+        const settlement =
+          await settleGameSession({
             userId,
             guildId,
-            target: 'coins',
-            amount: payout
+            payout
           });
+
+        userCoins =
+          settlement?.account;
+
+        if (!userCoins) {
+          throw new Error(
+            'MINES_RECOVERY_SESSION_MISSING'
+          );
+        }
       } finally {
         releaseGameLock();
       }

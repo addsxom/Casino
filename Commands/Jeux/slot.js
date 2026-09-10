@@ -26,11 +26,14 @@ const {
 } = require('../../utils/staffLogs.js');
 
 const {
-  debitBalance,
-  drainPocket,
-  creditBalance,
   getAccount
 } = require('../../utils/economyService.js');
+const {
+  reserveGameFunds,
+  updateGameRefundAmount,
+  settleGameSession,
+  refundGameSession
+} = require('../../utils/gameRecoveryService.js');
 
 const {
   tryAcquireActiveGame,
@@ -515,69 +518,34 @@ module.exports = {
     };
 
     try {
-      let accountAfterReserve;
+      const reservation =
+        await reserveGameFunds({
+          userId,
+          guildId,
+          game: 'slots',
+          amount,
+          allIn
+        });
 
-      if (allIn) {
-        const drained =
-          await drainPocket(
-            userId,
-            guildId
-          );
+      if (!reservation) {
+        releaseGameLock();
 
-        if (
-          !drained ||
-          drained.amount <= 0
-        ) {
-          releaseGameLock();
-
-          return message.reply(
-            componentReply(
-              buildStatusContainer(
-                '❌ Cagnotte impossible',
-                'Vous n’avez plus assez de coins pour démarrer.',
-                0xed4245
-              )
+        return message.reply(
+          componentReply(
+            buildStatusContainer(
+              '❌ Cagnotte impossible',
+              'Vous n’avez plus assez de coins pour démarrer.',
+              0xed4245
             )
-          );
-        }
-
-        reservedAmount =
-          drained.amount;
-
-        accountAfterReserve =
-          await getAccount(
-            userId,
-            guildId
-          );
-      } else {
-        accountAfterReserve =
-          await debitBalance({
-            userId,
-            guildId,
-            source:
-              'coins',
-            amount
-          });
-
-        if (
-          !accountAfterReserve
-        ) {
-          releaseGameLock();
-
-          return message.reply(
-            componentReply(
-              buildStatusContainer(
-                '❌ Cagnotte impossible',
-                'Vous n’avez plus assez de coins pour démarrer.',
-                0xed4245
-              )
-            )
-          );
-        }
-
-        reservedAmount =
-          amount;
+          )
+        );
       }
+
+      reservedAmount =
+        reservation.amount;
+
+      const accountAfterReserve =
+        reservation.account;
 
       const session = {
         initialCagnotte:
@@ -622,13 +590,9 @@ module.exports = {
             )
           );
       } catch (error) {
-        await creditBalance({
+        await refundGameSession({
           userId,
-          guildId,
-          target:
-            'coins',
-          amount:
-            reservedAmount
+          guildId
         }).catch(() => {});
 
         reservedAmount = 0;
@@ -676,25 +640,16 @@ module.exports = {
               )
             );
 
-          let account;
+          const settlement =
+            await settleGameSession({
+              userId,
+              guildId,
+              payout:
+                withdrawn
+            });
 
-          if (withdrawn > 0) {
-            account =
-              await creditBalance({
-                userId,
-                guildId,
-                target:
-                  'coins',
-                amount:
-                  withdrawn
-              });
-          } else {
-            account =
-              await getAccount(
-                userId,
-                guildId
-              );
-          }
+          const account =
+            settlement?.account;
 
           if (!account) {
             return null;
@@ -895,6 +850,19 @@ module.exports = {
 
               betSettled = true;
 
+              if (
+                !await updateGameRefundAmount({
+                  userId,
+                  guildId,
+                  amount:
+                    session.cagnotte
+                })
+              ) {
+                throw new Error(
+                  'SLOT_RECOVERY_SESSION_MISSING'
+                );
+              }
+
               lines.push(
                 '**Vous avez gagné ' +
                   formatAmount(
@@ -962,6 +930,19 @@ module.exports = {
 
               betSettled = true;
 
+              if (
+                !await updateGameRefundAmount({
+                  userId,
+                  guildId,
+                  amount:
+                    session.cagnotte
+                })
+              ) {
+                throw new Error(
+                  'SLOT_RECOVERY_SESSION_MISSING'
+                );
+              }
+
               lines.push(
                 '**Vous avez perdu ' +
                   formatAmount(
@@ -1013,7 +994,15 @@ module.exports = {
                 'Cagnotte épuisée'
               );
 
+              const finalSettlement =
+                await settleGameSession({
+                  userId,
+                  guildId,
+                  payout: 0
+                });
+
               const finalAccount =
+                finalSettlement?.account ||
                 await getAccount(
                   userId,
                   guildId
@@ -1142,29 +1131,18 @@ module.exports = {
               )
             );
 
-          let account;
+          const settlement =
+            await settleGameSession({
+              userId,
+              guildId,
+              payout:
+                withdrawn
+            }).catch(
+              () => null
+            );
 
-          if (withdrawn > 0) {
-            account =
-              await creditBalance({
-                userId,
-                guildId,
-                target:
-                  'coins',
-                amount:
-                  withdrawn
-              }).catch(
-                () => null
-              );
-          } else {
-            account =
-              await getAccount(
-                userId,
-                guildId
-              ).catch(
-                () => null
-              );
-          }
+          const account =
+            settlement?.account;
 
           if (!account) {
             releaseGameLock();
@@ -1201,18 +1179,12 @@ module.exports = {
         }
       );
     } catch (error) {
-      if (
-        reservedAmount > 0
-      ) {
-        await creditBalance({
-          userId,
-          guildId,
-          target:
-            'coins',
-          amount:
-            reservedAmount
-        }).catch(() => {});
-      }
+      await refundGameSession({
+        userId,
+        guildId
+      }).catch(() => {});
+
+      reservedAmount = 0;
 
       releaseGameLock();
 
