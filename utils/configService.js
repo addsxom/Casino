@@ -37,6 +37,18 @@ const CHANNEL_CONFIGS = {
       'rewards-channel'
     ]
   },
+  misccmd: {
+    label: 'Commandes diverses',
+    path: ['channels', 'miscCommands'],
+    type: 'text',
+    scope: 'guild',
+    aliases: [
+      'misc',
+      'misc-cmd',
+      'commands',
+      'cmd'
+    ]
+  },
   afkfarm: {
     label: 'Vocal AFK Farm',
     path: ['channels', 'afkFarm'],
