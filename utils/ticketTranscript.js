@@ -99,8 +99,8 @@ async function archiveTicketTranscript({
     return false;
   }
 
-  await archiveChannel.send({
-    ...replyEmbedPayload(
+  await archiveChannel.send(
+    replyEmbedPayload(
       `**Ticket :** #${channel.name}\n` +
       `👤 **Créateur :** <@${ownerId}>\n` +
       `👮 **Fermé par :** ${closedBy}\n` +
@@ -111,7 +111,10 @@ async function archiveTicketTranscript({
         type: 'info',
         title: '📄 Transcript de ticket archivé'
       }
-    ),
+    )
+  );
+
+  await archiveChannel.send({
     files: [transcript]
   });
 
