@@ -208,6 +208,48 @@ function currentActivityText(bot) {
   );
 }
 
+const ACTIVITY_TEXTS_PER_PAGE = 4;
+
+function getActivityTexts(botInfo) {
+  const stored =
+    Array.isArray(
+      botInfo?.activityTexts
+    )
+      ? botInfo.activityTexts
+          .map(
+            normalizeActivityTemplate
+          )
+          .filter(Boolean)
+      : [];
+
+  if (stored.length) {
+    return stored;
+  }
+
+  return [
+    botInfo?.activityText,
+    botInfo?.activityText2
+  ]
+    .map(
+      normalizeActivityTemplate
+    )
+    .filter(Boolean);
+}
+
+function syncLegacyActivityTexts(
+  botInfo,
+  texts
+) {
+  botInfo.activityTexts =
+    texts;
+
+  botInfo.activityText =
+    texts[0] || '';
+
+  botInfo.activityText2 =
+    texts[1] || '';
+}
+
 function normalizeTwitchUrl(
   value
 ) {
@@ -274,14 +316,9 @@ function buildRuntimeActivity(
   bot,
   botInfo
 ) {
-  const text1 =
-    normalizeActivityTemplate(
-      botInfo.activityText
-    );
-
-  const text2 =
-    normalizeActivityTemplate(
-      botInfo.activityText2
+  const texts =
+    getActivityTexts(
+      botInfo
     );
 
   const type =
@@ -290,10 +327,7 @@ function buildRuntimeActivity(
     );
 
   bot.activityRotation = {
-    texts: [
-      text1,
-      text2
-    ].filter(Boolean),
+    texts,
     type,
     streamingUrl:
       botInfo.streamingUrl ||
@@ -401,28 +435,134 @@ function buildGlobalButtons(botInfo) {
     );
 }
 
-function buildActivityTextButtons() {
-  return new ActionRowBuilder()
-    .addComponents(
-      new ButtonBuilder()
-        .setCustomId(
-          'editbot_text1'
-        )
-        .setLabel('Texte 1')
-        .setEmoji('1️⃣')
-        .setStyle(
-          ButtonStyle.Secondary
-        ),
-      new ButtonBuilder()
-        .setCustomId(
-          'editbot_text2'
-        )
-        .setLabel('Texte 2')
-        .setEmoji('2️⃣')
-        .setStyle(
-          ButtonStyle.Secondary
+function buildActivityTextControls(
+  botInfo,
+  page = 0
+) {
+  const texts =
+    getActivityTexts(
+      botInfo
+    );
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        texts.length /
+        ACTIVITY_TEXTS_PER_PAGE
+      )
+    );
+
+  const safePage =
+    Math.min(
+      Math.max(
+        0,
+        page
+      ),
+      totalPages - 1
+    );
+
+  const start =
+    safePage *
+    ACTIVITY_TEXTS_PER_PAGE;
+
+  const visible =
+    texts.slice(
+      start,
+      start +
+        ACTIVITY_TEXTS_PER_PAGE
+    );
+
+  const editRow =
+    new ActionRowBuilder();
+
+  visible.forEach(
+    (_text, offset) => {
+      const index =
+        start + offset;
+
+      editRow.addComponents(
+        new ButtonBuilder()
+          .setCustomId(
+            'editbot_text_' +
+            index
+          )
+          .setLabel(
+            'Texte ' +
+            (index + 1)
+          )
+          .setEmoji('📝')
+          .setStyle(
+            ButtonStyle.Secondary
+          )
+      );
+    }
+  );
+
+  editRow.addComponents(
+    new ButtonBuilder()
+      .setCustomId(
+        'editbot_text_add'
+      )
+      .setLabel('Ajouter')
+      .setEmoji('➕')
+      .setStyle(
+        ButtonStyle.Success
+      )
+  );
+
+  const rows = [
+    editRow
+  ];
+
+  if (
+    totalPages > 1
+  ) {
+    rows.push(
+      new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId(
+              'editbot_text_prev'
+            )
+            .setEmoji('◀️')
+            .setStyle(
+              ButtonStyle.Secondary
+            )
+            .setDisabled(
+              safePage === 0
+            ),
+          new ButtonBuilder()
+            .setCustomId(
+              'editbot_text_page'
+            )
+            .setLabel(
+              'Page ' +
+              (safePage + 1) +
+              '/' +
+              totalPages
+            )
+            .setStyle(
+              ButtonStyle.Secondary
+            )
+            .setDisabled(true),
+          new ButtonBuilder()
+            .setCustomId(
+              'editbot_text_next'
+            )
+            .setEmoji('▶️')
+            .setStyle(
+              ButtonStyle.Secondary
+            )
+            .setDisabled(
+              safePage >=
+              totalPages - 1
+            )
         )
     );
+  }
+
+  return rows;
 }
 
 function buildCloseButton() {
@@ -442,29 +582,12 @@ function buildCloseButton() {
 
 function buildMainContainer(
   botInfo,
-  bot
+  bot,
+  textPage = 0
 ) {
   const prefix =
     process.env.PREFIX ||
     '+';
-
-  const text1 =
-    botInfo.activityText
-      ? renderActivityText(
-          botInfo.activityText,
-          bot,
-          prefix
-        )
-      : 'Non défini';
-
-  const text2 =
-    botInfo.activityText2
-      ? renderActivityText(
-          botInfo.activityText2,
-          bot,
-          prefix
-        )
-      : 'Non défini';
 
   const activityType =
     getActivityTypeName(
@@ -487,6 +610,59 @@ function buildMainContainer(
     STATUS_META[status] ||
     STATUS_META.online;
 
+  const texts =
+    getActivityTexts(
+      botInfo
+    );
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        texts.length /
+        ACTIVITY_TEXTS_PER_PAGE
+      )
+    );
+
+  const safePage =
+    Math.min(
+      Math.max(
+        0,
+        textPage
+      ),
+      totalPages - 1
+    );
+
+  const start =
+    safePage *
+    ACTIVITY_TEXTS_PER_PAGE;
+
+  const visibleTexts =
+    texts
+      .slice(
+        start,
+        start +
+          ACTIVITY_TEXTS_PER_PAGE
+      )
+      .map(
+        (text, offset) =>
+          '• **Texte ' +
+          (start + offset + 1) +
+          '** · ' +
+          renderActivityText(
+            text,
+            bot,
+            prefix
+          )
+      );
+
+  const textLines =
+    visibleTexts.length
+      ? visibleTexts.join(
+          '\n'
+        )
+      : 'Aucun texte configuré.';
+
   let twitchLine = '';
 
   if (
@@ -501,59 +677,68 @@ function buildMainContainer(
       );
   }
 
-  return new ContainerBuilder()
-    .setAccentColor(
-      0x6b6de6
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder()
-        .setContent(
-          '# Paramètres du bot'
-        )
-    )
-    .addSeparatorComponents(
-      separator()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder()
-        .setContent(
-          '🤖 **Nom** · ' +
-          bot.user.username +
-          '\n' +
-          statusMeta.emoji +
-          ' **Statut** · ' +
-          statusMeta.label +
-          '\n' +
-          activityMeta.emoji +
-          ' **Activité** · ' +
-          activityMeta.label +
-          twitchLine
-        )
-    )
-    .addActionRowComponents(
-      buildGlobalButtons(
-        botInfo
+  const container =
+    new ContainerBuilder()
+      .setAccentColor(
+        0x6b6de6
       )
-    )
-    .addSeparatorComponents(
-      separator()
-    )
-    .addTextDisplayComponents(
-      new TextDisplayBuilder()
-        .setContent(
-          '## Activité du bot\n\n' +
-          '1️⃣ **Texte 1** · ' +
-          text1 +
-          '\n' +
-          '2️⃣ **Texte 2** · ' +
-          text2 +
-          '\n\n' +
-          '-# Variables dynamiques : `{prefix}` et `{users}`'
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '# Paramètres du bot'
+          )
+      )
+      .addSeparatorComponents(
+        separator()
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '🤖 **Nom** · ' +
+            bot.user.username +
+            '\n' +
+            statusMeta.emoji +
+            ' **Statut** · ' +
+            statusMeta.label +
+            '\n' +
+            activityMeta.emoji +
+            ' **Activité** · ' +
+            activityMeta.label +
+            twitchLine
+          )
+      )
+      .addActionRowComponents(
+        buildGlobalButtons(
+          botInfo
         )
+      )
+      .addSeparatorComponents(
+        separator()
+      )
+      .addTextDisplayComponents(
+        new TextDisplayBuilder()
+          .setContent(
+            '## Activité du bot\n\n' +
+            textLines +
+            '\n\n' +
+            '-# Variables dynamiques : `{prefix}` et `{users}`'
+          )
+      );
+
+  for (
+    const row of
+    buildActivityTextControls(
+      botInfo,
+      safePage
     )
-    .addActionRowComponents(
-      buildActivityTextButtons()
-    )
+  ) {
+    container
+      .addActionRowComponents(
+        row
+      );
+  }
+
+  return container
     .addSeparatorComponents(
       separator()
     )
@@ -1073,6 +1258,155 @@ async function showStreamingModal({
     .catch(() => null);
 }
 
+async function showActivityTextModal({
+  interaction,
+  index,
+  botInfo
+}) {
+  const texts =
+    getActivityTexts(
+      botInfo
+    );
+
+  const isNew =
+    index === null;
+
+  const current =
+    isNew
+      ? ''
+      : texts[index] || '';
+
+  const modalId =
+    'editbot_activity_text_' +
+    (
+      isNew
+        ? 'add'
+        : index
+    ) +
+    '_' +
+    interaction.id;
+
+  const input =
+    new TextInputBuilder()
+      .setCustomId(
+        'activity_text'
+      )
+      .setLabel(
+        isNew
+          ? 'Nouveau texte'
+          : 'Modifier le texte ' +
+            (index + 1)
+      )
+      .setPlaceholder(
+        '{prefix}help • {users} users'
+      )
+      .setStyle(
+        TextInputStyle.Short
+      )
+      .setRequired(true)
+      .setMaxLength(128);
+
+  if (current) {
+    input.setValue(
+      current.slice(
+        0,
+        128
+      )
+    );
+  }
+
+  const modal =
+    new ModalBuilder()
+      .setCustomId(
+        modalId
+      )
+      .setTitle(
+        isNew
+          ? 'Ajouter une activité'
+          : 'Modifier une activité'
+      )
+      .addComponents(
+        new ActionRowBuilder()
+          .addComponents(
+            input
+          )
+      );
+
+  await interaction
+    .showModal(modal);
+
+  return interaction
+    .awaitModalSubmit({
+      filter:
+        modalInteraction =>
+          modalInteraction
+            .customId ===
+            modalId &&
+          modalInteraction
+            .user.id ===
+            interaction.user.id,
+      time: 60000
+    })
+    .catch(() => null);
+}
+
+async function applyActivityTextChange(
+  bot,
+  botInfo,
+  index,
+  value
+) {
+  const cleanValue =
+    normalizeActivityTemplate(
+      value
+    );
+
+  if (!cleanValue) {
+    throw new Error(
+      'EMPTY_VALUE'
+    );
+  }
+
+  const texts =
+    getActivityTexts(
+      botInfo
+    );
+
+  if (
+    index === null
+  ) {
+    texts.push(
+      cleanValue
+    );
+  } else {
+    if (
+      index < 0 ||
+      index >= texts.length
+    ) {
+      throw new Error(
+        'INVALID_ACTIVITY_TEXT'
+      );
+    }
+
+    texts[index] =
+      cleanValue;
+  }
+
+  syncLegacyActivityTexts(
+    botInfo,
+    texts
+  );
+
+  await botInfo.save();
+
+  buildRuntimeActivity(
+    bot,
+    botInfo
+  );
+
+  return texts.length;
+}
+
 async function applyValueChange(
   bot,
   botInfo,
@@ -1301,6 +1635,13 @@ function getErrorText(
     return 'Ce statut est invalide.';
   }
 
+  if (
+    error?.message ===
+    'INVALID_ACTIVITY_TEXT'
+  ) {
+    return 'Ce texte d’activité n’existe plus.';
+  }
+
   return 'Impossible d’appliquer cette modification.';
 }
 
@@ -1359,6 +1700,12 @@ module.exports = {
               ),
             activityText2:
               DEFAULT_DYNAMIC_ACTIVITY,
+            activityTexts: [
+              currentActivityText(
+                message.client
+              ),
+              DEFAULT_DYNAMIC_ACTIVITY
+            ],
             streamingUrl: '',
             status:
               message.client
@@ -1382,37 +1729,58 @@ module.exports = {
         shouldSave = true;
       }
 
-      const normalizedText1 =
-        normalizeActivityTemplate(
-          botInfo.activityText
-        );
-
-      const normalizedText2 =
-        normalizeActivityTemplate(
-          botInfo.activityText2
-        );
+      let activityTexts =
+        getActivityTexts(
+          botInfo
+        )
+          .map(
+            normalizeActivityTemplate
+          )
+          .filter(Boolean);
 
       if (
-        normalizedText1 !==
-        botInfo.activityText
+        !activityTexts.length
       ) {
-        botInfo.activityText =
-          normalizedText1;
-        shouldSave = true;
+        activityTexts = [
+          currentActivityText(
+            message.client
+          ),
+          DEFAULT_DYNAMIC_ACTIVITY
+        ];
       }
 
+      const storedTexts =
+        Array.isArray(
+          botInfo.activityTexts
+        )
+          ? botInfo.activityTexts
+              .map(
+                normalizeActivityTemplate
+              )
+              .filter(Boolean)
+          : [];
+
       if (
-        normalizedText2 !==
-        botInfo.activityText2
+        JSON.stringify(
+          storedTexts
+        ) !==
+        JSON.stringify(
+          activityTexts
+        )
       ) {
-        botInfo.activityText2 =
-          normalizedText2;
+        syncLegacyActivityTexts(
+          botInfo,
+          activityTexts
+        );
+
         shouldSave = true;
       }
 
       if (shouldSave) {
         await botInfo.save();
       }
+
+      let textPage = 0;
 
       const panel =
         await message.reply({
@@ -1422,7 +1790,8 @@ module.exports = {
           components: [
             buildMainContainer(
               botInfo,
-              message.client
+              message.client,
+              textPage
             )
           ]
         });
@@ -1445,11 +1814,32 @@ module.exports = {
             return;
           }
 
+          const textCount =
+            getActivityTexts(
+              botInfo
+            ).length;
+
+          const pageCount =
+            Math.max(
+              1,
+              Math.ceil(
+                textCount /
+                ACTIVITY_TEXTS_PER_PAGE
+              )
+            );
+
+          textPage =
+            Math.min(
+              textPage,
+              pageCount - 1
+            );
+
           await panel.edit({
             components: [
               buildMainContainer(
                 botInfo,
-                message.client
+                message.client,
+                textPage
               )
             ]
           });
@@ -1514,11 +1904,134 @@ module.exports = {
                   components: [
                     buildMainContainer(
                       botInfo,
-                      message.client
+                      message.client,
+                      textPage
                     )
                   ]
                 });
 
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_text_prev' ||
+              interaction.customId ===
+              'editbot_text_next'
+            ) {
+              if (
+                interaction.customId ===
+                'editbot_text_prev'
+              ) {
+                textPage =
+                  Math.max(
+                    0,
+                    textPage - 1
+                  );
+              } else {
+                const pageCount =
+                  Math.max(
+                    1,
+                    Math.ceil(
+                      getActivityTexts(
+                        botInfo
+                      ).length /
+                      ACTIVITY_TEXTS_PER_PAGE
+                    )
+                  );
+
+                textPage =
+                  Math.min(
+                    pageCount - 1,
+                    textPage + 1
+                  );
+              }
+
+              await interaction
+                .update({
+                  components: [
+                    buildMainContainer(
+                      botInfo,
+                      message.client,
+                      textPage
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_text_page'
+            ) {
+              return interaction
+                .deferUpdate()
+                .catch(() => {});
+            }
+
+            if (
+              interaction.customId ===
+                'editbot_text_add' ||
+              /^editbot_text_\d+$/.test(
+                interaction.customId
+              )
+            ) {
+              const isNew =
+                interaction.customId ===
+                'editbot_text_add';
+
+              const index =
+                isNew
+                  ? null
+                  : Number(
+                      interaction.customId
+                        .replace(
+                          'editbot_text_',
+                          ''
+                        )
+                    );
+
+              const modalInteraction =
+                await showActivityTextModal({
+                  interaction,
+                  index,
+                  botInfo
+                });
+
+              if (
+                !modalInteraction
+              ) {
+                return;
+              }
+
+              await modalInteraction
+                .deferUpdate();
+
+              const value =
+                modalInteraction
+                  .fields
+                  .getTextInputValue(
+                    'activity_text'
+                  );
+
+              const textCount =
+                await applyActivityTextChange(
+                  message.client,
+                  botInfo,
+                  index,
+                  value
+                );
+
+              if (isNew) {
+                textPage =
+                  Math.floor(
+                    (textCount - 1) /
+                    ACTIVITY_TEXTS_PER_PAGE
+                  );
+              }
+
+              await refreshMain();
               return;
             }
 
@@ -1646,10 +2159,6 @@ module.exports = {
             const fieldMap = {
               editbot_name:
                 'name',
-              editbot_text1:
-                'text1',
-              editbot_text2:
-                'text2',
               editbot_avatar:
                 'avatar',
               editbot_banner:
