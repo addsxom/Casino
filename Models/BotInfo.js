@@ -17,6 +17,10 @@ const botInfoSchema = new mongoose.Schema({
     type: String,
     default: "{prefix}help for {users} users!"
   },
+  activityTexts: {
+    type: [String],
+    default: []
+  },
   streamingUrl: {
     type: String,
     default: ""
