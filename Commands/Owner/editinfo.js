@@ -437,7 +437,8 @@ function buildGlobalButtons(botInfo) {
 
 function buildActivityTextControls(
   botInfo,
-  page = 0
+  page = 0,
+  deleteMode = false
 ) {
   const texts =
     getActivityTexts(
@@ -473,7 +474,7 @@ function buildActivityTextControls(
         ACTIVITY_TEXTS_PER_PAGE
     );
 
-  const editRow =
+  const textRow =
     new ActionRowBuilder();
 
   visible.forEach(
@@ -481,38 +482,73 @@ function buildActivityTextControls(
       const index =
         start + offset;
 
-      editRow.addComponents(
+      textRow.addComponents(
         new ButtonBuilder()
           .setCustomId(
-            'editbot_text_' +
-            index
+            deleteMode
+              ? 'editbot_text_delete_' +
+                index
+              : 'editbot_text_' +
+                index
           )
           .setLabel(
             'Texte ' +
             (index + 1)
           )
-          .setEmoji('📝')
+          .setEmoji(
+            deleteMode
+              ? '🗑️'
+              : '📝'
+          )
           .setStyle(
-            ButtonStyle.Secondary
+            deleteMode
+              ? ButtonStyle.Danger
+              : ButtonStyle.Secondary
           )
       );
     }
   );
 
-  editRow.addComponents(
-    new ButtonBuilder()
-      .setCustomId(
-        'editbot_text_add'
-      )
-      .setLabel('Ajouter')
-      .setEmoji('➕')
-      .setStyle(
-        ButtonStyle.Success
-      )
-  );
+  if (!deleteMode) {
+    textRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_text_add'
+        )
+        .setLabel('Ajouter')
+        .setEmoji('➕')
+        .setStyle(
+          ButtonStyle.Success
+        ),
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_text_delete_mode'
+        )
+        .setLabel('Supprimer')
+        .setEmoji('🗑️')
+        .setStyle(
+          ButtonStyle.Danger
+        )
+        .setDisabled(
+          texts.length <= 1
+        )
+    );
+  } else {
+    textRow.addComponents(
+      new ButtonBuilder()
+        .setCustomId(
+          'editbot_text_delete_cancel'
+        )
+        .setLabel('Annuler')
+        .setEmoji('↩️')
+        .setStyle(
+          ButtonStyle.Secondary
+        )
+    );
+  }
 
   const rows = [
-    editRow
+    textRow
   ];
 
   if (
@@ -583,7 +619,8 @@ function buildCloseButton() {
 function buildMainContainer(
   botInfo,
   bot,
-  textPage = 0
+  textPage = 0,
+  deleteMode = false
 ) {
   const prefix =
     process.env.PREFIX ||
@@ -721,7 +758,11 @@ function buildMainContainer(
             '## Activité du bot\n\n' +
             textLines +
             '\n\n' +
-            '-# Variables dynamiques : `{prefix}` et `{users}`'
+            (
+              deleteMode
+                ? '-# 🗑️ Mode suppression : choisissez le texte à supprimer.'
+                : '-# Variables dynamiques : `{prefix}` et `{users}`'
+            )
           )
       );
 
@@ -729,7 +770,8 @@ function buildMainContainer(
     const row of
     buildActivityTextControls(
       botInfo,
-      safePage
+      safePage,
+      deleteMode
     )
   ) {
     container
@@ -1407,6 +1449,53 @@ async function applyActivityTextChange(
   return texts.length;
 }
 
+async function deleteActivityText(
+  bot,
+  botInfo,
+  index
+) {
+  const texts =
+    getActivityTexts(
+      botInfo
+    );
+
+  if (
+    index < 0 ||
+    index >= texts.length
+  ) {
+    throw new Error(
+      'INVALID_ACTIVITY_TEXT'
+    );
+  }
+
+  if (
+    texts.length <= 1
+  ) {
+    throw new Error(
+      'LAST_ACTIVITY_TEXT'
+    );
+  }
+
+  texts.splice(
+    index,
+    1
+  );
+
+  syncLegacyActivityTexts(
+    botInfo,
+    texts
+  );
+
+  await botInfo.save();
+
+  buildRuntimeActivity(
+    bot,
+    botInfo
+  );
+
+  return texts.length;
+}
+
 async function applyValueChange(
   bot,
   botInfo,
@@ -1642,6 +1731,13 @@ function getErrorText(
     return 'Ce texte d’activité n’existe plus.';
   }
 
+  if (
+    error?.message ===
+    'LAST_ACTIVITY_TEXT'
+  ) {
+    return 'Vous devez conserver au moins un texte d’activité.';
+  }
+
   return 'Impossible d’appliquer cette modification.';
 }
 
@@ -1781,6 +1877,7 @@ module.exports = {
       }
 
       let textPage = 0;
+      let deleteMode = false;
 
       const panel =
         await message.reply({
@@ -1791,7 +1888,8 @@ module.exports = {
             buildMainContainer(
               botInfo,
               message.client,
-              textPage
+              textPage,
+              deleteMode
             )
           ]
         });
@@ -1839,7 +1937,8 @@ module.exports = {
               buildMainContainer(
                 botInfo,
                 message.client,
-                textPage
+                textPage,
+                deleteMode
               )
             ]
           });
@@ -1905,11 +2004,83 @@ module.exports = {
                     buildMainContainer(
                       botInfo,
                       message.client,
-                      textPage
+                      textPage,
+                      deleteMode
                     )
                   ]
                 });
 
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_text_delete_mode'
+            ) {
+              deleteMode = true;
+
+              await interaction
+                .update({
+                  components: [
+                    buildMainContainer(
+                      botInfo,
+                      message.client,
+                      textPage,
+                      deleteMode
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              interaction.customId ===
+              'editbot_text_delete_cancel'
+            ) {
+              deleteMode = false;
+
+              await interaction
+                .update({
+                  components: [
+                    buildMainContainer(
+                      botInfo,
+                      message.client,
+                      textPage,
+                      deleteMode
+                    )
+                  ]
+                });
+
+              return;
+            }
+
+            if (
+              /^editbot_text_delete_\d+$/.test(
+                interaction.customId
+              )
+            ) {
+              const index =
+                Number(
+                  interaction.customId
+                    .replace(
+                      'editbot_text_delete_',
+                      ''
+                    )
+                );
+
+              await interaction
+                .deferUpdate();
+
+              await deleteActivityText(
+                message.client,
+                botInfo,
+                index
+              );
+
+              deleteMode = false;
+
+              await refreshMain();
               return;
             }
 
@@ -1953,7 +2124,8 @@ module.exports = {
                     buildMainContainer(
                       botInfo,
                       message.client,
-                      textPage
+                      textPage,
+                      deleteMode
                     )
                   ]
                 });
@@ -1977,6 +2149,8 @@ module.exports = {
                 interaction.customId
               )
             ) {
+              deleteMode = false;
+
               const isNew =
                 interaction.customId ===
                 'editbot_text_add';
