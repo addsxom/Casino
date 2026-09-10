@@ -208,7 +208,7 @@ function currentActivityText(bot) {
   );
 }
 
-const ACTIVITY_TEXTS_PER_PAGE = 4;
+const ACTIVITY_TEXTS_PER_PAGE = 3;
 
 function getActivityTexts(botInfo) {
   const stored =
@@ -2213,6 +2213,7 @@ module.exports = {
               interaction.customId ===
               'editbot_activity'
             ) {
+              deleteMode = false;
               await interaction
                 .update({
                   components: [
@@ -2229,6 +2230,7 @@ module.exports = {
               interaction.customId ===
               'editbot_status'
             ) {
+              deleteMode = false;
               await interaction
                 .update({
                   components: [
@@ -2349,6 +2351,8 @@ module.exports = {
                 .deferUpdate()
                 .catch(() => {});
             }
+
+            deleteMode = false;
 
             const modalInteraction =
               await showValueModal({
