@@ -35,20 +35,26 @@ function isLockableChannel(channel) {
   );
 }
 
-function resolveTargetChannel(message) {
+async function resolveTargetChannel(message, args = []) {
   const mentioned =
     message.mentions.channels.first();
 
   if (mentioned) return mentioned;
 
   const rawId =
-    message.content.match(/\b\d{17,20}\b/)?.[0];
+    args.join(' ').match(/\b\d{17,20}\b/)?.[0];
 
   if (rawId) {
     return (
       message.guild.channels.cache.get(rawId) ||
-      message.channel
+      await message.guild.channels
+        .fetch(rawId)
+        .catch(() => null)
     );
+  }
+
+  if (args.length > 0) {
+    return null;
   }
 
   return message.channel;
