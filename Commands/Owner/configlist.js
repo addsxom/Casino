@@ -260,7 +260,10 @@ function buildConfigDetailsEmbed() {
       '`+configlist rewards <ID>` — salon des récompenses\n' +
       '`+configlist afkfarm <ID>` — vocal AFK unique\n' +
       '`+configlist mines <ID>` — salon Mines\n' +
-      '`+configlist slots <ID>` — salon Slots\n\n' +
+      '`+configlist slots <ID>` — salon Slots\n' +
+      '`+configlist crash <ID>` — salon Crash\n' +
+      '`+configlist misccmd <ID>` — commandes diverses\n' +
+      '`+configlist ticketlogs <ID>` — transcripts des tickets\n\n' +
 
       '**Voir une configuration précise**\n' +
       '`+configlist rewards`\n' +

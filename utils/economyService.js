@@ -247,7 +247,11 @@ async function moveAllBalance({
   };
 }
 
-async function drainPocket(userId, guildId) {
+async function drainPocket(
+  userId,
+  guildId,
+  options = {}
+) {
   const before = await UserCoins.findOneAndUpdate(
     {
       userId,
@@ -260,7 +264,8 @@ async function drainPocket(userId, guildId) {
       }
     },
     {
-      new: false
+      new: false,
+      session: options.session || null
     }
   );
 

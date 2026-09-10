@@ -10,6 +10,8 @@ const AfkRewardProgress = require('../Models/AfkRewardProgress.js');
 const BotConfigOverride = require('../Models/BotConfigOverride.js');
 const ServerPrefix = require('../Models/ServerPrefix.js');
 const Owner = require('../Models/Owner.js');
+const ActiveGameSession =
+  require('../Models/ActiveGameSession.js');
 
 async function hasUserGuildUniqueIndex(Model) {
   try {
@@ -273,7 +275,8 @@ async function createDeclaredIndexes() {
     AfkRewardProgress,
     BotConfigOverride,
     ServerPrefix,
-    Owner
+    Owner,
+    ActiveGameSession
   ];
 
   for (const Model of models) {

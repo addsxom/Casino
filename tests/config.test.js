@@ -13,6 +13,8 @@ const {
 test('important config aliases resolve correctly', () => {
   assert.equal(resolveConfigKey('mines'), 'mines');
   assert.equal(resolveConfigKey('slot'), 'slots');
+  assert.equal(resolveConfigKey('crash'), 'crash');
+  assert.equal(resolveConfigKey('ticket-logs'), 'ticketlogs');
   assert.equal(resolveConfigKey('reward-voc'), 'rewards');
   assert.equal(resolveConfigKey('misc-cmd'), 'misccmd');
   assert.equal(resolveConfigKey('economy-logs'), 'economylogs');
@@ -54,6 +56,16 @@ test('default channel ids are used without an override', () => {
   );
 
   assert.equal(
+    getConfiguredChannelId('crash', 'unconfigured-guild'),
+    config.channels.games.crash
+  );
+
+  assert.equal(
+    getConfiguredChannelId('ticketlogs', 'unconfigured-guild'),
+    config.channels.staffLogs.ticket.id
+  );
+
+  assert.equal(
     getConfiguredChannelId('unknown', 'unconfigured-guild'),
     null
   );
@@ -90,5 +102,6 @@ test('reward safety settings stay centralized', () => {
   assert.equal(config.rewards.afk.rewardMinMs, 30 * 60 * 1000);
   assert.equal(config.rewards.afk.rewardMaxMs, 40 * 60 * 1000);
   assert.equal(config.rewards.afk.rewardCoins, 250);
+  assert.equal(config.system.progressPersistIntervalMs, 15 * 1000);
   assert.equal(config.channels.afkFarm, '1547368687579955290');
 });

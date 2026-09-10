@@ -12,6 +12,13 @@ const { ensureDatabaseIntegrity } = require('../utils/databaseIntegrity.js');
 const { startVoiceRewardTracker } = require('../utils/voiceRewardTracker.js');
 const { startAfkRewardTracker } = require('../utils/afkRewardTracker.js');
 const {
+  refundInterruptedGameSessions
+} = require('../utils/gameRecoveryService.js');
+const {
+  sendStaffLog,
+  buildCoinMovementLog
+} = require('../utils/staffLogs.js');
+const {
   applyStoredChannelOverrides,
   getConfiguredChannelId
 } = require('../utils/configService.js');
@@ -138,6 +145,51 @@ module.exports = async (bot) => {
 
   await ensureDatabaseIntegrity();
   await applyStoredChannelOverrides();
+
+  const recoveredGames =
+    await refundInterruptedGameSessions();
+
+  if (recoveredGames.length) {
+    console.log(
+      `Games • ${recoveredGames.length} partie(s) interrompue(s) remboursée(s)`
+    );
+
+    for (const recovery of recoveredGames) {
+      const guild =
+        bot.guilds.cache.get(
+          recovery.guildId
+        );
+
+      if (!guild) continue;
+
+      const user =
+        bot.users.cache.get(
+          recovery.userId
+        ) ||
+        await bot.users
+          .fetch(recovery.userId)
+          .catch(() => null);
+
+      if (!user) continue;
+
+      await sendStaffLog(
+        guild,
+        'economy-logs',
+        buildCoinMovementLog({
+          title: '♻️ Partie remboursée après redémarrage',
+          user,
+          delta: recovery.refundedAmount,
+          pocket: recovery.account.coins,
+          bank: recovery.account.bank,
+          reason:
+            `${recovery.game} • remboursement automatique`,
+          details:
+            'La partie était encore active lorsque le bot a été interrompu.'
+        })
+      );
+    }
+  }
+
   await startVoiceRewardTracker(bot);
   await startAfkRewardTracker(bot);
 

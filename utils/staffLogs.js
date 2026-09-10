@@ -26,6 +26,9 @@ const STAFF_LOG_CHANNELS = {
   },
   'moderation-logs': {
     configKey: 'moderationlogs'
+  },
+  'ticket-logs': {
+    configKey: 'ticketlogs'
   }
 };
 

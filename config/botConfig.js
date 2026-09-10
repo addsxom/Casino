@@ -16,7 +16,8 @@ module.exports = {
 
     games: {
       slots: '1546311653564620897',
-      mines: '1546311653564620899'
+      mines: '1546311653564620899',
+      crash: '1546311653564620900'
     },
 
     staffLogs: {
@@ -51,6 +52,10 @@ module.exports = {
       moderation: {
         id: '1546960328502546484',
         name: 'moderation-logs'
+      },
+      ticket: {
+        id: '1547428665611255818',
+        name: 'ticket-logs'
       }
     }
   },
@@ -113,6 +118,7 @@ module.exports = {
   },
 
   system: {
+    progressPersistIntervalMs: 15 * 1000,
     memberCountResyncMs: 10 * 60 * 1000,
     memberCountRenameIntervalMs:
       5 * 60 * 1000 + 5000

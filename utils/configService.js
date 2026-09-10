@@ -97,6 +97,12 @@ const CHANNEL_CONFIGS = {
     type: 'text',
     scope: 'guild'
   },
+  crash: {
+    label: 'Crash',
+    path: ['channels', 'games', 'crash'],
+    type: 'text',
+    scope: 'guild'
+  },
   warn: {
     label: 'Logs warn',
     path: ['channels', 'staffLogs', 'warn', 'id'],
@@ -171,6 +177,17 @@ const CHANNEL_CONFIGS = {
     aliases: [
       'moderation',
       'moderation-logs'
+    ]
+  },
+  ticketlogs: {
+    label: 'Logs tickets',
+    path: ['channels', 'staffLogs', 'ticket', 'id'],
+    type: 'text',
+    scope: 'guild',
+    aliases: [
+      'ticket',
+      'ticket-logs',
+      'tickets'
     ]
   }
 };
