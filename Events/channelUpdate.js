@@ -1,9 +1,19 @@
 const { sendStaffLog, buildDiscordLog } = require('../utils/staffLogs.js');
-const { MEMBER_COUNT_CHANNEL_ID } = require('../utils/updateMemberCount.js');
+const {
+  getMemberCountChannelId
+} = require('../utils/updateMemberCount.js');
 const { AuditLogEvent, getRecentAuditExecutor } = require('../utils/auditLogs.js');
 
 module.exports = async (_bot, oldChannel, newChannel) => {
-  if (!newChannel.guild || newChannel.id === MEMBER_COUNT_CHANNEL_ID) return;
+  if (
+    !newChannel.guild ||
+    newChannel.id ===
+      getMemberCountChannelId(
+        newChannel.guild.id
+      )
+  ) {
+    return;
+  }
 
   const changes = [];
 

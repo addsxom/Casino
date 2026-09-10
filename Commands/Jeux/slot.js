@@ -544,9 +544,6 @@ module.exports = {
       reservedAmount =
         reservation.amount;
 
-      const accountAfterReserve =
-        reservation.account;
-
       const session = {
         initialCagnotte:
           reservedAmount,
