@@ -8,6 +8,39 @@ const {
 
 const ServerPrefix = require('../../Models/ServerPrefix');
 const helpFeatures = require('../../utils/helpFeatures.js');
+const {
+  getConfiguredChannelId
+} = require('../../utils/configService.js');
+
+const MISC_HELP_CATEGORIES = new Set([
+  'General',
+  'Recup',
+  'Gestion coins'
+]);
+
+const SPECIAL_COMMAND_USAGES = {
+  clear: [
+    'clear [nombre]',
+    'clearctg <ID catégorie>'
+  ],
+  configlist: [
+    'configlist',
+    'configlist <clé> <ID>',
+    'configlist voicefarm add/remove/set/clear <ID...>'
+  ],
+  slot: [
+    'slot <mise>',
+    'slotall'
+  ],
+  mines: [
+    'mines <mise>',
+    'minesall'
+  ],
+  crash: [
+    'crash <mise>',
+    'crashall'
+  ]
+};
 
 const CATEGORY_META = {
   General: { name: 'Général', emoji: '📌' },
@@ -37,6 +70,107 @@ function cleanUsage(command) {
   }
 
   return usage ? ` ${usage}` : '';
+}
+
+function getCommandUsages(
+  command,
+  prefix
+) {
+  const special =
+    SPECIAL_COMMAND_USAGES[
+      command.name
+    ];
+
+  if (special) {
+    return special.map(
+      usage => `${prefix}${usage}`
+    );
+  }
+
+  const usage =
+    cleanUsage(command);
+
+  const names = [
+    `${prefix}${command.name}${usage}`,
+    ...(Array.isArray(command.aliases)
+      ? command.aliases.map(
+          alias =>
+            `${prefix}${alias}`
+        )
+      : [])
+  ];
+
+  return [...new Set(names)];
+}
+
+function getCategoryNotice(
+  category,
+  message
+) {
+  if (
+    MISC_HELP_CATEGORIES.has(
+      category
+    )
+  ) {
+    const miscChannelId =
+      getConfiguredChannelId(
+        'misccmd',
+        message.guild?.id
+      );
+
+    return miscChannelId
+      ? `📍 Ces commandes s’utilisent dans <#${miscChannelId}>.`
+      : null;
+  }
+
+  if (category === 'Admin') {
+    return '🛡️ Commandes réservées au staff / administrateurs selon la commande.';
+  }
+
+  if (category === 'Owner') {
+    return '👑 Commandes de gestion réservées aux owners du bot.';
+  }
+
+  return null;
+}
+
+function getCommandLocation(
+  command,
+  message
+) {
+  if (!message.guild) {
+    return null;
+  }
+
+  if (command.name === 'slot') {
+    const id =
+      getConfiguredChannelId(
+        'slots',
+        message.guild.id
+      );
+
+    return id
+      ? `📍 <#${id}>`
+      : null;
+  }
+
+  if (command.name === 'mines') {
+    const id =
+      getConfiguredChannelId(
+        'mines',
+        message.guild.id
+      );
+
+    return id
+      ? `📍 <#${id}>`
+      : null;
+  }
+
+  if (command.name === 'close') {
+    return '🎫 Ticket uniquement • Modérateur';
+  }
+
+  return null;
 }
 
 function buildNavigationRow(page, totalPages) {
@@ -119,25 +253,56 @@ module.exports = {
 
       const commandText = categoryCommands
         .map(command => {
-          const usage = cleanUsage(command);
-          const names = [
-            `\`${prefix}${command.name}${usage}\``,
-            ...(Array.isArray(command.aliases)
-              ? command.aliases.map(alias => `\`${prefix}${alias}\``)
-              : [])
-          ].join('/');
+          const usages =
+            getCommandUsages(
+              command,
+              prefix
+            )
+              .map(
+                usage =>
+                  `\`${usage}\``
+              )
+              .join(' / ');
+
+          const location =
+            getCommandLocation(
+              command,
+              message
+            );
 
           return (
-            `**${names}**\n` +
-            `${command.description || 'Aucune description.'}`
+            `**${usages}**\n` +
+            `${command.description || 'Aucune description.'}` +
+            (
+              location
+                ? `\n-# ${location}`
+                : ''
+            )
           );
         })
         .join('\n\n');
 
+      const categoryNotice =
+        getCategoryNotice(
+          category,
+          message
+        );
+
+      const categoryDescription =
+        (
+          categoryNotice
+            ? `-# ${categoryNotice}\n\n`
+            : ''
+        ) +
+        (
+          commandText ||
+          'Aucune commande dans cette catégorie.'
+        );
+
       embeds.push(
         new EmbedBuilder()
           .setTitle(`${meta.emoji} ${meta.name}`)
-          .setDescription(commandText || 'Aucune commande dans cette catégorie.')
+          .setDescription(categoryDescription)
           .setColor(0x6b6de6)
           .setFooter({
             text: `${categoryCommands.length} commande${categoryCommands.length > 1 ? 's' : ''} • Préfixe : ${prefix}`,
