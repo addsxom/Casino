@@ -82,12 +82,20 @@ module.exports = async (bot, message) => {
           );
         } catch (error) {
           console.error(error);
-          message.channel.send(
-            replyEmbedPayload(
-              "Une erreur s'est produite lors de l'exécution de la commande.",
-              { type: 'error' }
-            )
-          );
+
+          const channel = message.channel;
+
+          if (
+            channel &&
+            typeof channel.send === 'function'
+          ) {
+            await channel.send(
+              replyEmbedPayload(
+                "Une erreur s'est produite lors de l'exécution de la commande.",
+                { type: 'error' }
+              )
+            ).catch(() => {});
+          }
         }
       }
     } else {
