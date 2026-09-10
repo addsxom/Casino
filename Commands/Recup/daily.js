@@ -26,15 +26,15 @@ module.exports = {
       );
 
       if (!cooldown.acquired) {
-        const timeLeft = Math.max(
-          0,
-          cooldown.availableAt - Date.now()
-        );
-        const formattedTimeLeft = formatCooldown(timeLeft);
+        const availableAtUnix =
+          Math.floor(
+            cooldown.availableAt /
+            1000
+          );
 
         const cooldownEmbed = new EmbedBuilder()
           .setTitle('Vous avez déjà réclamé votre récompense quotidienne')
-          .setDescription(`❌・Réessayez dans ${formattedTimeLeft}`)
+          .setDescription(`⏳・Disponible <t:${availableAtUnix}:R>`)
           .setFooter({ text: 'Kuromi Coins', iconURL: message.client.user.displayAvatarURL({ dynamic: true })})
           .setColor(0xFF0000);
 
@@ -93,27 +93,3 @@ module.exports = {
   },
 };
 
-function formatCooldown(time) {
-  const seconds = Math.floor(time / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  let formattedTime = '';
-
-  if (days > 0) {
-    formattedTime += `${days} jour, `;
-  }
-
-  if (hours % 24 > 0) {
-    formattedTime += `${hours % 24} heures, `;
-  }
-
-  if (minutes % 60 > 0) {
-    formattedTime += `${minutes % 60} minutes et `;
-  }
-
-  formattedTime += `${seconds % 60} secondes.`;
-
-  return formattedTime.trim();
-}
