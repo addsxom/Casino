@@ -8,6 +8,9 @@ const {
   shouldDealerHit,
   resolveOutcome
 } = require('../utils/blackjack/gameRules.js');
+const {
+  renderBlackjackTable
+} = require('../utils/blackjack/tableRenderer.js');
 
 function card(rank, suit = '♠') {
   return { rank, suit };
@@ -102,4 +105,36 @@ test('push returns the complete stake', () => {
 
   assert.equal(outcome.status, 'push');
   assert.equal(outcome.payout, 2000);
+});
+
+test('blackjack visual renderer creates a PNG table', () => {
+  const image = renderBlackjackTable(
+    {
+      author: { username: 'Tester' },
+      member: { displayName: 'Tester' }
+    },
+    {
+      bet: 1000,
+      doubled: false,
+      dealer: [
+        card('9', '♦'),
+        card('K', '♣')
+      ],
+      player: [
+        card('A'),
+        card('7', '♥')
+      ]
+    },
+    {
+      revealDealer: false,
+      statusText: 'À toi de jouer.'
+    }
+  );
+
+  assert.ok(Buffer.isBuffer(image));
+  assert.ok(image.length > 1000);
+  assert.deepEqual(
+    [...image.subarray(0, 8)],
+    [137, 80, 78, 71, 13, 10, 26, 10]
+  );
 });

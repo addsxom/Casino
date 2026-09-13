@@ -38,7 +38,7 @@ const {
   resolveOutcome
 } = require('../../utils/blackjack/gameRules.js');
 const {
-  buildTableEmbed,
+  buildTableVisual,
   buildActionRow
 } = require('../../utils/blackjack/ui.js');
 
@@ -61,74 +61,75 @@ function getResultPresentation(
   const net =
     outcome.payout - state.bet;
 
-  let title;
   let color;
+  let visualStatus;
   let mainText;
 
   switch (outcome.status) {
     case 'blackjack':
-      title = '♠️ BLACKJACK • BLACKJACK !';
       color = 0xfee75c;
+      visualStatus = 'BLACKJACK !';
       mainText =
         '🃏 **Blackjack naturel ! Paiement 3:2.**';
       break;
 
     case 'dealer_bust':
-      title = '♠️ BLACKJACK • VICTOIRE';
       color = 0x57f287;
+      visualStatus = 'VICTOIRE';
       mainText =
         '💥 **Le croupier dépasse 21. Vous gagnez !**';
       break;
 
     case 'win':
-      title = '♠️ BLACKJACK • VICTOIRE';
       color = 0x57f287;
+      visualStatus = 'VICTOIRE';
       mainText =
         '🏆 **Votre main bat celle du croupier.**';
       break;
 
     case 'push':
-      title = '♠️ BLACKJACK • ÉGALITÉ';
       color = 0x5865f2;
+      visualStatus = 'EGALITE';
       mainText =
         '🤝 **Égalité. Votre mise vous est rendue.**';
       break;
 
     case 'player_bust':
-      title = '♠️ BLACKJACK • BUST';
       color = 0xed4245;
+      visualStatus = 'BUST';
       mainText =
         '💥 **Vous dépassez 21. La banque l’emporte.**';
       break;
 
     case 'dealer_blackjack':
-      title = '♠️ BLACKJACK • DÉFAITE';
       color = 0xed4245;
+      visualStatus = 'BLACKJACK CROUPIER';
       mainText =
         '🎩 **Blackjack du croupier. La banque l’emporte.**';
       break;
 
     default:
-      title = '♠️ BLACKJACK • DÉFAITE';
       color = 0xed4245;
+      visualStatus = 'DEFAITE';
       mainText =
         '🎩 **La banque l’emporte.**';
       break;
   }
 
-  const sign =
-    net > 0
-      ? '+'
-      : '';
-
+  const sign = net > 0 ? '+' : '';
   const timeoutText =
     timedOut
       ? '\n-# ⌛ Temps écoulé : la main a été automatiquement mise en « Rester ».'
       : '';
 
   return {
-    title,
     color,
+    visualStatus:
+      timedOut
+        ? `AUTO STAND - ${visualStatus}`
+        : visualStatus,
+    visualSubtext:
+      `RETOUR ${formatCoins(outcome.payout)} / NET ${sign}${formatCoins(net)}`,
     statusText:
       `${mainText}\n\n` +
       `💰 **Retour :** \`${formatCoins(outcome.payout)} coins\`\n` +
@@ -139,6 +140,7 @@ function getResultPresentation(
 
 module.exports = {
   name: 'blackjack',
+  aliases: ['bj'],
   description:
     'Affrontez le croupier au Blackjack. Ajoutez `all` au nom pour miser toute votre poche.',
   usage: 'blackjack <mise>',
@@ -149,6 +151,9 @@ module.exports = {
     const guildId = message.guild.id;
     const userId = message.author.id;
     const allIn = options.all === true;
+    const invokedName =
+      options.invokedName ||
+      (allIn ? 'blackjackall' : 'blackjack');
 
     const blackjackChannelId =
       getConfiguredChannelId(
@@ -161,25 +166,20 @@ module.exports = {
       message.channel.id !==
         blackjackChannelId
     ) {
-      const warning =
-        await message.reply(
-          replyEmbedPayload(
-            `Blackjack est uniquement disponible dans <#${blackjackChannelId}>.`,
-            {
-              type: 'error',
-              title: '♠️ Mauvais salon'
-            }
-          )
-        );
+      const warning = await message.reply(
+        replyEmbedPayload(
+          `Blackjack est uniquement disponible dans <#${blackjackChannelId}>.`,
+          {
+            type: 'error',
+            title: '♠️ Mauvais salon'
+          }
+        )
+      );
 
-      await message
-        .delete()
-        .catch(() => {});
+      await message.delete().catch(() => {});
 
       setTimeout(() => {
-        warning
-          .delete()
-          .catch(() => {});
+        warning.delete().catch(() => {});
       }, 5000);
 
       return;
@@ -196,7 +196,7 @@ module.exports = {
       ) {
         return message.reply(
           replyEmbedPayload(
-            'Utilisation : **+blackjack <mise>**\nExemple : **+blackjack 1000**',
+            'Utilisation : **+blackjack <mise>** ou **+bj <mise>**\nExemple : **+bj 1000**',
             { type: 'error' }
           )
         );
@@ -226,8 +226,7 @@ module.exports = {
       });
     }
 
-    let activeGameToken =
-      activeGame.token;
+    let activeGameToken = activeGame.token;
     let reservation;
 
     const releaseLock = () => {
@@ -243,17 +242,15 @@ module.exports = {
     };
 
     try {
-      reservation =
-        await reserveGameFunds({
-          userId,
-          guildId,
-          game: 'blackjack',
-          amount,
-          allIn
-        });
+      reservation = await reserveGameFunds({
+        userId,
+        guildId,
+        game: 'blackjack',
+        amount,
+        allIn
+      });
     } catch (error) {
       releaseLock();
-
       console.error(
         'Blackjack reservation error:',
         error
@@ -294,29 +291,48 @@ module.exports = {
     let gameMessage = null;
     let collector = null;
 
+    const visualOptions = ({
+      revealDealer = false,
+      statusText = null,
+      visualStatus = null,
+      visualSubtext = null,
+      color = 0x6b6de6
+    } = {}) => ({
+      revealDealer,
+      statusText:
+        statusText ||
+        'À toi de jouer.',
+      visualStatus,
+      visualSubtext,
+      color
+    });
+
     const editGame = async ({
       revealDealer = false,
       statusText = null,
-      title = undefined,
-      color = undefined,
+      visualStatus = null,
+      visualSubtext = null,
+      color = 0x6b6de6,
       controls = null
     } = {}) => {
       if (!gameMessage) return;
 
-      const embed =
-        buildTableEmbed(
-          message,
-          state,
-          {
-            revealDealer,
-            statusText,
-            ...(title ? { title } : {}),
-            ...(color ? { color } : {})
-          }
-        );
+      const visual = buildTableVisual(
+        message,
+        state,
+        visualOptions({
+          revealDealer,
+          statusText,
+          visualStatus,
+          visualSubtext,
+          color
+        })
+      );
 
       await gameMessage.edit({
-        embeds: [embed],
+        attachments: [],
+        embeds: [visual.embed],
+        files: [visual.file],
         components:
           controls
             ? [controls]
@@ -361,6 +377,7 @@ module.exports = {
               title: '♠️ Blackjack interrompu'
             }
           ),
+          attachments: [],
           components: []
         }).catch(() => {});
       }
@@ -410,25 +427,16 @@ module.exports = {
           );
         }
 
-        const finalEmbed =
-          buildTableEmbed(
-            message,
-            state,
-            {
-              revealDealer: true,
-              statusText:
-                presentation.statusText,
-              title:
-                presentation.title,
-              color:
-                presentation.color
-            }
-          )
-            .setTimestamp();
-
-        await gameMessage.edit({
-          embeds: [finalEmbed],
-          components: []
+        await editGame({
+          revealDealer: true,
+          statusText:
+            presentation.statusText,
+          visualStatus:
+            presentation.visualStatus,
+          visualSubtext:
+            presentation.visualSubtext,
+          color:
+            presentation.color
         }).catch(() => {});
 
         const net =
@@ -447,10 +455,7 @@ module.exports = {
               settlement.account.coins,
             bank:
               settlement.account.bank,
-            reason:
-              allIn
-                ? '+blackjackall'
-                : '+blackjack',
+            reason: `+${invokedName}`,
             sourceChannel:
               message.channel,
             details:
@@ -474,6 +479,7 @@ module.exports = {
               title: '♠️ Erreur de règlement'
             }
           ),
+          attachments: [],
           components: []
         }).catch(() => {});
       } finally {
@@ -497,8 +503,8 @@ module.exports = {
         revealDealer: true,
         statusText:
           timedOut
-            ? '⌛ **Temps écoulé. Le croupier termine automatiquement la main.**'
-            : '🎩 **Le croupier révèle sa carte cachée...**',
+            ? 'Temps écoulé. Le croupier termine la main.'
+            : 'Le croupier révèle sa carte cachée...',
         controls:
           buildActionRow({
             canDouble: false,
@@ -510,9 +516,7 @@ module.exports = {
 
       while (
         !state.finished &&
-        shouldDealerHit(
-          state.dealer
-        )
+        shouldDealerHit(state.dealer)
       ) {
         state.dealer.push(
           drawCard(state.deck)
@@ -525,8 +529,8 @@ module.exports = {
           revealDealer: true,
           statusText:
             value.bust
-              ? '🎩 **Le croupier tire... et dépasse 21.**'
-              : `🎩 **Le croupier tire une carte... ${value.total}.**`,
+              ? 'Le croupier tire... et dépasse 21.'
+              : `Le croupier tire une carte... ${value.total}.`,
           controls:
             buildActionRow({
               canDouble: false,
@@ -537,26 +541,25 @@ module.exports = {
         await sleep(ACTION_STEP_MS);
       }
 
-      await finishRound({
-        timedOut
-      });
+      await finishRound({ timedOut });
     };
 
     try {
-      gameMessage =
-        await message.reply({
-          embeds: [
-            buildTableEmbed(
-              message,
-              state,
-              {
-                statusText:
-                  '🎩 **Le croupier mélange les cartes...**'
-              }
-            )
-          ],
-          components: []
-        });
+      const initialVisual =
+        buildTableVisual(
+          message,
+          state,
+          visualOptions({
+            statusText:
+              'Le croupier mélange les cartes...'
+          })
+        );
+
+      gameMessage = await message.reply({
+        embeds: [initialVisual.embed],
+        files: [initialVisual.file],
+        components: []
+      });
 
       updateActiveGame({
         userId,
@@ -570,51 +573,39 @@ module.exports = {
 
       await sleep(DEAL_STEP_MS);
 
-      state.player.push(
-        drawCard(state.deck)
-      );
+      state.player.push(drawCard(state.deck));
       await editGame({
         statusText:
-          '🎩 **« Première carte pour vous. »**'
+          'Première carte pour vous.'
       });
 
       await sleep(DEAL_STEP_MS);
 
-      state.dealer.push(
-        drawCard(state.deck)
-      );
+      state.dealer.push(drawCard(state.deck));
       await editGame({
         statusText:
-          '🎩 **Le croupier prend sa première carte.**'
+          'Le croupier prend sa première carte.'
       });
 
       await sleep(DEAL_STEP_MS);
 
-      state.player.push(
-        drawCard(state.deck)
-      );
+      state.player.push(drawCard(state.deck));
       await editGame({
         statusText:
-          '🎩 **« Votre deuxième carte. »**'
+          'Votre deuxième carte.'
       });
 
       await sleep(DEAL_STEP_MS);
 
-      state.dealer.push(
-        drawCard(state.deck)
-      );
+      state.dealer.push(drawCard(state.deck));
       await editGame({
         statusText:
-          '🎩 **Une carte reste face cachée. Faites votre choix.**'
+          'Une carte reste cachée. Faites votre choix.'
       });
 
       const hasInitialNatural =
-        isNaturalBlackjack(
-          state.player
-        ) ||
-        isNaturalBlackjack(
-          state.dealer
-        );
+        isNaturalBlackjack(state.player) ||
+        isNaturalBlackjack(state.dealer);
 
       if (hasInitialNatural) {
         await sleep(ACTION_STEP_MS);
@@ -633,8 +624,8 @@ module.exports = {
       state.busy = false;
 
       await editGame({
-        statusText:
-          '🎩 **« À vous de jouer. »**',
+        statusText: 'À vous de jouer.',
+        visualStatus: 'A TOI DE JOUER',
         controls:
           buildActionRow({
             canDouble: true
@@ -659,24 +650,18 @@ module.exports = {
             'blackjack_hit',
             'blackjack_stand',
             'blackjack_double'
-          ].includes(
-            interaction.customId
-          )
+          ].includes(interaction.customId)
         ) {
           return;
         }
 
-        if (
-          interaction.user.id !==
-          userId
-        ) {
+        if (interaction.user.id !== userId) {
           return interaction.reply({
             ...replyEmbedPayload(
               'Cette table ne vous appartient pas.',
               { type: 'error' }
             ),
-            flags:
-              MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral
           }).catch(() => {});
         }
 
@@ -686,8 +671,7 @@ module.exports = {
               'Cette partie est déjà terminée.',
               { type: 'warning' }
             ),
-            flags:
-              MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral
           }).catch(() => {});
         }
 
@@ -697,14 +681,12 @@ module.exports = {
               'Le croupier termine déjà une animation. Patiente un instant.',
               { type: 'info' }
             ),
-            flags:
-              MessageFlags.Ephemeral
+            flags: MessageFlags.Ephemeral
           }).catch(() => {});
         }
 
         try {
-          await interaction
-            .deferUpdate();
+          await interaction.deferUpdate();
 
           if (
             interaction.customId ===
@@ -722,7 +704,7 @@ module.exports = {
 
             await editGame({
               statusText:
-                '🎩 **« Une carte pour vous... »**',
+                'Une carte pour vous...',
               controls:
                 buildActionRow({
                   canDouble: false,
@@ -737,9 +719,7 @@ module.exports = {
             );
 
             const value =
-              getHandValue(
-                state.player
-              );
+              getHandValue(state.player);
 
             if (value.bust) {
               await finishRound();
@@ -756,13 +736,12 @@ module.exports = {
 
             await editGame({
               statusText:
-                `🎩 **« ${value.total}. Vous tirez encore ou vous restez ? »**`,
+                `${value.total}. Vous tirez encore ou vous restez ?`,
               controls:
                 buildActionRow({
                   canDouble: false
                 })
             });
-
             return;
           }
 
@@ -777,10 +756,8 @@ module.exports = {
                 'Vous pouvez doubler uniquement avec vos deux premières cartes.',
                 { type: 'warning' }
               ),
-              flags:
-                MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral
             }).catch(() => {});
-
             return;
           }
 
@@ -788,7 +765,7 @@ module.exports = {
 
           await editGame({
             statusText:
-              '💰 **Le croupier vérifie votre mise doublée...**',
+              'Le croupier vérifie votre mise doublée...',
             controls:
               buildActionRow({
                 canDouble: false,
@@ -796,15 +773,12 @@ module.exports = {
               })
           });
 
-          const extraStake =
-            state.bet;
-
+          const extraStake = state.bet;
           const increased =
             await increaseGameStake({
               userId,
               guildId,
-              amount:
-                extraStake
+              amount: extraStake
             });
 
           if (!increased) {
@@ -818,19 +792,17 @@ module.exports = {
                   title: '💰 Mise insuffisante'
                 }
               ),
-              flags:
-                MessageFlags.Ephemeral
+              flags: MessageFlags.Ephemeral
             }).catch(() => {});
 
             await editGame({
               statusText:
-                '🎩 **« La mise reste inchangée. À vous de jouer. »**',
+                'La mise reste inchangée. À vous de jouer.',
               controls:
                 buildActionRow({
                   canDouble: true
                 })
             });
-
             return;
           }
 
@@ -844,13 +816,11 @@ module.exports = {
           );
 
           const value =
-            getHandValue(
-              state.player
-            );
+            getHandValue(state.player);
 
           await editGame({
             statusText:
-              `💰 **Mise doublée à ${formatCoins(state.bet)} coins. Une dernière carte : ${value.total}.**`,
+              `Mise doublée à ${formatCoins(state.bet)} coins. Dernière carte : ${value.total}.`,
             controls:
               buildActionRow({
                 canDouble: false,
@@ -876,9 +846,7 @@ module.exports = {
     collector.on(
       'end',
       async (_, reason) => {
-        if (state.finished) {
-          return;
-        }
+        if (state.finished) return;
 
         if (
           reason === 'idle' ||
@@ -891,7 +859,6 @@ module.exports = {
           }).catch(error =>
             abortGame(error)
           );
-
           return;
         }
 

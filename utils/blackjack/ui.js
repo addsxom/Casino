@@ -1,115 +1,54 @@
 const {
   EmbedBuilder,
+  AttachmentBuilder,
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle
 } = require('discord.js');
 
 const {
-  formatAmount
-} = require('../formatAmount.js');
-const {
-  getHandValue
-} = require('./gameRules.js');
+  renderBlackjackTable
+} = require('./tableRenderer.js');
 
-function renderCard(card) {
-  if (!card) return '🂠';
-  return `${card.rank}${card.suit}`;
-}
-
-function renderHand(
-  hand,
-  { hideHoleCard = false } = {}
-) {
-  if (!hand?.length) {
-    return '`—`';
-  }
-
-  const cards = hand.map(
-    (card, index) =>
-      hideHoleCard && index === 1
-        ? '🂠'
-        : renderCard(card)
-  );
-
-  return `\`${cards.join('  ')}\``;
-}
-
-function getDealerValueText(
-  hand,
-  hideHoleCard
-) {
-  if (!hand?.length) return '—';
-
-  if (
-    hideHoleCard &&
-    hand.length > 1
-  ) {
-    return String(
-      getHandValue([hand[0]]).total
-    );
-  }
-
-  return String(
-    getHandValue(hand).total
-  );
-}
-
-function buildTableEmbed(
+function buildTableVisual(
   message,
   state,
-  {
-    revealDealer = false,
-    statusText = null,
-    title = '♠️ BLACKJACK • FORTUNA LOUNGE',
-    color = 0x6b6de6
-  } = {}
+  options = {}
 ) {
-  const playerValue =
-    state.player.length
-      ? getHandValue(state.player).total
-      : '—';
-  const dealerValue =
-    getDealerValueText(
-      state.dealer,
-      !revealDealer
-    );
-  const displayName =
-    message.member?.displayName ||
-    message.author.username;
+  const image = renderBlackjackTable(
+    message,
+    state,
+    options
+  );
+  const attachmentName =
+    `blackjack-${message.author.id}.png`;
 
-  let description =
-    '🎩 **CROUPIER**\n' +
-    `${renderHand(state.dealer, {
-      hideHoleCard: !revealDealer
-    })}\n` +
-    `-# Valeur${revealDealer ? '' : ' visible'} : ${dealerValue}\n\n` +
-    '━━━━━━━━━━━━━━━━━━━━\n\n' +
-    `👤 **${displayName}**\n` +
-    `${renderHand(state.player)}\n` +
-    `-# Valeur : ${playerValue}\n\n` +
-    `💰 **Mise :** \`${formatAmount(state.bet)} coins\``;
-
-  if (state.doubled) {
-    description += '\n-# Mise doublée';
-  }
-
-  if (statusText) {
-    description += `\n\n${statusText}`;
-  }
-
-  return new EmbedBuilder()
-    .setTitle(title)
-    .setDescription(description)
-    .setColor(color)
+  const embed = new EmbedBuilder()
+    .setColor(
+      options.color ||
+      0x6b6de6
+    )
+    .setImage(
+      `attachment://${attachmentName}`
+    )
     .setFooter({
       text:
-        'Blackjack • Le croupier reste à 17 • Blackjack naturel 3:2',
+        'Fortuna Lounge • Blackjack • Croupier à 17 • Blackjack 3:2',
       iconURL:
         message.client.user.displayAvatarURL({
           dynamic: true
         })
     });
+
+  return {
+    embed,
+    file: new AttachmentBuilder(
+      image,
+      {
+        name: attachmentName
+      }
+    )
+  };
 }
 
 function buildActionRow({
@@ -143,8 +82,6 @@ function buildActionRow({
 }
 
 module.exports = {
-  renderCard,
-  renderHand,
-  buildTableEmbed,
+  buildTableVisual,
   buildActionRow
 };
