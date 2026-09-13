@@ -16,7 +16,8 @@ const activeGameSessionSchema =
       enum: [
         'slots',
         'mines',
-        'crash'
+        'crash',
+        'blackjack'
       ]
     },
     refundableAmount: {

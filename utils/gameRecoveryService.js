@@ -150,6 +150,101 @@ async function reserveGameFunds({
   }
 }
 
+async function increaseGameStake({
+  userId,
+  guildId,
+  amount
+}) {
+  amount = normalizeAmount(
+    amount,
+    { allowZero: false }
+  );
+
+  const mongoSession =
+    await mongoose.startSession();
+
+  let result = null;
+
+  try {
+    await mongoSession.withTransaction(
+      async () => {
+        const recovery =
+          await ActiveGameSession
+            .findOne({
+              userId,
+              guildId
+            })
+            .session(mongoSession);
+
+        if (!recovery) {
+          throw new Error(
+            'GAME_RECOVERY_SESSION_MISSING'
+          );
+        }
+
+        const account =
+          await debitBalance({
+            userId,
+            guildId,
+            source: 'coins',
+            amount,
+            session:
+              mongoSession
+          });
+
+        if (!account) {
+          return;
+        }
+
+        const updated =
+          await ActiveGameSession
+            .findOneAndUpdate(
+              {
+                _id:
+                  recovery._id
+              },
+              {
+                $inc: {
+                  refundableAmount:
+                    amount,
+                  originalAmount:
+                    amount
+                }
+              },
+              {
+                new: true,
+                session:
+                  mongoSession
+              }
+            );
+
+        if (!updated) {
+          throw new Error(
+            'GAME_RECOVERY_SESSION_MISSING'
+          );
+        }
+
+        result = {
+          amount,
+          account,
+          refundableAmount:
+            Number(
+              updated.refundableAmount
+            ) || 0,
+          originalAmount:
+            Number(
+              updated.originalAmount
+            ) || 0
+        };
+      }
+    );
+
+    return result;
+  } finally {
+    await mongoSession.endSession();
+  }
+}
+
 async function updateGameRefundAmount({
   userId,
   guildId,
@@ -406,6 +501,7 @@ async function refundInterruptedGameSessions() {
 
 module.exports = {
   reserveGameFunds,
+  increaseGameStake,
   updateGameRefundAmount,
   settleGameSession,
   refundGameSession,

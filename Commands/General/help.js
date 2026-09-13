@@ -25,6 +25,10 @@ const SPECIAL_COMMAND_USAGES = {
     'slot <mise>',
     'slotall'
   ],
+  blackjack: [
+    'blackjack <mise>',
+    'blackjackall'
+  ],
   mines: [
     'mines <mise>',
     'minesall'

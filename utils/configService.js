@@ -91,6 +91,13 @@ const CHANNEL_CONFIGS = {
     scope: 'guild',
     aliases: ['slot']
   },
+  blackjack: {
+    label: 'Blackjack',
+    path: ['channels', 'games', 'blackjack'],
+    type: 'text',
+    scope: 'guild',
+    aliases: ['bj']
+  },
   mines: {
     label: 'Mines',
     path: ['channels', 'games', 'mines'],
